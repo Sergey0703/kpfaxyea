@@ -1,0 +1,155 @@
+// src/webparts/xyea/components/ConvertFilesTable/ConvertFilesTable.module.scss
+
+.convertFilesTable {
+  width: 100%;
+  margin-bottom: 20px;
+
+  .tableHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 10px 0;
+
+    .title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--bodyText, #323130);
+    }
+
+    .addButton {
+      background-color: #0078d4;
+      color: white;
+      border: none;
+      border-radius: 2px;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      
+      &:hover {
+        background-color: #106ebe;
+      }
+
+      &:disabled {
+        background-color: #f3f2f1;
+        color: #a19f9d;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #edebe9;
+    background-color: white;
+
+    .tableHead {
+      background-color: #f8f8f8;
+      
+      .headerCell {
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 1px solid #edebe9;
+        color: #323130;
+      }
+    }
+
+    .tableBody {
+      .tableRow {
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+
+        &:hover {
+          background-color: #f8f8f8;
+        }
+
+        &.expanded {
+          background-color: #deecf9;
+        }
+
+        .tableCell {
+          padding: 12px;
+          border-bottom: 1px solid #edebe9;
+          vertical-align: middle;
+
+          &.expandCell {
+            width: 40px;
+            text-align: center;
+            
+            .expandIcon {
+              transition: transform 0.2s ease;
+              font-size: 12px;
+              color: #605e5c;
+
+              &.expanded {
+                transform: rotate(90deg);
+              }
+            }
+          }
+
+          &.titleCell {
+            font-weight: 500;
+            color: #323130;
+          }
+
+          &.actionsCell {
+            width: 120px;
+            text-align: right;
+
+            .actionButton {
+              background: none;
+              border: none;
+              cursor: pointer;
+              padding: 6px 8px;
+              margin-left: 4px;
+              border-radius: 2px;
+              font-size: 12px;
+              
+              &.editButton {
+                color: #0078d4;
+                &:hover {
+                  background-color: #deecf9;
+                }
+              }
+
+              &.deleteButton {
+                color: #d13438;
+                &:hover {
+                  background-color: #fde7e9;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: #605e5c;
+    font-style: italic;
+  }
+
+  .empty {
+    text-align: center;
+    padding: 40px;
+    color: #605e5c;
+    
+    .emptyMessage {
+      margin-bottom: 16px;
+    }
+  }
+
+  .error {
+    background-color: #fde7e9;
+    border: 1px solid #d13438;
+    border-radius: 2px;
+    padding: 12px;
+    color: #d13438;
+    margin-bottom: 16px;
+  }
+}

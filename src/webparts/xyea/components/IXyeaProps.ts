@@ -1,7 +1,8 @@
+// src/webparts/xyea/components/IXyeaProps.ts
+
+import { WebPartContext } from '@microsoft/sp-webpart-base';
+
 export interface IXyeaProps {
-  description: string;
-  isDarkTheme: boolean;
-  environmentMessage: string;
-  hasTeamsContext: boolean;
+  context: WebPartContext;
   userDisplayName: string;
 }

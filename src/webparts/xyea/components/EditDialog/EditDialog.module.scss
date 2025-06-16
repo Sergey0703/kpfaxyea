@@ -1,0 +1,143 @@
+// src/webparts/xyea/components/EditDialog/EditDialog.module.scss
+
+.dialogOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dialog {
+  background: white;
+  border-radius: 4px;
+  box-shadow: 0 4px 23px rgba(0, 0, 0, 0.2);
+  min-width: 400px;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow: hidden;
+  animation: dialogSlideIn 0.2s ease-out;
+
+  .header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid #edebe9;
+    background-color: #f8f8f8;
+
+    .title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: #323130;
+    }
+  }
+
+  .content {
+    padding: 24px;
+    max-height: 60vh;
+    overflow-y: auto;
+
+    .field {
+      margin-bottom: 16px;
+
+      .label {
+        display: block;
+        margin-bottom: 4px;
+        font-weight: 600;
+        color: #323130;
+        font-size: 14px;
+      }
+
+      .required {
+        color: #d13438;
+      }
+
+      .input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #edebe9;
+        border-radius: 2px;
+        font-size: 14px;
+        box-sizing: border-box;
+        
+        &:focus {
+          outline: none;
+          border-color: #0078d4;
+          box-shadow: 0 0 0 1px #0078d4;
+        }
+
+        &.error {
+          border-color: #d13438;
+          box-shadow: 0 0 0 1px #d13438;
+        }
+      }
+
+      .errorMessage {
+        margin-top: 4px;
+        color: #d13438;
+        font-size: 12px;
+      }
+    }
+  }
+
+  .footer {
+    padding: 16px 24px 20px;
+    border-top: 1px solid #edebe9;
+    background-color: #f8f8f8;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+
+    .button {
+      padding: 8px 16px;
+      border: 1px solid;
+      border-radius: 2px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 400;
+      min-width: 80px;
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      &.primary {
+        background-color: #0078d4;
+        border-color: #0078d4;
+        color: white;
+
+        &:hover:not(:disabled) {
+          background-color: #106ebe;
+          border-color: #106ebe;
+        }
+      }
+
+      &.secondary {
+        background-color: white;
+        border-color: #edebe9;
+        color: #323130;
+
+        &:hover:not(:disabled) {
+          background-color: #f8f8f8;
+          border-color: #c8c6c4;
+        }
+      }
+    }
+  }
+}
+
+@keyframes dialogSlideIn {
+  from {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
