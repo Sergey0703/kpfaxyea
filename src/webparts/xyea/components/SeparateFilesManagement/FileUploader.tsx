@@ -79,7 +79,7 @@ export default class FileUploader extends React.Component<IFileUploaderProps, IF
     // Валидация файла
     const validation = this.validateFile(file);
     if (!validation.isValid) {
-      this.setState({ error: validation.error });
+      this.setState({ error: validation.error || null });
       return;
     }
 
@@ -91,7 +91,9 @@ export default class FileUploader extends React.Component<IFileUploaderProps, IF
     const { acceptedFormats = ['.xlsx', '.xls', '.csv'], maxFileSize = 10 } = this.props;
 
     // Проверка формата
-    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+    const nameParts = file.name.split('.');
+    const fileExtension = nameParts.length > 1 ? '.' + nameParts[nameParts.length - 1].toLowerCase() : '';
+    
     if (!acceptedFormats.some(format => format.toLowerCase() === fileExtension)) {
       return {
         isValid: false,

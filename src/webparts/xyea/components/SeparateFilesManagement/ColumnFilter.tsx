@@ -2,15 +2,11 @@
 
 import * as React from 'react';
 import styles from './ColumnFilter.module.scss';
-import { IColumnFilter, ExcelDataType } from '../../interfaces/ExcelInterfaces';
+import { IColumnFilter, ExcelDataType, IExcelColumn } from '../../interfaces/ExcelInterfaces';
 import { ExcelFilterService } from '../../services/ExcelFilterService';
 
 export interface IColumnFilterProps {
-  column: {
-    name: string;
-    uniqueValues: any[];
-    dataType: ExcelDataType;
-  };
+  column: IExcelColumn;
   filter: IColumnFilter;
   isOpen: boolean;
   onFilterChange: (columnName: string, selectedValues: any[]) => void;
@@ -166,8 +162,8 @@ export default class ColumnFilter extends React.Component<IColumnFilterProps, IC
       return null;
     }
 
-    const { column, filter } = this.props;
-    const { searchTerm, filteredValues, selectedValues, selectAll } = this.state;
+    const { column } = this.props;
+    const { searchTerm, filteredValues, selectedValues } = this.state;
 
     const isAllFilteredSelected = filteredValues.every(value => selectedValues.has(value));
     const isIndeterminate = filteredValues.some(value => selectedValues.has(value)) && !isAllFilteredSelected;

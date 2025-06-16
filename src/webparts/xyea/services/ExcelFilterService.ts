@@ -25,10 +25,10 @@ export class ExcelFilterService {
       const columnValues = sheet.data.map(row => row.data[header]);
       
       // Уникальные значения (исключая пустые)
-      const uniqueValues = [...new Set(columnValues.filter(value => 
-        value !== null && value !== undefined && value !== ''
-      ))];
-
+      const uniqueValuesSet = new Set(columnValues.filter(value => 
+  value !== null && value !== undefined && value !== ''
+));
+const uniqueValues = Array.from(uniqueValuesSet);
       // Определяем тип данных
       const dataType = ExcelParserService.detectColumnDataType(columnValues);
 

@@ -1,0 +1,295 @@
+// src/webparts/xyea/components/ConfirmationDialog/ConfirmationDialog.module.scss
+
+.dialogOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.dialog {
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  min-width: 400px;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow: hidden;
+  animation: slideIn 0.3s ease-out;
+
+  .header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid #edebe9;
+
+    .titleContainer {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .icon {
+        font-size: 24px;
+        flex-shrink: 0;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #323130;
+        flex: 1;
+      }
+    }
+  }
+
+  .content {
+    padding: 20px 24px;
+    max-height: 60vh;
+    overflow-y: auto;
+
+    .message {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #605e5c;
+
+      .paragraph {
+        margin: 0 0 12px 0;
+
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+    }
+  }
+
+  .footer {
+    padding: 16px 24px 20px;
+    border-top: 1px solid #edebe9;
+    background-color: #faf9f8;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+
+    .button {
+      padding: 8px 20px;
+      border: 1px solid;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      min-width: 80px;
+      transition: all 0.2s ease;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+
+      &:focus {
+        outline: 2px solid #0078d4;
+        outline-offset: 2px;
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .spinner {
+        width: 14px;
+        height: 14px;
+        border: 2px solid transparent;
+        border-top: 2px solid currentColor;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      &.secondary {
+        background-color: white;
+        border-color: #c8c6c4;
+        color: #323130;
+
+        &:hover:not(:disabled) {
+          background-color: #f3f2f1;
+          border-color: #a19f9d;
+        }
+      }
+
+      &.primary {
+        color: white;
+
+        &.warning {
+          background-color: #ca5010;
+          border-color: #ca5010;
+
+          &:hover:not(:disabled) {
+            background-color: #b5460c;
+            border-color: #b5460c;
+          }
+        }
+
+        &.danger {
+          background-color: #d13438;
+          border-color: #d13438;
+
+          &:hover:not(:disabled) {
+            background-color: #a4262c;
+            border-color: #a4262c;
+          }
+        }
+
+        &.info {
+          background-color: #0078d4;
+          border-color: #0078d4;
+
+          &:hover:not(:disabled) {
+            background-color: #106ebe;
+            border-color: #106ebe;
+          }
+        }
+
+        &.success {
+          background-color: #107c10;
+          border-color: #107c10;
+
+          &:hover:not(:disabled) {
+            background-color: #0e6e0e;
+            border-color: #0e6e0e;
+          }
+        }
+      }
+    }
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-30px) scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Scrollbar styling for content
+.content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.content::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .dialog {
+    min-width: 320px;
+    max-width: 90vw;
+    margin: 20px;
+
+    .header {
+      padding: 16px 20px 12px;
+
+      .titleContainer {
+        gap: 8px;
+
+        .icon {
+          font-size: 20px;
+        }
+
+        .title {
+          font-size: 16px;
+        }
+      }
+    }
+
+    .content {
+      padding: 16px 20px;
+
+      .message {
+        font-size: 13px;
+      }
+    }
+
+    .footer {
+      padding: 12px 20px 16px;
+      flex-direction: column-reverse;
+      gap: 8px;
+
+      .button {
+        width: 100%;
+        padding: 10px 16px;
+      }
+    }
+  }
+}
+
+// High contrast mode support
+@media (prefers-contrast: high) {
+  .dialog {
+    border: 2px solid #000;
+  }
+
+  .button {
+    &.primary {
+      &.warning,
+      &.danger,
+      &.info,
+      &.success {
+        border-width: 2px;
+      }
+    }
+  }
+}
+
+// Reduced motion support
+@media (prefers-reduced-motion: reduce) {
+  .dialogOverlay,
+  .dialog {
+    animation: none;
+  }
+
+  .button {
+    transition: none;
+  }
+
+  .spinner {
+    animation: none;
+  }
+}

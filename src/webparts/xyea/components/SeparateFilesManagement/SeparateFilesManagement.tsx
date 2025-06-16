@@ -4,11 +4,6 @@ import * as React from 'react';
 import styles from './SeparateFilesManagement.module.scss';
 import { IXyeaProps } from '../IXyeaProps';
 import { 
-  IExcelFile, 
-  IExcelSheet, 
-  IExcelColumn, 
-  IFilterState, 
-  IUploadProgress, 
   IExportSettings,
   ISeparateFilesState,
   UploadStage,
@@ -17,6 +12,11 @@ import {
 import { ExcelParserService } from '../../services/ExcelParserService';
 import { ExcelFilterService } from '../../services/ExcelFilterService';
 import { ExcelExportService } from '../../services/ExcelExportService';
+import { 
+  ConfirmationDialog, 
+  IConfirmationDialogConfig, 
+  ConfirmationDialogHelper 
+} from '../ConfirmationDialog';
 import FileUploader from './FileUploader';
 import ExcelDataTable from './ExcelDataTable';
 
@@ -25,7 +25,15 @@ export interface ISeparateFilesManagementProps {
   userDisplayName: string;
 }
 
-export default class SeparateFilesManagement extends React.Component<ISeparateFilesManagementProps, ISeparateFilesState> {
+// Расширяем интерфейс состояния с подтверждением
+interface ISeparateFilesManagementState extends ISeparateFilesState {
+  showConfirmDialog: boolean;
+  confirmDialogConfig: IConfirmationDialogConfig;
+  confirmDialogLoading: boolean;
+  confirmDialogAction: 'loadNewFile' | 'clearFilters' | null;
+}
+
+export default class SeparateFilesManagement extends React.Component<ISeparateFilesManagementProps, ISeparateFilesManagementState> {
   
   constructor(props: ISeparateFilesManagementProps) {
     super(props);
@@ -65,7 +73,17 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
         includeHeaders: true,
         onlyVisibleColumns: true,
         fileFormat: ExportFormat.XLSX
-      }
+      },
+      // Диалог подтверждения
+      showConfirmDialog: false,
+      confirmDialogConfig: {
+        title: '',
+        message: '',
+        confirmText: 'Confirm',
+        type: 'warning'
+      },
+      confirmDialogLoading: false,
+      confirmDialogAction: null
     };
   }
 
@@ -154,9 +172,11 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
   }
 
   private handleFilterChange = (columnName: string, selectedValues: any[]): void => {
-    const { filterState, currentSheet } = this.state;
+    const { filterState, uploadedFile } = this.state;
 
-    if (!currentSheet) return;
+    if (!uploadedFile) return;
+
+    const originalSheet = uploadedFile.sheets[0];
 
     // Обновляем состояние фильтра
     const updatedFilterState = ExcelFilterService.updateColumnFilter(
@@ -165,9 +185,9 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
       selectedValues
     );
 
-    // Применяем фильтры к данным
+    // Применяем фильтры к оригинальным данным
     const { filteredSheet, statistics } = ExcelFilterService.applyFilters(
-      currentSheet,
+      originalSheet,
       updatedFilterState
     );
 
@@ -211,13 +231,156 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
     console.log('[SeparateFilesManagement] All filters cleared');
   }
 
+  private handleClearFiltersClick = (): void => {
+    const { filterState } = this.state;
+    const activeFiltersCount = Object.values(filterState.filters).filter(f => f.isActive).length;
+
+    if (activeFiltersCount === 0) {
+      return; // Нет активных фильтров
+    }
+
+    if (activeFiltersCount <= 2) {
+      // Для малого количества фильтров - очищаем сразу
+      this.handleClearFilters();
+      return;
+    }
+
+    // Для большого количества фильтров - показываем подтверждение
+    const config = ConfirmationDialogHelper.createClearFiltersConfirmation(activeFiltersCount);
+    
+    this.setState({
+      showConfirmDialog: true,
+      confirmDialogConfig: {
+        ...config,
+        confirmText: 'Clear All Filters'
+      },
+      confirmDialogAction: 'clearFilters'
+    });
+  }
+
+  private handleLoadNewFileClick = (): void => {
+    const { uploadedFile, filterState } = this.state;
+
+    if (!uploadedFile) {
+      this.clearFileState();
+      return;
+    }
+
+    // Собираем информацию о текущих данных
+    const hasActiveFilters = filterState.isAnyFilterActive;
+    const hasData = uploadedFile.sheets[0]?.totalRows > 0;
+    const activeFiltersCount = Object.values(filterState.filters).filter(f => f.isActive).length;
+
+    let config: IConfirmationDialogConfig;
+
+    if (hasData && hasActiveFilters) {
+      // Данные с активными фильтрами
+      const currentDataInfo = `You have ${activeFiltersCount} active filter${activeFiltersCount > 1 ? 's' : ''} applied to ${filterState.filteredRows} of ${filterState.totalRows} rows.`;
+      config = ConfirmationDialogHelper.createReplaceDataConfirmation(
+        currentDataInfo,
+        'Loading a new file'
+      );
+      config.type = 'danger'; // Более серьезное предупреждение
+      config.confirmText = 'Yes, Replace Data';
+    } else if (hasData) {
+      // Данные без фильтров
+      const currentDataInfo = `You have ${filterState.totalRows} rows of data loaded.`;
+      config = ConfirmationDialogHelper.createReplaceDataConfirmation(
+        currentDataInfo,
+        'Loading a new file'
+      );
+    } else {
+      // Нет данных - просто очищаем
+      this.clearFileState();
+      return;
+    }
+
+    this.setState({
+      showConfirmDialog: true,
+      confirmDialogConfig: config,
+      confirmDialogAction: 'loadNewFile'
+    });
+  }
+
+  private handleConfirmAction = (): void => {
+    const { confirmDialogAction } = this.state;
+    
+    this.setState({ confirmDialogLoading: true });
+    
+    // Имитируем небольшую задержку для UX
+    setTimeout(() => {
+      switch (confirmDialogAction) {
+        case 'loadNewFile':
+          this.clearFileState();
+          break;
+        case 'clearFilters':
+          this.handleClearFilters();
+          break;
+      }
+      
+      this.setState({ 
+        showConfirmDialog: false,
+        confirmDialogLoading: false,
+        confirmDialogAction: null
+      });
+    }, 200);
+  }
+
+  private handleCancelConfirmation = (): void => {
+    this.setState({ 
+      showConfirmDialog: false,
+      confirmDialogAction: null
+    });
+  }
+
+  private clearFileState = (): void => {
+    this.setState({
+      uploadedFile: null,
+      currentSheet: null,
+      columns: [],
+      error: null,
+      filterState: {
+        filters: {},
+        totalRows: 0,
+        filteredRows: 0,
+        isAnyFilterActive: false
+      },
+      currentPage: 1,
+      exportSettings: {
+        fileName: '',
+        includeHeaders: true,
+        onlyVisibleColumns: true,
+        fileFormat: ExportFormat.XLSX
+      }
+    });
+  }
+
   private handleExport = async (): Promise<void> => {
-    const { uploadedFile, currentSheet, filterState, exportSettings } = this.state;
+    const { uploadedFile, currentSheet } = this.state;
 
     if (!uploadedFile || !currentSheet) {
       this.setState({ error: 'No data to export' });
       return;
     }
+
+    // Проверяем размер экспорта
+    const visibleRows = currentSheet.data.filter(row => row.isVisible).length;
+    if (visibleRows > 10000) {
+      const config = ConfirmationDialogHelper.createLargeExportConfirmation(visibleRows);
+      this.setState({
+        showConfirmDialog: true,
+        confirmDialogConfig: config
+      });
+      return;
+    }
+
+    this.performExport();
+  }
+
+  private performExport = async (): Promise<void> => {
+    const { uploadedFile, currentSheet, filterState, exportSettings } = this.state;
+
+    if (!uploadedFile || !currentSheet) return;
 
     this.setState({ isExporting: true, error: null });
 
@@ -281,7 +444,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
         columns={columns}
         filterState={filterState}
         onFilterChange={this.handleFilterChange}
-        onClearFilters={this.handleClearFilters}
+        onClearFilters={this.handleClearFiltersClick}
         loading={loading}
         pageSize={this.state.userPreferences.pageSize}
       />
@@ -369,7 +532,14 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
   }
 
   public render(): React.ReactElement<ISeparateFilesManagementProps> {
-    const { loading, error, uploadedFile } = this.state;
+    const { 
+      loading, 
+      error, 
+      uploadedFile, 
+      showConfirmDialog, 
+      confirmDialogConfig, 
+      confirmDialogLoading 
+    } = this.state;
 
     return (
       <section className={styles.separateFilesManagement}>
@@ -402,12 +572,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
                 </h2>
                 <button
                   className={styles.newFileButton}
-                  onClick={() => this.setState({
-                    uploadedFile: null,
-                    currentSheet: null,
-                    columns: [],
-                    error: null
-                  })}
+                  onClick={this.handleLoadNewFileClick}
                   disabled={loading}
                 >
                   📂 Load New File
@@ -418,6 +583,19 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
               {this.renderExportControls()}
             </div>
           )}
+
+          <ConfirmationDialog
+            isOpen={showConfirmDialog}
+            title={confirmDialogConfig.title}
+            message={confirmDialogConfig.message}
+            confirmText={confirmDialogConfig.confirmText}
+            cancelText={confirmDialogConfig.cancelText || 'Cancel'}
+            type={confirmDialogConfig.type}
+            showIcon={confirmDialogConfig.showIcon}
+            loading={confirmDialogLoading}
+            onConfirm={this.handleConfirmAction}
+            onCancel={this.handleCancelConfirmation}
+          />
         </div>
       </section>
     );
