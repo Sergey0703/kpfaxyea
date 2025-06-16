@@ -270,14 +270,14 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
     const { expandedRows } = this.state;
     
     if (expandedRows.includes(convertFileId)) {
-      // Закрыть строку
+      // Закрыть строку - убрать все раскрытые строки
       this.setState({
-        expandedRows: expandedRows.filter(id => id !== convertFileId)
+        expandedRows: []
       });
     } else {
-      // Открыть строку
+      // Открыть только эту строку - заменить все раскрытые строки на эту одну
       this.setState({
-        expandedRows: [...expandedRows, convertFileId]
+        expandedRows: [convertFileId]
       });
     }
   }

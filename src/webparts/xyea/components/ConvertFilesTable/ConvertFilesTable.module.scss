@@ -67,6 +67,11 @@
 
         &.expanded {
           background-color: #deecf9;
+          border-left: 4px solid #0078d4;
+          
+          .tableCell {
+            font-weight: 500;
+          }
         }
 
         .tableCell {

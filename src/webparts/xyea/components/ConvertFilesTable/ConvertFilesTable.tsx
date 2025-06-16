@@ -104,11 +104,6 @@ export default class ConvertFilesTable extends React.Component<IConvertFilesTabl
                     <span className={`${styles.expandIcon} ${this.isRowExpanded(item.Id) ? styles.expanded : ''}`}>
                       ▶
                     </span>
-                    {this.isRowExpanded(item.Id) && (
-                      <span style={{ fontSize: '10px', color: 'green', marginLeft: '4px' }}>
-                        (opened)
-                      </span>
-                    )}
                   </td>
                   <td className={styles.tableCell}>{item.Id}</td>
                   <td className={`${styles.tableCell} ${styles.titleCell}`}>{item.Title}</td>
