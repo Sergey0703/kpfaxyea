@@ -1,0 +1,64 @@
+// src/webparts/xyea/components/SeparateFilesManagement/SeparateFilesManagement.module.scss
+
+.separateFilesManagement {
+  padding: 20px;
+  background-color: #ffffff;
+  min-height: 400px;
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: #323130;
+  }
+
+  .error {
+    background-color: #fde7e9;
+    border: 1px solid #d13438;
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    color: #d13438;
+  }
+
+  .loading {
+    text-align: center;
+    padding: 60px 20px;
+    color: #605e5c;
+    font-style: italic;
+  }
+
+  .placeholder {
+    text-align: center;
+    padding: 60px 20px;
+    color: #605e5c;
+
+    .placeholderIcon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #323130;
+      margin-bottom: 12px;
+    }
+
+    p {
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 8px;
+      
+      &:last-child {
+        font-weight: 600;
+        color: #0078d4;
+      }
+    }
+  }
+}

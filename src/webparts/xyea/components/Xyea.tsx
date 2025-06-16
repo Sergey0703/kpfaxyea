@@ -9,6 +9,8 @@ import ConvertFilesTable from './ConvertFilesTable/ConvertFilesTable';
 import ConvertFilesPropsTable from './ConvertFilesPropsTable/ConvertFilesPropsTable';
 import EditDialog from './EditDialog/EditDialog';
 import EditPropsDialog from './EditDialog/EditPropsDialog';
+import Tabs, { ITabItem } from './Tabs/Tabs';
+import SeparateFilesManagement from './SeparateFilesManagement/SeparateFilesManagement';
 
 export interface IXyeaState {
   convertFiles: IConvertFile[];
@@ -300,59 +302,86 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
       propsDialogLoading
     } = this.state;
 
+    // Создаем контент для первой вкладки (Convert Files)
+    const convertFilesContent = (
+      <>
+        {error && (
+          <div className={styles.error}>
+            <strong>Error:</strong> {error}
+            <button 
+              className={styles.retryButton}
+              onClick={this.loadData}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        <ConvertFilesTable
+          context={this.props.context}
+          convertFiles={convertFiles}
+          loading={loading}
+          onAdd={this.handleAddConvertFile}
+          onEdit={this.handleEditConvertFile}
+          onDelete={this.handleDeleteConvertFile}
+          onRowClick={this.handleRowClick}
+          expandedRows={expandedRows}
+        />
+
+        {/* Показать подчиненные таблицы для раскрытых строк */}
+        {expandedRows.map(convertFileId => {
+          const convertFile = convertFiles.find(cf => cf.Id === convertFileId);
+          const propsForFile = convertFilesProps.filter(cfp => cfp.ConvertFilesID === convertFileId);
+          
+          if (!convertFile) return null;
+
+          return (
+            <ConvertFilesPropsTable
+              key={convertFileId}
+              context={this.props.context}
+              convertFileId={convertFileId}
+              convertFileTitle={convertFile.Title}
+              items={propsForFile}
+              allItems={convertFilesProps}
+              loading={loading}
+              onAdd={this.handleAddConvertFileProp}
+              onEdit={this.handleEditConvertFileProp}
+              onDelete={() => {}} // Не используется, используем onToggleDeleted
+              onMoveUp={this.handleMoveUp}
+              onMoveDown={this.handleMoveDown}
+              onToggleDeleted={this.handleToggleDeleted}
+            />
+          );
+        })}
+      </>
+    );
+
+    // Создаем элементы вкладок
+    const tabItems: ITabItem[] = [
+      {
+        key: 'convert-files',
+        label: 'Convert Files Management',
+        content: convertFilesContent
+      },
+      {
+        key: 'separate-files',
+        label: 'Separate Files Management',
+        content: (
+          <SeparateFilesManagement
+            context={this.props.context}
+            userDisplayName={this.props.userDisplayName}
+          />
+        )
+      }
+    ];
+
     return (
       <section className={styles.xyea}>
         <div className={styles.container}>
-          <h1 className={styles.title}>Convert Files Management</h1>
-          
-          {error && (
-            <div className={styles.error}>
-              <strong>Error:</strong> {error}
-              <button 
-                className={styles.retryButton}
-                onClick={this.loadData}
-              >
-                Retry
-              </button>
-            </div>
-          )}
-
-          <ConvertFilesTable
-            context={this.props.context}
-            convertFiles={convertFiles}
-            loading={loading}
-            onAdd={this.handleAddConvertFile}
-            onEdit={this.handleEditConvertFile}
-            onDelete={this.handleDeleteConvertFile}
-            onRowClick={this.handleRowClick}
-            expandedRows={expandedRows}
+          <Tabs
+            items={tabItems}
+            defaultActiveKey="convert-files"
           />
-
-          {/* Показать подчиненные таблицы для раскрытых строк */}
-          {expandedRows.map(convertFileId => {
-            const convertFile = convertFiles.find(cf => cf.Id === convertFileId);
-            const propsForFile = convertFilesProps.filter(cfp => cfp.ConvertFilesID === convertFileId);
-            
-            if (!convertFile) return null;
-
-            return (
-              <ConvertFilesPropsTable
-                key={convertFileId}
-                context={this.props.context}
-                convertFileId={convertFileId}
-                convertFileTitle={convertFile.Title}
-                items={propsForFile}
-                allItems={convertFilesProps}
-                loading={loading}
-                onAdd={this.handleAddConvertFileProp}
-                onEdit={this.handleEditConvertFileProp}
-                onDelete={() => {}} // Не используется, используем onToggleDeleted
-                onMoveUp={this.handleMoveUp}
-                onMoveDown={this.handleMoveDown}
-                onToggleDeleted={this.handleToggleDeleted}
-              />
-            );
-          })}
 
           <EditDialog
             isOpen={dialogOpen}

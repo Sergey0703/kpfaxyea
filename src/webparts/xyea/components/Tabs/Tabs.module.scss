@@ -1,0 +1,55 @@
+// src/webparts/xyea/components/Tabs/Tabs.module.scss
+
+.tabs {
+  width: 100%;
+  
+  .tabsHeader {
+    display: flex;
+    border-bottom: 2px solid #edebe9;
+    margin-bottom: 15px;
+    background-color: #faf9f8;
+    border-radius: 4px 4px 0 0;
+    
+    .tabButton {
+      background: none;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      color: #605e5c;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s ease;
+      min-width: 200px;
+      
+      &:hover {
+        background-color: #f3f2f1;
+        color: #323130;
+      }
+      
+      &.active {
+        color: #0078d4;
+        border-bottom-color: #0078d4;
+        background-color: white;
+        
+        &:hover {
+          background-color: white;
+        }
+      }
+      
+      &:first-child {
+        border-radius: 4px 0 0 0;
+      }
+      
+      &:last-child {
+        border-radius: 0 4px 0 0;
+      }
+    }
+  }
+  
+  .tabsContent {
+    background-color: white;
+    border-radius: 0 0 4px 4px;
+    min-height: 400px;
+  }
+}

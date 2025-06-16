@@ -10,7 +10,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
+    padding: 8px 16px;
     background-color: #deecf9;
     border-bottom: 1px solid #c7e0f4;
 
@@ -50,7 +50,7 @@
       background-color: #f3f2f1;
       
       .headerCell {
-        padding: 8px 12px;
+        padding: 6px 10px;
         text-align: left;
         font-weight: 600;
         font-size: 12px;
@@ -76,7 +76,7 @@
         }
 
         .tableCell {
-          padding: 8px 12px;
+          padding: 6px 10px;
           border-bottom: 1px solid #edebe9;
           vertical-align: middle;
           font-size: 12px;
@@ -129,13 +129,13 @@
               background: none;
               border: 1px solid transparent;
               cursor: pointer;
-              padding: 6px 10px;
-              margin-left: 3px;
+              padding: 3px 6px;
+              margin-left: 2px;
               border-radius: 4px;
-              font-size: 11px;
+              font-size: 10px;
               font-weight: 600;
-              min-width: 32px;
-              height: 28px;
+              min-width: 24px;
+              height: 20px;
               display: inline-flex;
               align-items: center;
               justify-content: center;
