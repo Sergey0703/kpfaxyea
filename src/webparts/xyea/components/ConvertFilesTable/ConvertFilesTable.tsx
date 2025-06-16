@@ -119,14 +119,14 @@ export default class ConvertFilesTable extends React.Component<IConvertFilesTabl
                       onClick={(e) => this.handleEdit(e, item)}
                       title="Edit"
                     >
-                      ✏️ Edit
+                      Edit
                     </button>
                     <button 
                       className={`${styles.actionButton} ${styles.deleteButton}`}
                       onClick={(e) => this.handleDelete(e, item.Id)}
                       title="Delete"
                     >
-                      🗑️ Delete
+                      Delete
                     </button>
                   </td>
                 </tr>

@@ -21,13 +21,20 @@ export class PriorityHelper {
     return [...items].sort((a: IConvertFileProps, b: IConvertFileProps) => a.Priority - b.Priority);
   }
 
-  // Переместить элемент вверх (уменьшить приоритет)
+  // Переместить элемент вверх (уменьшить приоритет) - работает со ВСЕМИ элементами
   public static moveUp(items: IConvertFileProps[], itemId: number): { 
     updatedItems: IConvertFileProps[], 
     itemsToUpdate: Array<{ id: number, priority: number }> 
   } {
     const sortedItems = this.sortByPriority(items);
-    const currentIndex = sortedItems.findIndex((item: IConvertFileProps) => item.Id === itemId);
+    let currentIndex = -1;
+    
+    for (let i = 0; i < sortedItems.length; i++) {
+      if (sortedItems[i].Id === itemId) {
+        currentIndex = i;
+        break;
+      }
+    }
     
     if (currentIndex <= 0) {
       // Элемент уже первый или не найден
@@ -51,13 +58,20 @@ export class PriorityHelper {
     };
   }
 
-  // Переместить элемент вниз (увеличить приоритет)
+  // Переместить элемент вниз (увеличить приоритет) - работает со ВСЕМИ элементами
   public static moveDown(items: IConvertFileProps[], itemId: number): { 
     updatedItems: IConvertFileProps[], 
     itemsToUpdate: Array<{ id: number, priority: number }> 
   } {
     const sortedItems = this.sortByPriority(items);
-    const currentIndex = sortedItems.findIndex((item: IConvertFileProps) => item.Id === itemId);
+    let currentIndex = -1;
+    
+    for (let i = 0; i < sortedItems.length; i++) {
+      if (sortedItems[i].Id === itemId) {
+        currentIndex = i;
+        break;
+      }
+    }
     
     if (currentIndex < 0 || currentIndex >= sortedItems.length - 1) {
       // Элемент последний или не найден
@@ -106,23 +120,35 @@ export class PriorityHelper {
     };
   }
 
-  // Проверить, можно ли переместить элемент вверх
+  // Проверить, можно ли переместить элемент вверх - работает со ВСЕМИ элементами
   public static canMoveUp(items: IConvertFileProps[], itemId: number, convertFilesId: number): boolean {
     const filteredItems = items
-      .filter((item: IConvertFileProps) => item.ConvertFilesID === convertFilesId && !item.IsDeleted)
+      .filter((item: IConvertFileProps) => item.ConvertFilesID === convertFilesId)
       .sort((a: IConvertFileProps, b: IConvertFileProps) => a.Priority - b.Priority);
     
-    const currentIndex = filteredItems.findIndex((item: IConvertFileProps) => item.Id === itemId);
+    let currentIndex = -1;
+    for (let i = 0; i < filteredItems.length; i++) {
+      if (filteredItems[i].Id === itemId) {
+        currentIndex = i;
+        break;
+      }
+    }
     return currentIndex > 0;
   }
 
-  // Проверить, можно ли переместить элемент вниз
+  // Проверить, можно ли переместить элемент вниз - работает со ВСЕМИ элементами
   public static canMoveDown(items: IConvertFileProps[], itemId: number, convertFilesId: number): boolean {
     const filteredItems = items
-      .filter((item: IConvertFileProps) => item.ConvertFilesID === convertFilesId && !item.IsDeleted)
+      .filter((item: IConvertFileProps) => item.ConvertFilesID === convertFilesId)
       .sort((a: IConvertFileProps, b: IConvertFileProps) => a.Priority - b.Priority);
     
-    const currentIndex = filteredItems.findIndex((item: IConvertFileProps) => item.Id === itemId);
+    let currentIndex = -1;
+    for (let i = 0; i < filteredItems.length; i++) {
+      if (filteredItems[i].Id === itemId) {
+        currentIndex = i;
+        break;
+      }
+    }
     return currentIndex >= 0 && currentIndex < filteredItems.length - 1;
   }
 }

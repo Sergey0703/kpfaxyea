@@ -24,10 +24,11 @@ export class ConvertFilesPropsService {
         'ConvertFilesIDId asc, Priority asc'
       );
 
-      // Маппинг ConvertFilesIDId в ConvertFilesID
+      // Маппинг ConvertFilesIDId в ConvertFilesID и IsDeleted в boolean
       return items.map((item: any) => ({
         ...item,
-        ConvertFilesID: item.ConvertFilesIDId
+        ConvertFilesID: item.ConvertFilesIDId,
+        IsDeleted: item.IsDeleted === 1
       }));
     } catch (error) {
       console.error('Error getting convert files props:', error);
@@ -46,10 +47,11 @@ export class ConvertFilesPropsService {
         'Priority asc'
       );
 
-      // Маппинг ConvertFilesIDId в ConvertFilesID
+      // Маппинг ConvertFilesIDId в ConvertFilesID и IsDeleted в boolean
       return items.map((item: any) => ({
         ...item,
-        ConvertFilesID: item.ConvertFilesIDId
+        ConvertFilesID: item.ConvertFilesIDId,
+        IsDeleted: item.IsDeleted === 1
       }));
     } catch (error) {
       console.error(`Error getting convert files props for ${convertFilesId}:`, error);
@@ -66,10 +68,11 @@ export class ConvertFilesPropsService {
         'Id,Title,ConvertFilesIDId,Prop,Prop2,IsDeleted,Priority,Created,Modified'
       );
 
-      // Маппинг ConvertFilesIDId в ConvertFilesID
+      // Маппинг ConvertFilesIDId в ConvertFilesID и IsDeleted в boolean
       return {
         ...item,
-        ConvertFilesID: item.ConvertFilesIDId
+        ConvertFilesID: item.ConvertFilesIDId,
+        IsDeleted: item.IsDeleted === 1
       };
     } catch (error) {
       console.error(`Error getting convert file prop ${id}:`, error);
@@ -86,35 +89,49 @@ export class ConvertFilesPropsService {
     allItems?: IConvertFileProps[]
   ): Promise<IConvertFileProps> {
     try {
+      // Если не передан массив всех элементов, получаем их
+      if (!allItems) {
+        allItems = await this.getAllConvertFilesProps();
+      }
+
+      // Вычисляем следующий приоритет
+      const nextPriority = PriorityHelper.getNextPriority(allItems, convertFilesId);
+
       // Сначала создаем с основными полями
       const basicItem = {
         Title: title,
         Prop: prop,
-        Prop2: prop2
+        Prop2: prop2,
+        Priority: nextPriority,
+        IsDeleted: 0  // Используем 0 для SharePoint (false)
       };
 
-      console.log('Creating ConvertFileProps with basic fields only:', basicItem);
+      console.log('Creating ConvertFileProps with all fields:', basicItem);
       const createdItem = await this.spService.createListItem<any>(this.LIST_NAME, basicItem);
-      console.log('Created item with basic fields:', createdItem);
+      console.log('Created item:', createdItem);
 
       // Теперь попробуем обновить с Lookup полем
       const itemId = createdItem.Id;
       
       try {
-        // Попробуем разные варианты Lookup поля при обновлении
         console.log('Trying to update with ConvertFilesIDId...');
         const updateData1 = {
           ConvertFilesIDId: convertFilesId
         };
         
-        await this.spService.updateListItem(this.LIST_NAME, itemId, updateData1);
-        console.log('Successfully updated with ConvertFilesIDId');
+        const updatedItem = await this.spService.updateListItem<any>(this.LIST_NAME, itemId, updateData1);
+        console.log('Successfully updated with ConvertFilesIDId:', updatedItem);
         
         return {
-          ...createdItem,
+          Id: itemId,
+          Title: title,
           ConvertFilesID: convertFilesId,
+          Prop: prop,
+          Prop2: prop2,
+          Priority: nextPriority,
           IsDeleted: false,
-          Priority: 1
+          Created: createdItem.Created,
+          Modified: updatedItem?.Modified || createdItem.Modified
         };
         
       } catch (error1) {
@@ -125,14 +142,19 @@ export class ConvertFilesPropsService {
             ConvertFilesID: convertFilesId
           };
           
-          await this.spService.updateListItem(this.LIST_NAME, itemId, updateData2);
-          console.log('Successfully updated with ConvertFilesID');
+          const updatedItem = await this.spService.updateListItem<any>(this.LIST_NAME, itemId, updateData2);
+          console.log('Successfully updated with ConvertFilesID:', updatedItem);
           
           return {
-            ...createdItem,
+            Id: itemId,
+            Title: title,
             ConvertFilesID: convertFilesId,
+            Prop: prop,
+            Prop2: prop2,
+            Priority: nextPriority,
             IsDeleted: false,
-            Priority: 1
+            Created: createdItem.Created,
+            Modified: updatedItem?.Modified || createdItem.Modified
           };
           
         } catch (error2) {
@@ -140,10 +162,15 @@ export class ConvertFilesPropsService {
           
           // Возвращаем элемент без lookup
           return {
-            ...createdItem,
+            Id: itemId,
+            Title: title,
             ConvertFilesID: 0, // Не удалось установить lookup
+            Prop: prop,
+            Prop2: prop2,
+            Priority: nextPriority,
             IsDeleted: false,
-            Priority: 1
+            Created: createdItem.Created,
+            Modified: createdItem.Modified
           };
         }
       }
@@ -167,7 +194,10 @@ export class ConvertFilesPropsService {
         Prop2: prop2
       };
 
-      return await this.spService.updateListItem<IConvertFileProps>(this.LIST_NAME, id, updateItem);
+      await this.spService.updateListItem<any>(this.LIST_NAME, id, updateItem);
+      
+      // Получаем полную информацию об обновленном элементе
+      return await this.getConvertFilePropById(id);
     } catch (error) {
       console.error(`Error updating convert file prop ${id}:`, error);
       throw error;
@@ -178,10 +208,11 @@ export class ConvertFilesPropsService {
   public async markAsDeleted(id: number): Promise<IConvertFileProps> {
     try {
       const updateItem = {
-        IsDeleted: true
+        IsDeleted: 1  // Используем 1 для SharePoint (true)
       };
 
-      return await this.spService.updateListItem<IConvertFileProps>(this.LIST_NAME, id, updateItem);
+      await this.spService.updateListItem<any>(this.LIST_NAME, id, updateItem);
+      return await this.getConvertFilePropById(id);
     } catch (error) {
       console.error(`Error marking convert file prop ${id} as deleted:`, error);
       throw error;
@@ -192,10 +223,11 @@ export class ConvertFilesPropsService {
   public async restoreDeleted(id: number): Promise<IConvertFileProps> {
     try {
       const updateItem = {
-        IsDeleted: false
+        IsDeleted: 0  // Используем 0 для SharePoint (false)
       };
 
-      return await this.spService.updateListItem<IConvertFileProps>(this.LIST_NAME, id, updateItem);
+      await this.spService.updateListItem<any>(this.LIST_NAME, id, updateItem);
+      return await this.getConvertFilePropById(id);
     } catch (error) {
       console.error(`Error restoring convert file prop ${id}:`, error);
       throw error;

@@ -135,33 +135,29 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
                     {item.Created ? new Date(item.Created).toLocaleDateString() : '-'}
                   </td>
                   <td className={`${styles.tableCell} ${styles.actionsCell}`}>
-                    {!item.IsDeleted && (
-                      <>
-                        <button 
-                          className={`${styles.actionButton} ${styles.moveButton}`}
-                          onClick={() => this.handleMoveUp(item.Id)}
-                          disabled={loading || !this.canMoveUp(item)}
-                          title="Move Up"
-                        >
-                          ↑
-                        </button>
-                        <button 
-                          className={`${styles.actionButton} ${styles.moveButton}`}
-                          onClick={() => this.handleMoveDown(item.Id)}
-                          disabled={loading || !this.canMoveDown(item)}
-                          title="Move Down"
-                        >
-                          ↓
-                        </button>
-                      </>
-                    )}
+                    <button 
+                      className={`${styles.actionButton} ${styles.moveButton}`}
+                      onClick={() => this.handleMoveUp(item.Id)}
+                      disabled={loading || !this.canMoveUp(item)}
+                      title="Move Up"
+                    >
+                      ↑
+                    </button>
+                    <button 
+                      className={`${styles.actionButton} ${styles.moveButton}`}
+                      onClick={() => this.handleMoveDown(item.Id)}
+                      disabled={loading || !this.canMoveDown(item)}
+                      title="Move Down"
+                    >
+                      ↓
+                    </button>
                     <button 
                       className={`${styles.actionButton} ${styles.editButton}`}
                       onClick={() => this.handleEdit(item)}
                       disabled={loading}
                       title="Edit"
                     >
-                      ✏️
+                      Edit
                     </button>
                     {item.IsDeleted ? (
                       <button 
@@ -170,7 +166,7 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
                         disabled={loading}
                         title="Restore"
                       >
-                        ↶
+                        Restore
                       </button>
                     ) : (
                       <button 
@@ -179,7 +175,7 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
                         disabled={loading}
                         title="Mark as Deleted"
                       >
-                        🗑️
+                        Delete
                       </button>
                     )}
                   </td>

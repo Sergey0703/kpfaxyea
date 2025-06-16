@@ -127,12 +127,19 @@
 
             .actionButton {
               background: none;
-              border: none;
+              border: 1px solid transparent;
               cursor: pointer;
-              padding: 4px 6px;
-              margin-left: 2px;
-              border-radius: 2px;
-              font-size: 10px;
+              padding: 6px 10px;
+              margin-left: 3px;
+              border-radius: 4px;
+              font-size: 11px;
+              font-weight: 600;
+              min-width: 32px;
+              height: 28px;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              transition: all 0.2s ease;
               
               &:disabled {
                 opacity: 0.4;
@@ -140,30 +147,54 @@
               }
 
               &.moveButton {
-                color: #0078d4;
+                background-color: #0078d4;
+                color: white;
+                border-color: #0078d4;
+                
                 &:hover:not(:disabled) {
-                  background-color: #deecf9;
+                  background-color: #106ebe;
+                  border-color: #106ebe;
+                  transform: translateY(-1px);
+                  box-shadow: 0 2px 4px rgba(0,120,212,0.3);
                 }
               }
 
               &.editButton {
-                color: #0078d4;
+                background-color: #107c10;
+                color: white;
+                border-color: #107c10;
+                
                 &:hover:not(:disabled) {
-                  background-color: #deecf9;
+                  background-color: #0e6e0e;
+                  border-color: #0e6e0e;
+                  transform: translateY(-1px);
+                  box-shadow: 0 2px 4px rgba(16,124,16,0.3);
                 }
               }
 
               &.deleteButton {
-                color: #d13438;
+                background-color: #d13438;
+                color: white;
+                border-color: #d13438;
+                
                 &:hover:not(:disabled) {
-                  background-color: #fde7e9;
+                  background-color: #a4262c;
+                  border-color: #a4262c;
+                  transform: translateY(-1px);
+                  box-shadow: 0 2px 4px rgba(209,52,56,0.3);
                 }
               }
 
               &.restoreButton {
-                color: #107c10;
+                background-color: #ca5010;
+                color: white;
+                border-color: #ca5010;
+                
                 &:hover:not(:disabled) {
-                  background-color: #dff6dd;
+                  background-color: #b5460c;
+                  border-color: #b5460c;
+                  transform: translateY(-1px);
+                  box-shadow: 0 2px 4px rgba(202,80,16,0.3);
                 }
               }
             }
