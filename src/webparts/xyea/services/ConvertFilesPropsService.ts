@@ -86,79 +86,69 @@ export class ConvertFilesPropsService {
     allItems?: IConvertFileProps[]
   ): Promise<IConvertFileProps> {
     try {
-      // Если не передан массив всех элементов, получаем их
-      if (!allItems) {
-        allItems = await this.getAllConvertFilesProps();
-      }
-
-      // Вычисляем следующий приоритет
-      const nextPriority = PriorityHelper.getNextPriority(allItems, convertFilesId);
-
-      // Попробуем разные варианты поля Lookup
-      const newItem = {
+      // Сначала создаем с основными полями
+      const basicItem = {
         Title: title,
-        ConvertFilesID: convertFilesId, // Попробуем без Id суффикса
         Prop: prop,
-        Prop2: prop2,
-        IsDeleted: false,
-        Priority: nextPriority
+        Prop2: prop2
       };
 
-      console.log('Creating ConvertFileProps with data (attempt 1):', newItem);
+      console.log('Creating ConvertFileProps with basic fields only:', basicItem);
+      const createdItem = await this.spService.createListItem<any>(this.LIST_NAME, basicItem);
+      console.log('Created item with basic fields:', createdItem);
 
+      // Теперь попробуем обновить с Lookup полем
+      const itemId = createdItem.Id;
+      
       try {
-        const createdItem = await this.spService.createListItem<any>(this.LIST_NAME, newItem);
-        console.log('Created item response (attempt 1):', createdItem);
+        // Попробуем разные варианты Lookup поля при обновлении
+        console.log('Trying to update with ConvertFilesIDId...');
+        const updateData1 = {
+          ConvertFilesIDId: convertFilesId
+        };
+        
+        await this.spService.updateListItem(this.LIST_NAME, itemId, updateData1);
+        console.log('Successfully updated with ConvertFilesIDId');
+        
         return {
           ...createdItem,
-          ConvertFilesID: createdItem.ConvertFilesID || convertFilesId
-        };
-      } catch (error1) {
-        console.log('Attempt 1 failed, trying with ConvertFilesIDId...');
-        
-        // Попробуем с Id суффиксом
-        const newItem2 = {
-          Title: title,
-          ConvertFilesIDId: convertFilesId,
-          Prop: prop,
-          Prop2: prop2,
+          ConvertFilesID: convertFilesId,
           IsDeleted: false,
-          Priority: nextPriority
+          Priority: 1
         };
-
-        console.log('Creating ConvertFileProps with data (attempt 2):', newItem2);
+        
+      } catch (error1) {
+        console.log('ConvertFilesIDId update failed, trying ConvertFilesID...');
         
         try {
-          const createdItem = await this.spService.createListItem<any>(this.LIST_NAME, newItem2);
-          console.log('Created item response (attempt 2):', createdItem);
-          return {
-            ...createdItem,
-            ConvertFilesID: createdItem.ConvertFilesIDId || convertFilesId
+          const updateData2 = {
+            ConvertFilesID: convertFilesId
           };
-        } catch (error2) {
-          console.log('Attempt 2 failed, trying with lookup format...');
           
-          // Попробуем формат {results: [id]}
-          const newItem3 = {
-            Title: title,
-            ConvertFilesIDId: { results: [convertFilesId] },
-            Prop: prop,
-            Prop2: prop2,
-            IsDeleted: false,
-            Priority: nextPriority
-          };
-
-          console.log('Creating ConvertFileProps with data (attempt 3):', newItem3);
-          const createdItem = await this.spService.createListItem<any>(this.LIST_NAME, newItem3);
-          console.log('Created item response (attempt 3):', createdItem);
+          await this.spService.updateListItem(this.LIST_NAME, itemId, updateData2);
+          console.log('Successfully updated with ConvertFilesID');
+          
           return {
             ...createdItem,
-            ConvertFilesID: createdItem.ConvertFilesIDId || convertFilesId
+            ConvertFilesID: convertFilesId,
+            IsDeleted: false,
+            Priority: 1
+          };
+          
+        } catch (error2) {
+          console.log('Both lookup update attempts failed. Item created but without lookup.');
+          
+          // Возвращаем элемент без lookup
+          return {
+            ...createdItem,
+            ConvertFilesID: 0, // Не удалось установить lookup
+            IsDeleted: false,
+            Priority: 1
           };
         }
       }
     } catch (error) {
-      console.error('Error creating convert file prop (all attempts failed):', error);
+      console.error('Error creating convert file prop:', error);
       throw error;
     }
   }

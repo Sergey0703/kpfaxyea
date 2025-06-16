@@ -35,7 +35,14 @@ export class SharePointService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`SharePoint API Error Response:`, errorText);
-        throw new Error(`HTTP error! status: ${response.status}, details: ${errorText}`);
+        let errorObj;
+        try {
+          errorObj = JSON.parse(errorText);
+        } catch (e) {
+          errorObj = { message: errorText };
+        }
+        
+        throw new Error(`HTTP error! status: ${response.status}, details: ${errorObj.error?.message?.value || errorObj.error?.message || errorText}`);
       }
 
       const data = await response.json();
