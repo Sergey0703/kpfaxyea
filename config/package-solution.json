@@ -1,0 +1,40 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
+  "solution": {
+    "name": "kpfaxyea-client-side-solution",
+    "id": "60cc03c6-d8ab-40a8-a6d7-51ad4ef2be58",
+    "version": "1.0.0.0",
+    "includeClientSideAssets": true,
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "developer": {
+      "name": "",
+      "websiteUrl": "",
+      "privacyUrl": "",
+      "termsOfUseUrl": "",
+      "mpnId": "Undefined-1.19.0"
+    },
+    "metadata": {
+      "shortDescription": {
+        "default": "kpfaxyea description"
+      },
+      "longDescription": {
+        "default": "kpfaxyea description"
+      },
+      "screenshotPaths": [],
+      "videoUrl": "",
+      "categories": []
+    },
+    "features": [
+      {
+        "title": "kpfaxyea Feature",
+        "description": "The feature that activates elements of the kpfaxyea solution.",
+        "id": "fe977125-e0d6-4e3f-930d-48ff4760b2b3",
+        "version": "1.0.0.0"
+      }
+    ]
+  },
+  "paths": {
+    "zippedPackage": "solution/kpfaxyea.sppkg"
+  }
+}

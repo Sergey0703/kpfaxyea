@@ -1,0 +1,18 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/config.2.0.schema.json",
+  "version": "2.0",
+  "bundles": {
+    "xyea-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/xyea/XyeaWebPart.js",
+          "manifest": "./src/webparts/xyea/XyeaWebPart.manifest.json"
+        }
+      ]
+    }
+  },
+  "externals": {},
+  "localizedResources": {
+    "XyeaWebPartStrings": "lib/webparts/xyea/loc/{locale}.js"
+  }
+}
