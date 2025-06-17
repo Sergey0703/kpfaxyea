@@ -137,17 +137,19 @@
 
           &.propCell {
             color: #605e5c;
+            transition: background-color 0.2s ease;
             
+            // Column validation colors - very light tints with higher specificity
             &.columnValid {
-              background-color: #f8fdf8;
+              background-color: #f8fdf8 !important; // Very light green
             }
             
             &.columnInvalid {
-              background-color: #fef8f8;
+              background-color: #fef8f8 !important; // Very light pink/red
             }
             
             &.columnUnknown {
-              background-color: #fafafa;
+              background-color: #fafafa !important; // Very light gray
             }
           }
 
