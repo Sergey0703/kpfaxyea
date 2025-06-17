@@ -43,6 +43,50 @@
     }
   }
 
+  .progressContainer {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: #f8f9fa;
+    border: 1px solid #107c10;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-top: 4px;
+    font-size: 11px;
+    z-index: 1000;
+    min-width: 300px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+    .progressMessage {
+      color: #107c10;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .progressBar {
+      width: 100%;
+      height: 8px;
+      background-color: #edebe9;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 4px;
+
+      .progressFill {
+        height: 100%;
+        background-color: #107c10;
+        transition: width 0.3s ease;
+        border-radius: 4px;
+      }
+    }
+
+    .progressText {
+      color: #605e5c;
+      font-size: 10px;
+      text-align: center;
+    }
+  }
+
   .error {
     position: absolute;
     top: 100%;

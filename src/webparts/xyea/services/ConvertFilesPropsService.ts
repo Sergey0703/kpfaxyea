@@ -1,4 +1,4 @@
-// src/webparts/xyea/services/ConvertFilesPropsService.ts - Updated with bulk import methods
+// src/webparts/xyea/services/ConvertFilesPropsService.ts
 
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { SharePointService } from './SharePointService';
@@ -55,7 +55,8 @@ export class ConvertFilesPropsService {
         'Id,Title,ConvertFilesIDId,Prop,Prop2,IsDeleted,Priority,Created,Modified',
         undefined,
         undefined,
-        'ConvertFilesIDId asc, Priority asc'
+        'ConvertFilesIDId asc, Priority asc',
+        5000 // Increase limit to 5000 items
       );
 
       // Маппинг ConvertFilesIDId в ConvertFilesID и IsDeleted в boolean
@@ -74,7 +75,8 @@ export class ConvertFilesPropsService {
         'Id,Title,ConvertFilesIDId,Prop,Prop2,IsDeleted,Priority,Created,Modified',
         undefined,
         `ConvertFilesIDId eq ${convertFilesId}`,
-        'Priority asc'
+        'Priority asc',
+        1000 // Increase limit for single ConvertFile
       );
 
       // Маппинг ConvertFilesIDId в ConvertFilesID и IsDeleted в boolean
@@ -120,46 +122,103 @@ export class ConvertFilesPropsService {
       if (existingItems.length > 0) {
         console.log(`[ConvertFilesPropsService] Deleting ${existingItems.length} existing items`);
         
-        // Delete items in batches to avoid overwhelming SharePoint
-        for (const item of existingItems) {
-          await this.deleteConvertFileProp(item.Id);
-        }
-      }
-
-      // Step 2: Create new items from Excel data
-      const createdItems: IConvertFileProps[] = [];
-      
-      for (let i = 0; i < excelData.length; i++) {
-        const data = excelData[i];
-        const priority = i + 1; // Sequential priority starting from 1
-
-        // Generate title from Prop value, fallback to row number
-        const title = data.prop.trim() || `Row ${i + 1}`;
-
-        console.log(`[ConvertFilesPropsService] Creating item ${i + 1}/${excelData.length}:`, {
-          title,
-          prop: data.prop,
-          prop2: data.prop2,
-          priority
-        });
-
-        try {
-          const createdItem = await this.createConvertFilePropDirect(
-            convertFilesId,
-            title,
-            data.prop,
-            data.prop2,
-            priority
-          );
+        // Delete items in parallel batches of 10 to avoid overwhelming SharePoint
+        const deletePromises: Promise<void>[] = [];
+        for (let i = 0; i < existingItems.length; i += 10) {
+          const batch = existingItems.slice(i, i + 10);
+          for (const item of batch) {
+            deletePromises.push(this.deleteConvertFileProp(item.Id));
+          }
           
-          createdItems.push(createdItem);
-        } catch (error) {
-          console.error(`[ConvertFilesPropsService] Failed to create item ${i + 1}:`, error);
-          // Continue with other items even if one fails
+          // Wait for this batch before starting the next
+          if (deletePromises.length >= 10) {
+            await Promise.all(deletePromises);
+            deletePromises.length = 0; // Clear the array
+            
+            // Small delay between batches
+            await this.delay(200);
+          }
+        }
+        
+        // Wait for any remaining deletes
+        if (deletePromises.length > 0) {
+          await Promise.all(deletePromises);
         }
       }
 
-      console.log(`[ConvertFilesPropsService] Excel import completed. Created ${createdItems.length}/${excelData.length} items`);
+      // Step 2: Create new items from Excel data in batches
+      const createdItems: IConvertFileProps[] = [];
+      const batchSize = 5; // Smaller batch size for creation to ensure reliability
+      
+      console.log(`[ConvertFilesPropsService] Creating ${excelData.length} new items in batches of ${batchSize}`);
+      
+      for (let i = 0; i < excelData.length; i += batchSize) {
+        const batch = excelData.slice(i, i + batchSize);
+        const batchPromises: Promise<IConvertFileProps>[] = [];
+        
+        console.log(`[ConvertFilesPropsService] Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(excelData.length / batchSize)}`);
+        
+        for (let j = 0; j < batch.length; j++) {
+          const data = batch[j];
+          const priority = i + j + 1; // Sequential priority across all batches
+
+          // Generate title from Prop value, fallback to row number
+          const title = data.prop.trim() || `Row ${i + j + 1}`;
+
+          console.log(`[ConvertFilesPropsService] Creating item ${i + j + 1}/${excelData.length}:`, {
+            title,
+            prop: data.prop,
+            prop2: data.prop2,
+            priority
+          });
+
+          batchPromises.push(
+            this.createConvertFilePropDirect(
+              convertFilesId,
+              title,
+              data.prop,
+              data.prop2,
+              priority
+            ).catch(error => {
+              console.error(`[ConvertFilesPropsService] Failed to create item ${i + j + 1}:`, error);
+              // Return a placeholder item to maintain count
+              return {
+                Id: -1,
+                Title: title,
+                ConvertFilesID: convertFilesId,
+                Prop: data.prop,
+                Prop2: data.prop2,
+                Priority: priority,
+                IsDeleted: false,
+                Created: undefined,
+                Modified: undefined
+              } as IConvertFileProps;
+            })
+          );
+        }
+        
+        // Wait for this batch to complete
+        const batchResults = await Promise.all(batchPromises);
+        
+        // Add successful items to results (filter out failed ones with Id: -1)
+        const successfulItems = batchResults.filter(item => item.Id !== -1);
+        createdItems.push(...successfulItems);
+        
+        // Log batch progress
+        console.log(`[ConvertFilesPropsService] Batch completed. Created ${successfulItems.length}/${batch.length} items. Total: ${createdItems.length}/${excelData.length}`);
+        
+        // Delay between batches to avoid overwhelming SharePoint
+        if (i + batchSize < excelData.length) {
+          await this.delay(500); // 500ms delay between batches
+        }
+      }
+
+      console.log(`[ConvertFilesPropsService] Excel import completed. Successfully created ${createdItems.length}/${excelData.length} items`);
+      
+      // If we didn't create all items, log the discrepancy
+      if (createdItems.length < excelData.length) {
+        console.warn(`[ConvertFilesPropsService] Warning: Only ${createdItems.length} out of ${excelData.length} items were created successfully`);
+      }
       
       return createdItems;
 
@@ -167,6 +226,11 @@ export class ConvertFilesPropsService {
       console.error('[ConvertFilesPropsService] Excel import failed:', error);
       throw new Error(`Excel import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  // NEW: Utility method for delays
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   // NEW: Direct creation method for bulk operations (bypasses priority calculation)

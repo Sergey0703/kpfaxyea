@@ -24,6 +24,11 @@ export interface IExcelImportButtonState {
   confirmDialogLoading: boolean;
   pendingData: IExcelImportData[] | undefined;
   dialogType: 'initial' | 'final'; // Track which type of dialog we're showing
+  importProgress: {
+    current: number;
+    total: number;
+    message: string;
+  } | undefined;
 }
 
 export default class ExcelImportButton extends React.Component<IExcelImportButtonProps, IExcelImportButtonState> {
@@ -44,7 +49,8 @@ export default class ExcelImportButton extends React.Component<IExcelImportButto
       },
       confirmDialogLoading: false,
       pendingData: undefined,
-      dialogType: 'initial'
+      dialogType: 'initial',
+      importProgress: undefined
     };
 
     this.fileInputRef = React.createRef<HTMLInputElement>();
@@ -271,10 +277,34 @@ export default class ExcelImportButton extends React.Component<IExcelImportButto
 
   private performImport = async (data: IExcelImportData[]): Promise<void> => {
     try {
+      this.setState({ 
+        importProgress: {
+          current: 0,
+          total: data.length,
+          message: 'Starting import...'
+        }
+      });
+
       await this.props.onImport(data);
+      
+      this.setState({ 
+        importProgress: {
+          current: data.length,
+          total: data.length,
+          message: 'Import completed successfully!'
+        }
+      });
+
       console.log('[ExcelImportButton] Import completed successfully');
+      
+      // Clear progress after a short delay
+      setTimeout(() => {
+        this.setState({ importProgress: undefined });
+      }, 2000);
+
     } catch (error) {
       console.error('[ExcelImportButton] Import failed:', error);
+      this.setState({ importProgress: undefined });
       throw error;
     }
   }
@@ -294,7 +324,9 @@ export default class ExcelImportButton extends React.Component<IExcelImportButto
 
   public render(): React.ReactElement<IExcelImportButtonProps> {
     const { disabled } = this.props;
-    const { loading, error, showConfirmDialog, confirmDialogConfig, confirmDialogLoading } = this.state;
+    const { loading, error, showConfirmDialog, confirmDialogConfig, confirmDialogLoading, importProgress } = this.state;
+
+    const isProcessing = loading || confirmDialogLoading || importProgress !== undefined;
 
     return (
       <div className={styles.excelImportButton}>
@@ -304,19 +336,22 @@ export default class ExcelImportButton extends React.Component<IExcelImportButto
           accept=".xlsx,.xls"
           onChange={(e) => { this.handleFileInputChange(e).catch(console.error); }}
           style={{ display: 'none' }}
-          disabled={disabled || loading}
+          disabled={disabled || isProcessing}
         />
 
         <button
           className={styles.importButton}
           onClick={this.handleButtonClick}
-          disabled={disabled || loading}
+          disabled={disabled || isProcessing}
           title="Import properties from Excel file"
         >
-          {loading ? (
+          {isProcessing ? (
             <>
               <span className={styles.spinner} />
-              Processing...
+              {importProgress ? 
+                `Importing... ${importProgress.current}/${importProgress.total}` : 
+                'Processing...'
+              }
             </>
           ) : (
             <>
@@ -324,6 +359,21 @@ export default class ExcelImportButton extends React.Component<IExcelImportButto
             </>
           )}
         </button>
+
+        {importProgress && (
+          <div className={styles.progressContainer}>
+            <div className={styles.progressMessage}>{importProgress.message}</div>
+            <div className={styles.progressBar}>
+              <div 
+                className={styles.progressFill}
+                style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+              />
+            </div>
+            <div className={styles.progressText}>
+              {importProgress.current} of {importProgress.total} items processed
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className={styles.error}>

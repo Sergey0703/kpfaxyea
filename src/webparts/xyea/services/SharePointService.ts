@@ -1,4 +1,4 @@
-// src/webparts/xyea/services/SharePointService.ts
+// src/webparts/xyea/services/SharePointService.ts - Updated to support top parameter
 
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { SPHttpClient, SPHttpClientResponse } from '@microsoft/sp-http';
@@ -14,7 +14,14 @@ export class SharePointService {
   }
 
   // Получить все элементы из списка
-  public async getListItems<T>(listName: string, select?: string, expand?: string, filter?: string, orderBy?: string): Promise<T[]> {
+  public async getListItems<T>(
+    listName: string, 
+    select?: string, 
+    expand?: string, 
+    filter?: string, 
+    orderBy?: string,
+    top?: number // NEW: Add top parameter for limiting results
+  ): Promise<T[]> {
     try {
       let url = `${this.context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('${listName}')/items`;
       
@@ -23,6 +30,7 @@ export class SharePointService {
       if (expand) queryParams.push(`$expand=${encodeURIComponent(expand)}`);
       if (filter) queryParams.push(`$filter=${encodeURIComponent(filter)}`);
       if (orderBy) queryParams.push(`$orderby=${encodeURIComponent(orderBy)}`);
+      if (top) queryParams.push(`$top=${top}`); // Add top parameter
       
       if (queryParams.length > 0) {
         url += `?${queryParams.join('&')}`;
@@ -86,7 +94,7 @@ export class SharePointService {
   }
 
   // Создать новый элемент
-  public async createListItem<T>(listName: string, item: SharePointListItem): Promise<T> { // Use specific type instead of any
+  public async createListItem<T>(listName: string, item: SharePointListItem): Promise<T> {
     try {
       const url = `${this.context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('${listName}')/items`;
       
@@ -115,7 +123,7 @@ export class SharePointService {
   }
 
   // Обновить элемент
-  public async updateListItem<T>(listName: string, id: number, item: SharePointListItem): Promise<T> { // Use specific type instead of any
+  public async updateListItem<T>(listName: string, id: number, item: SharePointListItem): Promise<T> {
     try {
       const url = `${this.context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('${listName}')/items(${id})`;
       
