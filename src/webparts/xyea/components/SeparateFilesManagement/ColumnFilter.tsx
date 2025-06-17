@@ -12,15 +12,17 @@ export interface IColumnFilterProps {
   column: IExcelColumn;
   filter: IColumnFilter;
   isOpen: boolean;
-  onFilterChange: (columnName: string, selectedValues: CellValue[]) => void; // Use specific type instead of any
+  onFilterChange: (columnName: string, selectedValues: CellValue[]) => void;
   onClose: () => void;
 }
 
 export interface IColumnFilterState {
   searchTerm: string;
-  filteredValues: CellValue[]; // Use specific type instead of any
-  selectedValues: Set<CellValue>; // Use specific type instead of any
+  filteredValues: CellValue[];
+  selectedValues: Set<CellValue>;
   selectAll: boolean;
+  position: { top: number; left: number };
+  positionClass: 'positionedBelow' | 'positionedAbove';
 }
 
 export default class ColumnFilter extends React.Component<IColumnFilterProps, IColumnFilterState> {
@@ -33,7 +35,9 @@ export default class ColumnFilter extends React.Component<IColumnFilterProps, IC
       searchTerm: '',
       filteredValues: [...props.column.uniqueValues],
       selectedValues: new Set(props.filter.selectedValues),
-      selectAll: props.filter.selectedValues.length === props.column.uniqueValues.length
+      selectAll: props.filter.selectedValues.length === props.column.uniqueValues.length,
+      position: { top: 0, left: 0 },
+      positionClass: 'positionedBelow'
     };
 
     this.dropdownRef = React.createRef<HTMLDivElement>();
@@ -41,6 +45,7 @@ export default class ColumnFilter extends React.Component<IColumnFilterProps, IC
 
   public componentDidMount(): void {
     document.addEventListener('mousedown', this.handleClickOutside);
+    this.calculatePosition();
   }
 
   public componentWillUnmount(): void {
@@ -54,11 +59,95 @@ export default class ColumnFilter extends React.Component<IColumnFilterProps, IC
         selectAll: this.props.filter.selectedValues.length === this.props.column.uniqueValues.length
       });
     }
+
+    if (this.props.isOpen && !prevProps.isOpen) {
+      // Recalculate position when filter opens
+      setTimeout(() => this.calculatePosition(), 10);
+    }
+  }
+
+  private calculatePosition = (): void => {
+    // Find the filter button that triggered this dropdown
+    const filterButtons = document.querySelectorAll('[data-column-filter]');
+    let triggerButton: HTMLElement | null = null;
+
+    // Find the button for our column - use for loop instead of forEach for better type handling
+    for (let i = 0; i < filterButtons.length; i++) {
+      const button = filterButtons[i];
+      if (button.getAttribute('data-column-filter') === this.props.column.name) {
+        triggerButton = button as HTMLElement;
+        break;
+      }
+    }
+
+    if (!triggerButton) {
+      // Fallback positioning if we can't find the trigger
+      this.setState({
+        position: { top: 100, left: 100 },
+        positionClass: 'positionedBelow'
+      });
+      return;
+    }
+
+    const buttonRect = triggerButton.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    
+    // Dropdown dimensions (approximate)
+    const dropdownHeight = 400;
+    const dropdownWidth = 300;
+
+    // Calculate vertical position
+    const spaceBelow = viewportHeight - buttonRect.bottom;
+    const spaceAbove = buttonRect.top;
+    
+    let top: number;
+    let positionClass: 'positionedBelow' | 'positionedAbove';
+
+    if (spaceBelow >= dropdownHeight || spaceBelow > spaceAbove) {
+      // Position below the button
+      top = buttonRect.bottom + 5;
+      positionClass = 'positionedBelow';
+    } else {
+      // Position above the button
+      top = buttonRect.top - dropdownHeight - 5;
+      positionClass = 'positionedAbove';
+    }
+
+    // Calculate horizontal position
+    let left = buttonRect.left;
+
+    // Ensure dropdown doesn't go off-screen horizontally
+    if (left + dropdownWidth > viewportWidth) {
+      left = viewportWidth - dropdownWidth - 10;
+    }
+    if (left < 10) {
+      left = 10;
+    }
+
+    // Ensure dropdown doesn't go off-screen vertically
+    if (top < 10) {
+      top = 10;
+    }
+    if (top + dropdownHeight > viewportHeight - 10) {
+      top = viewportHeight - dropdownHeight - 10;
+    }
+
+    this.setState({
+      position: { top, left },
+      positionClass
+    });
   }
 
   private handleClickOutside = (event: MouseEvent): void => {
     if (this.dropdownRef.current && !this.dropdownRef.current.contains(event.target as Node)) {
-      this.props.onClose();
+      // Also check if the click was on the filter button to prevent immediate close/open
+      const target = event.target as Element;
+      const isFilterButton = target?.closest('[data-column-filter]');
+      
+      if (!isFilterButton || isFilterButton.getAttribute('data-column-filter') !== this.props.column.name) {
+        this.props.onClose();
+      }
     }
   }
 
@@ -74,13 +163,13 @@ export default class ColumnFilter extends React.Component<IColumnFilterProps, IC
 
   private handleSelectAll = (checked: boolean): void => {
     const { filteredValues } = this.state;
-    const newSelectedValues = new Set(this.state.selectedValues); // Use const instead of let
+    const newSelectedValues = new Set(this.state.selectedValues);
 
     if (checked) {
-      // Добавляем все отфильтрованные значения
+      // Add all filtered values
       filteredValues.forEach(value => newSelectedValues.add(value));
     } else {
-      // Убираем все отфильтрованные значения
+      // Remove all filtered values
       filteredValues.forEach(value => newSelectedValues.delete(value));
     }
 
@@ -90,7 +179,7 @@ export default class ColumnFilter extends React.Component<IColumnFilterProps, IC
     });
   }
 
-  private handleValueToggle = (value: CellValue, checked: boolean): void => { // Use specific type instead of any
+  private handleValueToggle = (value: CellValue, checked: boolean): void => {
     const newSelectedValues = new Set(this.state.selectedValues);
 
     if (checked) {
@@ -129,7 +218,7 @@ export default class ColumnFilter extends React.Component<IColumnFilterProps, IC
     });
   }
 
-  private formatValue = (value: CellValue): string => { // Use specific type instead of any
+  private formatValue = (value: CellValue): string => {
     if (value === undefined || value === '') {
       return '(Empty)';
     }
@@ -160,19 +249,26 @@ export default class ColumnFilter extends React.Component<IColumnFilterProps, IC
     }
   }
 
-  public render(): React.ReactElement<IColumnFilterProps> | undefined { // Changed from null to undefined
+  public render(): React.ReactElement<IColumnFilterProps> | undefined {
     if (!this.props.isOpen) {
       return undefined;
     }
 
     const { column } = this.props;
-    const { searchTerm, filteredValues, selectedValues } = this.state;
+    const { searchTerm, filteredValues, selectedValues, position, positionClass } = this.state;
 
     const isAllFilteredSelected = filteredValues.every(value => selectedValues.has(value));
     const isIndeterminate = filteredValues.some(value => selectedValues.has(value)) && !isAllFilteredSelected;
 
     return (
-      <div ref={this.dropdownRef} className={styles.columnFilter}>
+      <div 
+        ref={this.dropdownRef} 
+        className={`${styles.columnFilter} ${styles[positionClass]}`}
+        style={{
+          top: `${position.top}px`,
+          left: `${position.left}px`
+        }}
+      >
         <div className={styles.header}>
           <div className={styles.columnInfo}>
             <span className={styles.dataTypeIcon}>{this.getDataTypeIcon()}</span>

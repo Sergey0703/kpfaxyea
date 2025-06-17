@@ -38,10 +38,6 @@ interface ISharePointUpdateResponse {
   Modified: string;
 }
 
-
-
-
-
 export class ConvertFilesPropsService {
   private spService: SharePointService;
   private readonly LIST_NAME = 'convertfilesprops';
@@ -105,12 +101,12 @@ export class ConvertFilesPropsService {
     }
   }
 
-  // Создать новое свойство
+  // Создать новое свойство - updated to handle optional fields
   public async createConvertFileProp(
     convertFilesId: number,
     title: string,
-    prop: string,
-    prop2: string,
+    prop: string = '', // Default to empty string
+    prop2: string = '', // Default to empty string
     allItems?: IConvertFileProps[]
   ): Promise<IConvertFileProps> {
     try {
@@ -122,11 +118,21 @@ export class ConvertFilesPropsService {
       // Вычисляем следующий приоритет
       const nextPriority = PriorityHelper.getNextPriority(allItems, convertFilesId);
 
+      // Sanitize inputs - allow empty strings for optional fields
+      const sanitizedTitle = title.trim();
+      const sanitizedProp = prop.trim();
+      const sanitizedProp2 = prop2.trim();
+
+      // Validate that title is not empty
+      if (!sanitizedTitle) {
+        throw new Error('Title is required and cannot be empty');
+      }
+
       // Сначала создаем с основными полями
       const basicItem = {
-        Title: title,
-        Prop: prop,
-        Prop2: prop2,
+        Title: sanitizedTitle,
+        Prop: sanitizedProp, // Can be empty
+        Prop2: sanitizedProp2, // Can be empty
         Priority: nextPriority,
         IsDeleted: 0  // Используем 0 для SharePoint (false)
       };
@@ -149,10 +155,10 @@ export class ConvertFilesPropsService {
         
         return {
           Id: itemId,
-          Title: title,
+          Title: sanitizedTitle,
           ConvertFilesID: convertFilesId,
-          Prop: prop,
-          Prop2: prop2,
+          Prop: sanitizedProp,
+          Prop2: sanitizedProp2,
           Priority: nextPriority,
           IsDeleted: false,
           Created: createdItem.Created ? new Date(createdItem.Created) : undefined,
@@ -172,10 +178,10 @@ export class ConvertFilesPropsService {
           
           return {
             Id: itemId,
-            Title: title,
+            Title: sanitizedTitle,
             ConvertFilesID: convertFilesId,
-            Prop: prop,
-            Prop2: prop2,
+            Prop: sanitizedProp,
+            Prop2: sanitizedProp2,
             Priority: nextPriority,
             IsDeleted: false,
             Created: createdItem.Created ? new Date(createdItem.Created) : undefined,
@@ -188,10 +194,10 @@ export class ConvertFilesPropsService {
           // Возвращаем элемент без lookup
           return {
             Id: itemId,
-            Title: title,
+            Title: sanitizedTitle,
             ConvertFilesID: 0, // Не удалось установить lookup
-            Prop: prop,
-            Prop2: prop2,
+            Prop: sanitizedProp,
+            Prop2: sanitizedProp2,
             Priority: nextPriority,
             IsDeleted: false,
             Created: createdItem.Created ? new Date(createdItem.Created) : undefined,
@@ -205,18 +211,28 @@ export class ConvertFilesPropsService {
     }
   }
 
-  // Обновить свойство
+  // Обновить свойство - updated to handle optional fields
   public async updateConvertFileProp(
     id: number,
     title: string,
-    prop: string,
-    prop2: string
+    prop: string = '', // Default to empty string
+    prop2: string = '' // Default to empty string
   ): Promise<IConvertFileProps> {
     try {
+      // Sanitize inputs - allow empty strings for optional fields
+      const sanitizedTitle = title.trim();
+      const sanitizedProp = prop.trim();
+      const sanitizedProp2 = prop2.trim();
+
+      // Validate that title is not empty
+      if (!sanitizedTitle) {
+        throw new Error('Title is required and cannot be empty');
+      }
+
       const updateItem = {
-        Title: title,
-        Prop: prop,
-        Prop2: prop2
+        Title: sanitizedTitle,
+        Prop: sanitizedProp, // Can be empty
+        Prop2: sanitizedProp2 // Can be empty
       };
 
       await this.spService.updateListItem<ISharePointUpdateResponse>(this.LIST_NAME, id, updateItem);
@@ -326,8 +342,8 @@ export class ConvertFilesPropsService {
       Title: item.Title,
       ConvertFilesID: item.ConvertFilesIDId,
       ConvertFilesIDId: item.ConvertFilesIDId,
-      Prop: item.Prop,
-      Prop2: item.Prop2,
+      Prop: item.Prop || '', // Ensure empty string instead of null/undefined
+      Prop2: item.Prop2 || '', // Ensure empty string instead of null/undefined
       IsDeleted: item.IsDeleted === 1,
       Priority: item.Priority,
       Created: item.Created ? new Date(item.Created) : undefined,

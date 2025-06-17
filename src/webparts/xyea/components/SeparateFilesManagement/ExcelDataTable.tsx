@@ -26,8 +26,8 @@ export interface IExcelDataTableProps {
 
 export interface IExcelDataTableState {
   currentPage: number;
-  openFilterColumn: string | undefined; // Changed from null to undefined
-  sortColumn: string | undefined; // Changed from null to undefined
+  openFilterColumn: string | undefined;
+  sortColumn: string | undefined;
   sortDirection: 'asc' | 'desc';
 }
 
@@ -319,6 +319,7 @@ export default class ExcelDataTable extends React.Component<IExcelDataTableProps
                           className={`${styles.filterButton} ${isFilterActive ? styles.active : ''}`}
                           onClick={() => this.handleFilterClick(column.name)}
                           title="Filter column"
+                          data-column-filter={column.name}
                         >
                           ⚲
                         </button>

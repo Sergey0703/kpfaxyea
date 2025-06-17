@@ -7,7 +7,7 @@ import { IConvertFileProps } from '../../models';
 import { PriorityHelper } from '../../utils';
 
 export interface IConvertFilesPropsTableState {
-  error: string | undefined; // Changed from null to undefined
+  error: string | undefined;
 }
 
 export default class ConvertFilesPropsTable extends React.Component<IConvertFilesPropsTableProps, IConvertFilesPropsTableState> {
@@ -15,7 +15,7 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
   constructor(props: IConvertFilesPropsTableProps) {
     super(props);
     this.state = {
-      error: undefined // Changed from null to undefined
+      error: undefined
     };
   }
 
@@ -46,10 +46,12 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
   }
 
   private canMoveUp = (item: IConvertFileProps): boolean => {
+    // Allow moving deleted items too
     return PriorityHelper.canMoveUp(this.props.allItems, item.Id, this.props.convertFileId);
   }
 
   private canMoveDown = (item: IConvertFileProps): boolean => {
+    // Allow moving deleted items too
     return PriorityHelper.canMoveDown(this.props.allItems, item.Id, this.props.convertFileId);
   }
 
@@ -135,11 +137,12 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
                     {item.Created ? new Date(item.Created).toLocaleDateString() : '-'}
                   </td>
                   <td className={`${styles.tableCell} ${styles.actionsCell}`}>
+                    {/* Move buttons - now work for deleted items too */}
                     <button 
                       className={`${styles.actionButton} ${styles.moveButton}`}
                       onClick={() => this.handleMoveUp(item.Id)}
                       disabled={loading || !this.canMoveUp(item)}
-                      title="Move Up"
+                      title={item.IsDeleted ? "Move Deleted Item Up" : "Move Up"}
                     >
                       ↑
                     </button>
@@ -147,18 +150,22 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
                       className={`${styles.actionButton} ${styles.moveButton}`}
                       onClick={() => this.handleMoveDown(item.Id)}
                       disabled={loading || !this.canMoveDown(item)}
-                      title="Move Down"
+                      title={item.IsDeleted ? "Move Deleted Item Down" : "Move Down"}
                     >
                       ↓
                     </button>
+                    
+                    {/* Edit button - only for active items */}
                     <button 
                       className={`${styles.actionButton} ${styles.editButton}`}
                       onClick={() => this.handleEdit(item)}
-                      disabled={loading}
-                      title="Edit"
+                      disabled={loading || item.IsDeleted}
+                      title={item.IsDeleted ? "Cannot edit deleted item" : "Edit"}
                     >
                       Edit
                     </button>
+                    
+                    {/* Delete/Restore button */}
                     {item.IsDeleted ? (
                       <button 
                         className={`${styles.actionButton} ${styles.restoreButton}`}

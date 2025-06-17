@@ -1,19 +1,28 @@
 // src/webparts/xyea/components/SeparateFilesManagement/ColumnFilter.module.scss
 
 .columnFilter {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 1000;
+  position: fixed; /* Changed from absolute to fixed */
+  top: auto;
+  left: auto;
+  z-index: 10000; /* Increased z-index to be above everything */
   background: white;
   border: 1px solid #c8c6c4;
   border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25); /* Enhanced shadow */
   min-width: 280px;
   max-width: 400px;
   max-height: 400px;
   display: flex;
   flex-direction: column;
+
+  /* Ensure it's always visible */
+  &.positionedBelow {
+    transform: translateY(0);
+  }
+
+  &.positionedAbove {
+    transform: translateY(-100%);
+  }
 
   .header {
     display: flex;
@@ -200,4 +209,20 @@
 
 .valuesList::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .columnFilter {
+    min-width: 250px;
+    max-width: 90vw;
+    max-height: 80vh;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .columnFilter {
+    border: 2px solid #000;
+  }
 }
