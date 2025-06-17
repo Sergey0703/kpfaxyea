@@ -5,8 +5,40 @@ import {
   IExcelSheet, 
   IFilterState, 
   IExportSettings,
-  ExportFormat 
+  ExportFormat,
+  IExcelRow
 } from '../interfaces/ExcelInterfaces';
+
+// Type definitions for better type safety
+type CellValue = string | number | boolean | Date | null | undefined;
+type ExcelRowData = CellValue[];
+type ExcelData = ExcelRowData[];
+
+interface IExportStatistics {
+  totalRows: number;
+  visibleRows: number;
+  hiddenRows: number;
+  activeFilters: number;
+  estimatedFileSize: string;
+  canExport: boolean;
+}
+
+interface IExportPreview {
+  headers: string[];
+  sampleRows: ExcelRowData[];
+  totalRows: number;
+  hasMoreData: boolean;
+}
+
+interface IExportValidation {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+interface IColumnWidth {
+  wch: number;
+}
 
 export class ExcelExportService {
 
@@ -70,7 +102,7 @@ export class ExcelExportService {
       console.error('[ExcelExportService] Export failed:', error);
       return {
         success: false,
-        error: `Export failed: ${error.message}`
+        error: `Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
   }
@@ -129,10 +161,10 @@ export class ExcelExportService {
    */
   private static prepareExportData(
     headers: string[],
-    rows: any[],
+    rows: IExcelRow[],
     settings: IExportSettings
-  ): any[][] {
-    const exportData: any[][] = [];
+  ): ExcelData {
+    const exportData: ExcelData = [];
 
     // Добавляем заголовки если нужно
     if (settings.includeHeaders) {
@@ -141,7 +173,7 @@ export class ExcelExportService {
 
     // Добавляем данные
     rows.forEach(row => {
-      const rowData: any[] = [];
+      const rowData: ExcelRowData = [];
       headers.forEach(header => {
         const cellValue = row.data[header];
         // Преобразуем значения для экспорта
@@ -156,7 +188,7 @@ export class ExcelExportService {
   /**
    * Форматирование значения ячейки для экспорта
    */
-  private static formatCellForExport(value: any): any {
+  private static formatCellForExport(value: CellValue): CellValue {
     if (value === null || value === undefined) {
       return '';
     }
@@ -178,7 +210,7 @@ export class ExcelExportService {
    * Экспорт в Excel формат
    */
   private static async exportAsExcel(
-    data: any[][],
+    data: ExcelData,
     fileName: string,
     sheetName: string
   ): Promise<void> {
@@ -203,7 +235,7 @@ export class ExcelExportService {
    * Экспорт в CSV формат
    */
   private static async exportAsCSV(
-    data: any[][],
+    data: ExcelData,
     fileName: string
   ): Promise<void> {
     // Преобразуем данные в CSV строку
@@ -239,7 +271,7 @@ export class ExcelExportService {
   /**
    * Вычисление оптимальной ширины колонок
    */
-  private static calculateColumnWidths(data: any[][]): any[] {
+  private static calculateColumnWidths(data: ExcelData): IColumnWidth[] {
     if (data.length === 0) return [];
 
     const columnCount = data[0].length;
@@ -268,14 +300,7 @@ export class ExcelExportService {
   public static getExportStatistics(
     sheet: IExcelSheet,
     filterState: IFilterState
-  ): {
-    totalRows: number;
-    visibleRows: number;
-    hiddenRows: number;
-    activeFilters: number;
-    estimatedFileSize: string;
-    canExport: boolean;
-  } {
+  ): IExportStatistics {
     const visibleRows = sheet.data.filter(row => row.isVisible).length;
     const hiddenRows = sheet.totalRows - visibleRows;
     const activeFilters = Object.values(filterState.filters).filter(f => f.isActive).length;
@@ -315,16 +340,11 @@ export class ExcelExportService {
     sheet: IExcelSheet,
     filterState: IFilterState,
     previewRows: number = 5
-  ): {
-    headers: string[];
-    sampleRows: any[][];
-    totalRows: number;
-    hasMoreData: boolean;
-  } {
+  ): IExportPreview {
     const visibleRows = sheet.data.filter(row => row.isVisible);
     const sampleRows = visibleRows
       .slice(0, previewRows)
-      .map(row => sheet.headers.map(header => row.data[header]));
+      .map(row => sheet.headers.map(header => row.data[header] as CellValue));
 
     return {
       headers: [...sheet.headers],
@@ -340,7 +360,7 @@ export class ExcelExportService {
   public static validateExportSettings(
     settings: IExportSettings,
     visibleRowsCount: number
-  ): { isValid: boolean; errors: string[]; warnings: string[] } {
+  ): IExportValidation {
     const errors: string[] = [];
     const warnings: string[] = [];
 
