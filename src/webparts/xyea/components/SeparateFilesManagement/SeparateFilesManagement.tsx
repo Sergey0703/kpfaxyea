@@ -25,7 +25,10 @@ export interface ISeparateFilesManagementProps {
   userDisplayName: string;
 }
 
-// Расширяем интерфейс состояния с подтверждением
+// Define proper types for filter values
+type FilterValue = string | number | boolean | Date;
+
+// Extend state interface with confirmation dialog
 interface ISeparateFilesManagementState extends ISeparateFilesState {
   showConfirmDialog: boolean;
   confirmDialogConfig: IConfirmationDialogConfig;
@@ -74,7 +77,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
         onlyVisibleColumns: true,
         fileFormat: ExportFormat.XLSX
       },
-      // Диалог подтверждения
+      // Confirmation dialog
       showConfirmDialog: false,
       confirmDialogConfig: {
         title: '',
@@ -97,7 +100,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
     });
 
     try {
-      // Парсинг файла с прогрессом
+      // Parse file with progress tracking
       const result = await ExcelParserService.parseFile(file, this.handleUploadProgress);
 
       if (!result.success) {
@@ -108,7 +111,16 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
         return;
       }
 
-      const excelFile = result.file!;
+      // Safe access to result.file with proper type checking
+      const { file: excelFile } = result;
+      if (!excelFile) {
+        this.setState({
+          loading: false,
+          error: 'No file data received from parser'
+        });
+        return;
+      }
+
       const firstSheet = excelFile.sheets[0];
 
       if (!firstSheet || !firstSheet.isValid) {
@@ -119,16 +131,16 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
         return;
       }
 
-      // Анализируем колонки
+      // Analyze columns
       const columns = ExcelFilterService.analyzeColumns(firstSheet);
       
-      // Создаем начальное состояние фильтров
+      // Create initial filter state
       const filterState = ExcelFilterService.createInitialFilterState(columns, firstSheet.totalRows);
 
-      // Применяем фильтры (изначально все видимо)
+      // Apply filters (initially all visible)
       const { filteredSheet } = ExcelFilterService.applyFilters(firstSheet, filterState);
 
-      // Создаем настройки экспорта по умолчанию
+      // Create default export settings
       const exportSettings = ExcelExportService.createDefaultExportSettings(file.name);
 
       this.setState({
@@ -154,7 +166,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
       console.error('[SeparateFilesManagement] File processing failed:', error);
       this.setState({
         loading: false,
-        error: error.message || 'Failed to process file'
+        error: error instanceof Error ? error.message : 'Failed to process file'
       });
     }
   }
@@ -171,21 +183,21 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
     });
   }
 
-  private handleFilterChange = (columnName: string, selectedValues: any[]): void => {
+  private handleFilterChange = (columnName: string, selectedValues: FilterValue[]): void => {
     const { filterState, uploadedFile } = this.state;
 
     if (!uploadedFile) return;
 
     const originalSheet = uploadedFile.sheets[0];
 
-    // Обновляем состояние фильтра
+    // Update filter state
     const updatedFilterState = ExcelFilterService.updateColumnFilter(
       filterState,
       columnName,
       selectedValues
     );
 
-    // Применяем фильтры к оригинальным данным
+    // Apply filters to original data
     const { filteredSheet, statistics } = ExcelFilterService.applyFilters(
       originalSheet,
       updatedFilterState
@@ -197,7 +209,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
         filteredRows: statistics.visible
       },
       currentSheet: filteredSheet,
-      currentPage: 1 // Сброс на первую страницу
+      currentPage: 1 // Reset to first page
     });
 
     console.log('[SeparateFilesManagement] Filter applied:', {
@@ -216,7 +228,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
     const originalSheet = uploadedFile.sheets[0];
     const clearedFilterState = ExcelFilterService.clearAllFilters(this.state.filterState, columns);
 
-    // Применяем очищенные фильтры
+    // Apply cleared filters
     const { filteredSheet } = ExcelFilterService.applyFilters(originalSheet, clearedFilterState);
 
     this.setState({
@@ -236,16 +248,16 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
     const activeFiltersCount = Object.values(filterState.filters).filter(f => f.isActive).length;
 
     if (activeFiltersCount === 0) {
-      return; // Нет активных фильтров
+      return; // No active filters
     }
 
     if (activeFiltersCount <= 2) {
-      // Для малого количества фильтров - очищаем сразу
+      // For small number of filters - clear immediately
       this.handleClearFilters();
       return;
     }
 
-    // Для большого количества фильтров - показываем подтверждение
+    // For large number of filters - show confirmation
     const config = ConfirmationDialogHelper.createClearFiltersConfirmation(activeFiltersCount);
     
     this.setState({
@@ -266,7 +278,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
       return;
     }
 
-    // Собираем информацию о текущих данных
+    // Gather information about current data
     const hasActiveFilters = filterState.isAnyFilterActive;
     const hasData = uploadedFile.sheets[0]?.totalRows > 0;
     const activeFiltersCount = Object.values(filterState.filters).filter(f => f.isActive).length;
@@ -274,23 +286,23 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
     let config: IConfirmationDialogConfig;
 
     if (hasData && hasActiveFilters) {
-      // Данные с активными фильтрами
+      // Data with active filters
       const currentDataInfo = `You have ${activeFiltersCount} active filter${activeFiltersCount > 1 ? 's' : ''} applied to ${filterState.filteredRows} of ${filterState.totalRows} rows.`;
       config = ConfirmationDialogHelper.createReplaceDataConfirmation(
         currentDataInfo,
         'Loading a new file'
       );
-      config.type = 'danger'; // Более серьезное предупреждение
+      config.type = 'danger'; // More serious warning
       config.confirmText = 'Yes, Replace Data';
     } else if (hasData) {
-      // Данные без фильтров
+      // Data without filters
       const currentDataInfo = `You have ${filterState.totalRows} rows of data loaded.`;
       config = ConfirmationDialogHelper.createReplaceDataConfirmation(
         currentDataInfo,
         'Loading a new file'
       );
     } else {
-      // Нет данных - просто очищаем
+      // No data - just clear
       this.clearFileState();
       return;
     }
@@ -307,7 +319,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
     
     this.setState({ confirmDialogLoading: true });
     
-    // Имитируем небольшую задержку для UX
+    // Simulate small delay for UX
     setTimeout(() => {
       switch (confirmDialogAction) {
         case 'loadNewFile':
@@ -363,7 +375,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
       return;
     }
 
-    // Проверяем размер экспорта
+    // Check export size
     const visibleRows = currentSheet.data.filter(row => row.isVisible).length;
     if (visibleRows > 10000) {
       const config = ConfirmationDialogHelper.createLargeExportConfirmation(visibleRows);
@@ -374,7 +386,8 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
       return;
     }
 
-    this.performExport();
+    // Await the export operation
+    await this.performExport();
   }
 
   private performExport = async (): Promise<void> => {
@@ -396,12 +409,12 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
         this.setState({ error: result.error || 'Export failed' });
       } else {
         console.log('[SeparateFilesManagement] Export completed:', result.fileName);
-        // Можно добавить уведомление об успешном экспорте
+        // Could add success notification here
       }
 
     } catch (error) {
       console.error('[SeparateFilesManagement] Export failed:', error);
-      this.setState({ error: error.message || 'Export failed' });
+      this.setState({ error: error instanceof Error ? error.message : 'Export failed' });
     } finally {
       this.setState({ isExporting: false });
     }
@@ -522,7 +535,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
 
         <button
           className={styles.exportButton}
-          onClick={this.handleExport}
+          onClick={() => { void this.handleExport(); }}
           disabled={!statistics.canExport || isExporting}
         >
           {isExporting ? 'Exporting...' : '📥 Export Filtered Data'}
