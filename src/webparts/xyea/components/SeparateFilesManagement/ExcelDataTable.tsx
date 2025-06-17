@@ -6,15 +6,19 @@ import {
   IExcelSheet, 
   IExcelColumn, 
   IFilterState, 
-  ExcelDataType 
+  ExcelDataType,
+  IExcelRow
 } from '../../interfaces/ExcelInterfaces';
 import ColumnFilter from './ColumnFilter';
+
+// Define proper types instead of using 'any'
+type CellValue = string | number | boolean | Date | undefined;
 
 export interface IExcelDataTableProps {
   sheet: IExcelSheet;
   columns: IExcelColumn[];
   filterState: IFilterState;
-  onFilterChange: (columnName: string, selectedValues: any[]) => void;
+  onFilterChange: (columnName: string, selectedValues: CellValue[]) => void;
   onClearFilters: () => void;
   loading?: boolean;
   pageSize?: number;
@@ -22,8 +26,8 @@ export interface IExcelDataTableProps {
 
 export interface IExcelDataTableState {
   currentPage: number;
-  openFilterColumn: string | null;
-  sortColumn: string | null;
+  openFilterColumn: string | undefined; // Changed from null to undefined
+  sortColumn: string | undefined; // Changed from null to undefined
   sortDirection: 'asc' | 'desc';
 }
 
@@ -34,23 +38,23 @@ export default class ExcelDataTable extends React.Component<IExcelDataTableProps
     
     this.state = {
       currentPage: 1,
-      openFilterColumn: null,
-      sortColumn: null,
+      openFilterColumn: undefined,
+      sortColumn: undefined,
       sortDirection: 'asc'
     };
   }
 
   private handleFilterClick = (columnName: string): void => {
     this.setState(prevState => ({
-      openFilterColumn: prevState.openFilterColumn === columnName ? null : columnName
+      openFilterColumn: prevState.openFilterColumn === columnName ? undefined : columnName
     }));
   }
 
   private handleFilterClose = (): void => {
-    this.setState({ openFilterColumn: null });
+    this.setState({ openFilterColumn: undefined });
   }
 
-  private handleFilterChange = (columnName: string, selectedValues: any[]): void => {
+  private handleFilterChange = (columnName: string, selectedValues: CellValue[]): void => {
     this.props.onFilterChange(columnName, selectedValues);
     this.setState({ currentPage: 1 }); // Reset to first page after filtering
   }
@@ -87,13 +91,13 @@ export default class ExcelDataTable extends React.Component<IExcelDataTableProps
     }
   }
 
-  private getSortIcon = (columnName: string): string | null => {
+  private getSortIcon = (columnName: string): string | undefined => {
     const { sortColumn, sortDirection } = this.state;
-    if (sortColumn !== columnName) return null;
+    if (sortColumn !== columnName) return undefined;
     return sortDirection === 'asc' ? '↑' : '↓';
   }
 
-  private getSortedData = (): any[] => {
+  private getSortedData = (): IExcelRow[] => {
     const { sheet } = this.props;
     const { sortColumn, sortDirection } = this.state;
 
@@ -108,8 +112,8 @@ export default class ExcelDataTable extends React.Component<IExcelDataTableProps
       const bValue = b.data[sortColumn];
 
       // Handle null/undefined values
-      if (aValue === null || aValue === undefined) return 1;
-      if (bValue === null || bValue === undefined) return -1;
+      if (aValue === undefined) return 1;
+      if (bValue === undefined) return -1;
 
       // Compare based on data type
       let comparison = 0;
@@ -125,7 +129,7 @@ export default class ExcelDataTable extends React.Component<IExcelDataTableProps
     });
   }
 
-  private getPaginatedData = (): any[] => {
+  private getPaginatedData = (): IExcelRow[] => {
     const { pageSize = 50 } = this.props;
     const { currentPage } = this.state;
     
@@ -142,8 +146,8 @@ export default class ExcelDataTable extends React.Component<IExcelDataTableProps
     return Math.ceil(totalRows / pageSize);
   }
 
-  private formatCellValue = (value: any, dataType: ExcelDataType): string => {
-    if (value === null || value === undefined || value === '') {
+  private formatCellValue = (value: CellValue, dataType: ExcelDataType): string => {
+    if (value === undefined || value === '') {
       return '';
     }
 
@@ -182,7 +186,7 @@ export default class ExcelDataTable extends React.Component<IExcelDataTableProps
     const totalRows = this.getSortedData().length;
     const { pageSize = 50 } = this.props;
     
-    if (totalPages <= 1) return null;
+    if (totalPages <= 1) return undefined;
 
     const startRow = (currentPage - 1) * pageSize + 1;
     const endRow = Math.min(currentPage * pageSize, totalRows);
@@ -237,7 +241,7 @@ export default class ExcelDataTable extends React.Component<IExcelDataTableProps
       return (
         <div className={styles.excelDataTable}>
           <div className={styles.loading}>
-            <div className={styles.loadingSpinner}></div>
+            <div className={styles.loadingSpinner} />
             <p>Loading data...</p>
           </div>
         </div>
