@@ -459,29 +459,27 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
 
   private validateAllColumns = async (): Promise<void> => {
     const selectedFiles = this.props.selectedFiles?.[this.props.convertFileId];
-    if (!selectedFiles?.export || !selectedFiles?.import) {
-      // Clear validation if files not selected
-      this.setState({ columnValidation: {}, filesCache: {} });
-      return;
-    }
-
+    
+    console.log('[ConvertFilesPropsTable] Starting column validation');
+    
     try {
-      console.log('[ConvertFilesPropsTable] Starting column validation');
-      
-      // Read files if not cached
+      // Read files if available (don't require both files)
       let exportData = this.state.filesCache.exportFile;
       let importData = this.state.filesCache.importFile;
 
-      if (!exportData) {
+      // Read export file if selected and not cached
+      if (selectedFiles?.export && !exportData) {
         console.log('[ConvertFilesPropsTable] Reading export file:', selectedFiles.export.name);
         exportData = await this.readExcelFile(selectedFiles.export);
       }
-      if (!importData) {
+      
+      // Read import file if selected and not cached
+      if (selectedFiles?.import && !importData) {
         console.log('[ConvertFilesPropsTable] Reading import file:', selectedFiles.import.name);
         importData = await this.readExcelFile(selectedFiles.import);
       }
 
-      // Cache the data
+      // Update cache with whatever we have
       this.setState({
         filesCache: {
           exportFile: exportData,
@@ -489,41 +487,52 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
         }
       });
 
-      console.log('[ConvertFilesPropsTable] Export file headers:', exportData.headers);
-      console.log('[ConvertFilesPropsTable] Import file headers:', importData.headers);
+      console.log('[ConvertFilesPropsTable] Available files:', {
+        hasExport: !!exportData,
+        hasImport: !!importData,
+        exportHeaders: exportData?.headers.length || 0,
+        importHeaders: importData?.headers.length || 0
+      });
 
-      // Validate all items
+      // Validate all items with available data
       const validation: { [itemId: number]: any } = {};
       
       this.props.items.forEach(item => {
         console.log(`[ConvertFilesPropsTable] Validating item ${item.Id}: Prop="${item.Prop}", Prop2="${item.Prop2}"`);
         
-        // Case-insensitive comparison with trimming
-        const propExists = exportData!.headers.some(header => {
-          const headerLower = header.toLowerCase().trim();
-          const propLower = item.Prop.toLowerCase().trim();
-          const matches = headerLower === propLower;
-          if (matches) {
-            console.log(`[ConvertFilesPropsTable] Prop match found: "${header}" === "${item.Prop}"`);
-          }
-          return matches;
-        });
+        // Check Prop in export file (if available)
+        let propExists: boolean | undefined = undefined;
+        if (exportData && item.Prop.trim()) {
+          propExists = exportData.headers.some(header => {
+            const headerLower = header.toLowerCase().trim();
+            const propLower = item.Prop.toLowerCase().trim();
+            const matches = headerLower === propLower;
+            if (matches) {
+              console.log(`[ConvertFilesPropsTable] Prop match found: "${header}" === "${item.Prop}"`);
+            }
+            return matches;
+          });
+        }
         
-        const prop2Exists = importData!.headers.some(header => {
-          const headerLower = header.toLowerCase().trim();
-          const prop2Lower = item.Prop2.toLowerCase().trim();
-          const matches = headerLower === prop2Lower;
-          if (matches) {
-            console.log(`[ConvertFilesPropsTable] Prop2 match found: "${header}" === "${item.Prop2}"`);
-          }
-          return matches;
-        });
+        // Check Prop2 in import file (if available)
+        let prop2Exists: boolean | undefined = undefined;
+        if (importData && item.Prop2.trim()) {
+          prop2Exists = importData.headers.some(header => {
+            const headerLower = header.toLowerCase().trim();
+            const prop2Lower = item.Prop2.toLowerCase().trim();
+            const matches = headerLower === prop2Lower;
+            if (matches) {
+              console.log(`[ConvertFilesPropsTable] Prop2 match found: "${header}" === "${item.Prop2}"`);
+            }
+            return matches;
+          });
+        }
 
         console.log(`[ConvertFilesPropsTable] Item ${item.Id} validation result: Prop exists=${propExists}, Prop2 exists=${prop2Exists}`);
 
         validation[item.Id] = {
-          propValid: propExists,
-          prop2Valid: prop2Exists,
+          propValid: propExists === true,
+          prop2Valid: prop2Exists === true,
           propExists,
           prop2Exists
         };
@@ -540,21 +549,54 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
 
   private getColumnValidationStyle = (itemId: number, column: 'prop' | 'prop2'): React.CSSProperties => {
     const validation = this.state.columnValidation[itemId];
+    const selectedFiles = this.props.selectedFiles?.[this.props.convertFileId];
+    
+    // Get the field value to check if it's empty
+    const item = this.props.items.find(i => i.Id === itemId);
+    const fieldValue = column === 'prop' ? item?.Prop : item?.Prop2;
+    const isFieldEmpty = !fieldValue || fieldValue.trim() === '';
+    
+    // Check if the corresponding file is available
+    const hasFile = column === 'prop' ? !!selectedFiles?.export : !!selectedFiles?.import;
+    
+    // Debug logging
+    console.log(`[getColumnValidationStyle] Item ${itemId}, Column ${column}:`, {
+      fieldValue,
+      isFieldEmpty,
+      hasFile,
+      validation,
+      exists: validation ? (column === 'prop' ? validation.propExists : validation.prop2Exists) : 'no validation',
+      isValid: validation ? (column === 'prop' ? validation.propValid : validation.prop2Valid) : 'no validation'
+    });
+    
+    // If file is not selected OR field is empty, show gray
+    if (!hasFile || isFieldEmpty) {
+      console.log(`[getColumnValidationStyle] → GRAY (no file or empty field)`);
+      return { backgroundColor: '#e6e6e6' }; // No file selected OR empty field - light gray
+    }
+    
+    // If we don't have validation data yet, show gray
     if (!validation) {
-      return { backgroundColor: '#e6e6e6' }; // Unknown - light gray (more visible)
+      console.log(`[getColumnValidationStyle] → GRAY (no validation data)`);
+      return { backgroundColor: '#e6e6e6' }; // No validation data - light gray
     }
 
     const isValid = column === 'prop' ? validation.propValid : validation.prop2Valid;
     const exists = column === 'prop' ? validation.propExists : validation.prop2Exists;
-
+    
+    // If exists is undefined, it means validation hasn't run for this field yet
     if (exists === undefined) {
-      return { backgroundColor: '#e6e6e6' }; // Unknown - light gray (more visible)
+      console.log(`[getColumnValidationStyle] → GRAY (exists is undefined)`);
+      return { backgroundColor: '#e6e6e6' }; // Validation not done - light gray
     }
     
+    // Show validation result: file is selected, field is filled, validation is done
     if (isValid) {
-      return { backgroundColor: '#d4edda' }; // Valid - light green (more visible)
+      console.log(`[getColumnValidationStyle] → GREEN (valid)`);
+      return { backgroundColor: '#d4edda' }; // Valid - light green
     } else {
-      return { backgroundColor: '#f8d7da' }; // Invalid - light red (more visible)
+      console.log(`[getColumnValidationStyle] → RED (invalid)`);
+      return { backgroundColor: '#f8d7da' }; // Invalid - light red
     }
   }
 
