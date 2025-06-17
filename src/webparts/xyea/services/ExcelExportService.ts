@@ -10,7 +10,7 @@ import {
 } from '../interfaces/ExcelInterfaces';
 
 // Type definitions for better type safety
-type CellValue = string | number | boolean | Date | null | undefined;
+type CellValue = string | number | boolean | Date | undefined; // Changed from null to undefined
 type ExcelRowData = CellValue[];
 type ExcelData = ExcelRowData[];
 
@@ -189,7 +189,7 @@ export class ExcelExportService {
    * Форматирование значения ячейки для экспорта
    */
   private static formatCellForExport(value: CellValue): CellValue {
-    if (value === null || value === undefined) {
+    if (value === undefined) {
       return '';
     }
 

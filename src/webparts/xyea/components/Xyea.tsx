@@ -15,17 +15,17 @@ export interface IXyeaState {
   convertFiles: IConvertFile[];
   convertFilesProps: IConvertFileProps[];
   loading: boolean;
-  error: string | null;
+  error: string | undefined; // Changed from null to undefined
   expandedRows: number[];
   // Состояние диалога для ConvertFiles
   dialogOpen: boolean;
   dialogEditMode: boolean;
-  dialogItem: IConvertFile | null;
+  dialogItem: IConvertFile | undefined; // Changed from null to undefined
   dialogLoading: boolean;
   // Состояние диалога для ConvertFilesProps
   propsDialogOpen: boolean;
   propsDialogEditMode: boolean;
-  propsDialogItem: IConvertFileProps | null;
+  propsDialogItem: IConvertFileProps | undefined; // Changed from null to undefined
   propsDialogConvertFileId: number;
   propsDialogLoading: boolean;
 }
@@ -41,17 +41,17 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
       convertFiles: [],
       convertFilesProps: [],
       loading: true,
-      error: null,
+      error: undefined, // Changed from null to undefined
       expandedRows: [],
       // Диалог для ConvertFiles
       dialogOpen: false,
       dialogEditMode: false,
-      dialogItem: null,
+      dialogItem: undefined, // Changed from null to undefined
       dialogLoading: false,
       // Диалог для ConvertFilesProps
       propsDialogOpen: false,
       propsDialogEditMode: false,
-      propsDialogItem: null,
+      propsDialogItem: undefined, // Changed from null to undefined
       propsDialogConvertFileId: 0,
       propsDialogLoading: false
     };
@@ -66,7 +66,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
 
   private loadData = async (): Promise<void> => {
     try {
-      this.setState({ loading: true, error: null });
+      this.setState({ loading: true, error: undefined });
       
       const [convertFiles, convertFilesProps] = await Promise.all([
         this.convertFilesService.getAllConvertFiles(),
@@ -82,7 +82,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
       console.error('Error loading data:', error);
       this.setState({
         loading: false,
-        error: error.message || 'Failed to load data'
+        error: error instanceof Error ? error.message : 'Failed to load data'
       });
     }
   }
@@ -91,7 +91,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
     this.setState({
       dialogOpen: true,
       dialogEditMode: false,
-      dialogItem: null
+      dialogItem: undefined
     });
   }
 
@@ -121,7 +121,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
       this.setState({
         dialogOpen: false,
         dialogEditMode: false,
-        dialogItem: null,
+        dialogItem: undefined,
         dialogLoading: false // Важно! Сбросить loading состояние
       });
 
@@ -139,7 +139,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
     this.setState({
       dialogOpen: false,
       dialogEditMode: false,
-      dialogItem: null,
+      dialogItem: undefined,
       dialogLoading: false
     });
   }
@@ -149,7 +149,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
     this.setState({
       propsDialogOpen: true,
       propsDialogEditMode: false,
-      propsDialogItem: null,
+      propsDialogItem: undefined,
       propsDialogConvertFileId: convertFileId
     });
   }
@@ -181,7 +181,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
       this.setState({
         propsDialogOpen: false,
         propsDialogEditMode: false,
-        propsDialogItem: null,
+        propsDialogItem: undefined,
         propsDialogConvertFileId: 0,
         propsDialogLoading: false
       });
@@ -199,7 +199,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
     this.setState({
       propsDialogOpen: false,
       propsDialogEditMode: false,
-      propsDialogItem: null,
+      propsDialogItem: undefined,
       propsDialogConvertFileId: 0,
       propsDialogLoading: false
     });
@@ -220,7 +220,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
       console.error('Error toggling deleted status:', error);
       this.setState({
         loading: false,
-        error: error.message || 'Failed to update item status'
+        error: error instanceof Error ? error.message : 'Failed to update item status'
       });
     }
   }
@@ -234,7 +234,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
       console.error('Error moving item up:', error);
       this.setState({
         loading: false,
-        error: error.message || 'Failed to move item up'
+        error: error instanceof Error ? error.message : 'Failed to move item up'
       });
     }
   }
@@ -248,7 +248,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
       console.error('Error moving item down:', error);
       this.setState({
         loading: false,
-        error: error.message || 'Failed to move item down'
+        error: error instanceof Error ? error.message : 'Failed to move item down'
       });
     }
   }
@@ -262,7 +262,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
       console.error('Error deleting convert file:', error);
       this.setState({
         loading: false,
-        error: error.message || 'Failed to delete convert file'
+        error: error instanceof Error ? error.message : 'Failed to delete convert file'
       });
     }
   }
@@ -281,6 +281,13 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
         expandedRows: [convertFileId]
       });
     }
+  }
+
+  // Provide empty implementation instead of empty arrow function
+  private handleDeleteProp = (): void => {
+    // This method is used to satisfy the interface contract but actual deletion
+    // is handled through onToggleDeleted
+    console.log('Delete operation handled through toggle deleted');
   }
 
   public render(): React.ReactElement<IXyeaProps> {
@@ -309,7 +316,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
             <strong>Error:</strong> {error}
             <button 
               className={styles.retryButton}
-              onClick={this.loadData}
+              onClick={() => void this.loadData()}
             >
               Retry
             </button>
@@ -345,7 +352,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
               loading={loading}
               onAdd={this.handleAddConvertFileProp}
               onEdit={this.handleEditConvertFileProp}
-              onDelete={() => {}} // Не используется, используем onToggleDeleted
+              onDelete={this.handleDeleteProp} // Use proper function instead of empty arrow
               onMoveUp={this.handleMoveUp}
               onMoveDown={this.handleMoveDown}
               onToggleDeleted={this.handleToggleDeleted}

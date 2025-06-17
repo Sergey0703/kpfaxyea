@@ -33,7 +33,7 @@ interface ISeparateFilesManagementState extends ISeparateFilesState {
   showConfirmDialog: boolean;
   confirmDialogConfig: IConfirmationDialogConfig;
   confirmDialogLoading: boolean;
-  confirmDialogAction: 'loadNewFile' | 'clearFilters' | null;
+  confirmDialogAction: 'loadNewFile' | 'clearFilters' | undefined;
 }
 
 export default class SeparateFilesManagement extends React.Component<ISeparateFilesManagementProps, ISeparateFilesManagementState> {
@@ -42,8 +42,8 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
     super(props);
     
     this.state = {
-      uploadedFile: null,
-      currentSheet: null,
+      uploadedFile: undefined,
+      currentSheet: undefined,
       columns: [],
       filterState: {
         filters: {},
@@ -52,7 +52,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
         isAnyFilterActive: false
       },
       loading: false,
-      error: null,
+      error: undefined,
       uploadProgress: {
         stage: UploadStage.IDLE,
         progress: 0,
@@ -86,16 +86,16 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
         type: 'warning'
       },
       confirmDialogLoading: false,
-      confirmDialogAction: null
+      confirmDialogAction: undefined
     };
   }
 
   private handleFileSelect = async (file: File): Promise<void> => {
     this.setState({ 
       loading: true, 
-      error: null,
-      uploadedFile: null,
-      currentSheet: null,
+      error: undefined,
+      uploadedFile: undefined,
+      currentSheet: undefined,
       columns: []
     });
 
@@ -333,7 +333,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
       this.setState({ 
         showConfirmDialog: false,
         confirmDialogLoading: false,
-        confirmDialogAction: null
+        confirmDialogAction: undefined
       });
     }, 200);
   }
@@ -341,16 +341,16 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
   private handleCancelConfirmation = (): void => {
     this.setState({ 
       showConfirmDialog: false,
-      confirmDialogAction: null
+      confirmDialogAction: undefined
     });
   }
 
   private clearFileState = (): void => {
     this.setState({
-      uploadedFile: null,
-      currentSheet: null,
+      uploadedFile: undefined,
+      currentSheet: undefined,
       columns: [],
-      error: null,
+      error: undefined,
       filterState: {
         filters: {},
         totalRows: 0,
@@ -395,7 +395,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
 
     if (!uploadedFile || !currentSheet) return;
 
-    this.setState({ isExporting: true, error: null });
+    this.setState({ isExporting: true, error: undefined });
 
     try {
       const result = await ExcelExportService.exportFilteredData(
@@ -448,7 +448,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
     const { currentSheet, columns, filterState, loading } = this.state;
 
     if (!currentSheet || !columns.length) {
-      return null;
+      return undefined;
     }
 
     return (
@@ -468,7 +468,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
     const { currentSheet, filterState, exportSettings, isExporting } = this.state;
 
     if (!currentSheet) {
-      return null;
+      return undefined;
     }
 
     const statistics = ExcelExportService.getExportStatistics(currentSheet, filterState);
@@ -562,7 +562,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
               <strong>Error:</strong> {error}
               <button 
                 className={styles.clearErrorButton}
-                onClick={() => this.setState({ error: null })}
+                onClick={() => this.setState({ error: undefined })}
               >
                 ✕
               </button>

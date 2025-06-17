@@ -28,9 +28,12 @@ export interface IExcelSheet {
  */
 export interface IExcelRow {
   rowIndex: number;
-  data: { [columnName: string]: any };
+  data: { [columnName: string]: CellValue }; // Use specific type instead of any
   isVisible: boolean; // для фильтрации
 }
+
+// Define cell value type for better type safety
+type CellValue = string | number | boolean | Date | undefined;
 
 /**
  * Интерфейс для колонки Excel
@@ -39,10 +42,10 @@ export interface IExcelColumn {
   name: string;
   index: number;
   dataType: ExcelDataType;
-  uniqueValues: any[];
+  uniqueValues: CellValue[]; // Use specific type instead of any
   totalValues: number;
   hasFilter: boolean;
-  selectedValues: any[];
+  selectedValues: CellValue[]; // Use specific type instead of any
 }
 
 /**
@@ -61,7 +64,7 @@ export enum ExcelDataType {
  */
 export interface IColumnFilter {
   columnName: string;
-  selectedValues: any[];
+  selectedValues: CellValue[]; // Use specific type instead of any
   isActive: boolean;
   totalUniqueValues: number;
   dataType: ExcelDataType;
@@ -169,9 +172,9 @@ export interface IColumnStats {
   uniqueValues: number;
   emptyValues: number;
   dataType: ExcelDataType;
-  sampleValues: any[];
-  minValue?: any;
-  maxValue?: any;
+  sampleValues: CellValue[]; // Use specific type instead of any
+  minValue?: CellValue; // Use specific type instead of any
+  maxValue?: CellValue; // Use specific type instead of any
   averageValue?: number;
 }
 
@@ -192,8 +195,8 @@ export interface IUserPreferences {
  */
 export interface ISeparateFilesState {
   // Файл и данные
-  uploadedFile: IExcelFile | null;
-  currentSheet: IExcelSheet | null;
+  uploadedFile: IExcelFile | undefined;
+  currentSheet: IExcelSheet | undefined;
   columns: IExcelColumn[];
   
   // Фильтрация
@@ -201,7 +204,7 @@ export interface ISeparateFilesState {
   
   // UI состояние
   loading: boolean;
-  error: string | null;
+  error: string | undefined;
   uploadProgress: IUploadProgress;
   
   // Пагинация

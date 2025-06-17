@@ -11,6 +11,10 @@ import {
   UploadStage 
 } from '../interfaces/ExcelInterfaces';
 
+// Define proper types instead of any
+type CellValue = string | number | boolean | Date | undefined;
+type ExcelRowArray = (string | number | boolean | Date | undefined)[];
+
 export class ExcelParserService {
   private static readonly MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   private static readonly SUPPORTED_FORMATS = [
@@ -105,7 +109,7 @@ export class ExcelParserService {
       console.error('[ExcelParserService] Parsing failed:', error);
       return {
         success: false,
-        error: `Failed to parse file: ${error.message}`,
+        error: `Failed to parse file: ${error instanceof Error ? error.message : 'Unknown error'}`,
         statistics: this.createEmptyStatistics(Date.now() - startTime)
       };
     }
@@ -208,7 +212,7 @@ export class ExcelParserService {
         defval: '',
         raw: false,
         dateNF: 'yyyy-mm-dd'
-      }) as any[][];
+      }) as ExcelRowArray[]; // Use proper type instead of any[][]
 
       if (jsonData.length === 0) {
         return null;
@@ -228,10 +232,10 @@ export class ExcelParserService {
       const rows: IExcelRow[] = [];
 
       dataRows.forEach((row, index) => {
-        const rowData: { [key: string]: any } = {};
+        const rowData: { [key: string]: CellValue } = {}; // Use proper type
         
         headers.forEach((header, colIndex) => {
-          rowData[header] = row[colIndex] || '';
+          rowData[header] = row[colIndex] || undefined; // Use undefined instead of empty string
         });
 
         rows.push({
@@ -263,7 +267,7 @@ export class ExcelParserService {
         data: [],
         totalRows: 0,
         isValid: false,
-        validationErrors: [`Failed to parse sheet: ${error.message}`]
+        validationErrors: [`Failed to parse sheet: ${error instanceof Error ? error.message : 'Unknown error'}`]
       };
     }
   }
@@ -271,12 +275,12 @@ export class ExcelParserService {
   /**
    * Определение типа данных в колонке
    */
-  public static detectColumnDataType(values: any[]): ExcelDataType {
+  public static detectColumnDataType(values: CellValue[]): ExcelDataType { // Use proper type
     if (values.length === 0) {
       return ExcelDataType.TEXT;
     }
 
-    const nonEmptyValues = values.filter(v => v !== null && v !== undefined && v !== '');
+    const nonEmptyValues = values.filter(v => v !== undefined && v !== '');
     if (nonEmptyValues.length === 0) {
       return ExcelDataType.TEXT;
     }
@@ -314,7 +318,7 @@ export class ExcelParserService {
   /**
    * Проверка, является ли значение датой
    */
-  private static isDateValue(value: any): boolean {
+  private static isDateValue(value: CellValue): boolean { // Use proper type and explicit return type
     if (value instanceof Date) {
       return true;
     }
@@ -349,7 +353,13 @@ export class ExcelParserService {
   /**
    * Создание пустой статистики
    */
-  private static createEmptyStatistics(processingTime: number) {
+  private static createEmptyStatistics(processingTime: number): {
+    totalSheets: number;
+    totalRows: number;
+    totalColumns: number;
+    fileSize: string;
+    processingTime: number;
+  } {
     return {
       totalSheets: 0,
       totalRows: 0,

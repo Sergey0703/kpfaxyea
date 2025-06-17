@@ -11,7 +11,7 @@ import {
 import { ExcelParserService } from './ExcelParserService';
 
 // Type definitions for better type safety
-type CellValue = string | number | boolean | Date | null | undefined;
+type CellValue = string | number | boolean | Date | undefined; // Changed from null to undefined
 
 interface IFilterStatistics {
   totalFilters: number;
@@ -46,7 +46,7 @@ export class ExcelFilterService {
       
       // Уникальные значения (исключая пустые)
       const uniqueValuesSet = new Set(columnValues.filter((value: CellValue) => 
-        value !== null && value !== undefined && value !== ''
+        value !== undefined && value !== ''
       ));
       const uniqueValues = Array.from(uniqueValuesSet);
       
@@ -184,9 +184,9 @@ export class ExcelFilterService {
    */
   private static isValueInSelection(value: CellValue, selectedValues: CellValue[]): boolean {
     // Обработка пустых значений
-    if (value === null || value === undefined || value === '') {
+    if (value === undefined || value === '') {
       return selectedValues.some(selected => 
-        selected === null || selected === undefined || selected === '' || selected === '(Empty)'
+        selected === undefined || selected === '' || selected === '(Empty)'
       );
     }
 
