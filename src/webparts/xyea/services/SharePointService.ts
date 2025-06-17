@@ -3,6 +3,9 @@
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { SPHttpClient, SPHttpClientResponse } from '@microsoft/sp-http';
 
+// Define proper types instead of any
+type SharePointListItem = Record<string, unknown>;
+
 export class SharePointService {
   private context: WebPartContext;
 
@@ -83,7 +86,7 @@ export class SharePointService {
   }
 
   // Создать новый элемент
-  public async createListItem<T>(listName: string, item: any): Promise<T> {
+  public async createListItem<T>(listName: string, item: SharePointListItem): Promise<T> { // Use specific type instead of any
     try {
       const url = `${this.context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('${listName}')/items`;
       
@@ -112,7 +115,7 @@ export class SharePointService {
   }
 
   // Обновить элемент
-  public async updateListItem<T>(listName: string, id: number, item: any): Promise<T> {
+  public async updateListItem<T>(listName: string, id: number, item: SharePointListItem): Promise<T> { // Use specific type instead of any
     try {
       const url = `${this.context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('${listName}')/items(${id})`;
       

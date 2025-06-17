@@ -15,7 +15,7 @@ export interface IFileUploaderProps {
 
 export interface IFileUploaderState {
   isDragOver: boolean;
-  error: string | null;
+  error: string | undefined; // Changed from null to undefined
 }
 
 export default class FileUploader extends React.Component<IFileUploaderProps, IFileUploaderState> {
@@ -26,7 +26,7 @@ export default class FileUploader extends React.Component<IFileUploaderProps, IF
     
     this.state = {
       isDragOver: false,
-      error: null
+      error: undefined // Changed from null to undefined
     };
 
     this.fileInputRef = React.createRef<HTMLInputElement>();
@@ -74,12 +74,12 @@ export default class FileUploader extends React.Component<IFileUploaderProps, IF
   }
 
   private processFile = (file: File): void => {
-    this.setState({ error: null });
+    this.setState({ error: undefined });
 
     // Валидация файла
     const validation = this.validateFile(file);
     if (!validation.isValid) {
-      this.setState({ error: validation.error || null });
+      this.setState({ error: validation.error || undefined });
       return;
     }
 

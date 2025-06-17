@@ -535,7 +535,7 @@ export default class SeparateFilesManagement extends React.Component<ISeparateFi
 
         <button
           className={styles.exportButton}
-          onClick={() => { void this.handleExport(); }}
+          onClick={() => { this.handleExport().catch(console.error); }}
           disabled={!statistics.canExport || isExporting}
         >
           {isExporting ? 'Exporting...' : '📥 Export Filtered Data'}

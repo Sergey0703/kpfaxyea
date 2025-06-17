@@ -5,18 +5,21 @@ import styles from './ColumnFilter.module.scss';
 import { IColumnFilter, ExcelDataType, IExcelColumn } from '../../interfaces/ExcelInterfaces';
 import { ExcelFilterService } from '../../services/ExcelFilterService';
 
+// Define proper types instead of any
+type CellValue = string | number | boolean | Date | undefined;
+
 export interface IColumnFilterProps {
   column: IExcelColumn;
   filter: IColumnFilter;
   isOpen: boolean;
-  onFilterChange: (columnName: string, selectedValues: any[]) => void;
+  onFilterChange: (columnName: string, selectedValues: CellValue[]) => void; // Use specific type instead of any
   onClose: () => void;
 }
 
 export interface IColumnFilterState {
   searchTerm: string;
-  filteredValues: any[];
-  selectedValues: Set<any>;
+  filteredValues: CellValue[]; // Use specific type instead of any
+  selectedValues: Set<CellValue>; // Use specific type instead of any
   selectAll: boolean;
 }
 
@@ -71,7 +74,7 @@ export default class ColumnFilter extends React.Component<IColumnFilterProps, IC
 
   private handleSelectAll = (checked: boolean): void => {
     const { filteredValues } = this.state;
-    let newSelectedValues = new Set(this.state.selectedValues);
+    const newSelectedValues = new Set(this.state.selectedValues); // Use const instead of let
 
     if (checked) {
       // Добавляем все отфильтрованные значения
@@ -87,7 +90,7 @@ export default class ColumnFilter extends React.Component<IColumnFilterProps, IC
     });
   }
 
-  private handleValueToggle = (value: any, checked: boolean): void => {
+  private handleValueToggle = (value: CellValue, checked: boolean): void => { // Use specific type instead of any
     const newSelectedValues = new Set(this.state.selectedValues);
 
     if (checked) {
@@ -126,8 +129,8 @@ export default class ColumnFilter extends React.Component<IColumnFilterProps, IC
     });
   }
 
-  private formatValue = (value: any): string => {
-    if (value === null || value === undefined || value === '') {
+  private formatValue = (value: CellValue): string => { // Use specific type instead of any
+    if (value === undefined || value === '') {
       return '(Empty)';
     }
     
@@ -157,9 +160,9 @@ export default class ColumnFilter extends React.Component<IColumnFilterProps, IC
     }
   }
 
-  public render(): React.ReactElement<IColumnFilterProps> | null {
+  public render(): React.ReactElement<IColumnFilterProps> | undefined { // Changed from null to undefined
     if (!this.props.isOpen) {
-      return null;
+      return undefined;
     }
 
     const { column } = this.props;

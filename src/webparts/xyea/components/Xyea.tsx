@@ -316,7 +316,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
             <strong>Error:</strong> {error}
             <button 
               className={styles.retryButton}
-              onClick={() => void this.loadData()}
+              onClick={() => { this.loadData().catch(console.error); }}
             >
               Retry
             </button>
