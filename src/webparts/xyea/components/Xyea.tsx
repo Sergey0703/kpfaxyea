@@ -1,5 +1,4 @@
 // src/webparts/xyea/components/Xyea.tsx
-
 import * as React from 'react';
 import styles from './Xyea.module.scss';
 import { IXyeaProps } from './IXyeaProps';
