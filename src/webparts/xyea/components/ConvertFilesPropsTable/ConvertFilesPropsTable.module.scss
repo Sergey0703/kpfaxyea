@@ -137,6 +137,18 @@
 
           &.propCell {
             color: #605e5c;
+            
+            &.columnValid {
+              background-color: #f8fdf8;
+            }
+            
+            &.columnInvalid {
+              background-color: #fef8f8;
+            }
+            
+            &.columnUnknown {
+              background-color: #fafafa;
+            }
           }
 
           &.statusCell {

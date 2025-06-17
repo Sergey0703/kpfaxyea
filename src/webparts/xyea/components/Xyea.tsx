@@ -11,6 +11,7 @@ import EditPropsDialog from './EditDialog/EditPropsDialog';
 import Tabs, { ITabItem } from './Tabs/Tabs';
 import SeparateFilesManagement from './SeparateFilesManagement/SeparateFilesManagement';
 import { IExcelImportData } from './ExcelImportButton/ExcelImportButton';
+import { ISelectedFiles } from './ConvertFilesTable/IConvertFilesTableProps';
 
 export interface IXyeaState {
   convertFiles: IConvertFile[];
@@ -29,6 +30,8 @@ export interface IXyeaState {
   propsDialogItem: IConvertFileProps | undefined; // Changed from null to undefined
   propsDialogConvertFileId: number;
   propsDialogLoading: boolean;
+  // NEW: Selected files state
+  selectedFiles: ISelectedFiles;
 }
 
 export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
@@ -54,7 +57,9 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
       propsDialogEditMode: false,
       propsDialogItem: undefined, // Changed from null to undefined
       propsDialogConvertFileId: 0,
-      propsDialogLoading: false
+      propsDialogLoading: false,
+      // NEW: Selected files
+      selectedFiles: {}
     };
 
     this.convertFilesService = new ConvertFilesService(this.props.context);
@@ -316,6 +321,11 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
     }
   }
 
+  // NEW: Handle selected files change
+  private handleSelectedFilesChange = (selectedFiles: ISelectedFiles): void => {
+    this.setState({ selectedFiles });
+  }
+
   // Provide empty implementation instead of empty arrow function
   private handleDeleteProp = (): void => {
     // This method is used to satisfy the interface contract but actual deletion
@@ -365,6 +375,8 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
           onDelete={this.handleDeleteConvertFile}
           onRowClick={this.handleRowClick}
           expandedRows={expandedRows}
+          selectedFiles={this.state.selectedFiles}
+          onSelectedFilesChange={this.handleSelectedFilesChange}
         />
 
         {/* Показать подчиненные таблицы для раскрытых строк */}
@@ -390,6 +402,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
               onMoveDown={this.handleMoveDown}
               onToggleDeleted={this.handleToggleDeleted}
               onImportFromExcel={this.handleExcelImport} // NEW: Pass Excel import handler
+              selectedFiles={this.state.selectedFiles} // NEW: Pass selected files for validation
             />
           );
         })}

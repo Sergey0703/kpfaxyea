@@ -53,6 +53,29 @@
         font-weight: 600;
         border-bottom: 1px solid #edebe9;
         color: #323130;
+        
+        &:first-child {
+          width: 40px; // Expand column
+        }
+        
+        &:nth-child(2) {
+          width: 60px; // ID column
+        }
+        
+        &:nth-child(3) {
+          width: auto; // Title column - flexible
+          min-width: 200px;
+        }
+        
+        &:nth-child(4) {
+          width: 70px; // Further reduced Actions column width
+        }
+        
+        &:nth-child(5),
+        &:nth-child(6) {
+          width: 220px; // Further increased width for file columns
+          text-align: center;
+        }
       }
     }
 
@@ -99,47 +122,149 @@
             color: #323130;
           }
 
-          &          .actionsCell {
-            width: 120px;
-            text-align: right;
+          &.actionsCell {
+            width: 70px; // Further reduced width
+            text-align: left;
+            white-space: nowrap;
 
             .actionButton {
               background: none;
               border: 1px solid transparent;
               cursor: pointer;
-              padding: 4px 8px;
-              margin-left: 2px;
-              border-radius: 4px;
-              font-size: 11px;
+              padding: 2px 4px; // Further reduced padding
+              margin-right: 1px; // Minimal margin
+              border-radius: 3px;
+              font-size: 9px; // Further reduced font size
               font-weight: 600;
-              min-width: 50px;
-              height: 24px;
+              min-width: 30px; // Further reduced min-width
+              height: 20px; // Further reduced height
               transition: all 0.2s ease;
-              display: inline-block;
+              display: inline;
               
               &.editButton {
-                background-color: #107c10;
+                background-color: #6bb6ff;
                 color: white;
-                border-color: #107c10;
+                border-color: #6bb6ff;
                 
                 &:hover {
-                  background-color: #0e6e0e;
-                  border-color: #0e6e0e;
+                  background-color: #4da6ff;
+                  border-color: #4da6ff;
                   transform: translateY(-1px);
-                  box-shadow: 0 2px 6px rgba(16,124,16,0.3);
+                  box-shadow: 0 2px 6px rgba(107,182,255,0.3);
                 }
               }
 
               &.deleteButton {
-                background-color: #d13438;
+                background-color: #ff8a95;
                 color: white;
-                border-color: #d13438;
+                border-color: #ff8a95;
                 
                 &:hover {
-                  background-color: #a4262c;
-                  border-color: #a4262c;
+                  background-color: #ff6b7a;
+                  border-color: #ff6b7a;
                   transform: translateY(-1px);
-                  box-shadow: 0 2px 6px rgba(209,52,56,0.3);
+                  box-shadow: 0 2px 6px rgba(255,138,149,0.3);
+                }
+              }
+            }
+          }
+
+          &.fileActionsCell {
+            width: 220px; // Further increased width
+            text-align: center;
+            padding: 6px 8px;
+
+            .fileButton {
+              background: none;
+              border: 1px solid;
+              cursor: pointer;
+              padding: 4px 8px;
+              border-radius: 4px;
+              font-size: 10px;
+              font-weight: 600;
+              min-width: 200px; // Further increased width
+              height: 26px;
+              transition: all 0.2s ease;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              gap: 4px;
+              position: relative;
+              
+              &:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+              }
+
+              .buttonContent {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 4px;
+                width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+
+                .clearButton {
+                  background: rgba(255, 255, 255, 0.8);
+                  border: none;
+                  border-radius: 50%;
+                  width: 14px;
+                  height: 14px;
+                  font-size: 8px;
+                  cursor: pointer;
+                  color: #333;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  margin-left: 4px;
+                  flex-shrink: 0;
+
+                  &:hover {
+                    background: rgba(255, 255, 255, 1);
+                  }
+                }
+              }
+
+              &.hasFile {
+                font-weight: 700;
+                box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+              }
+
+              &.exportButton {
+                background-color: #ffb366;
+                color: white;
+                border-color: #ffb366;
+                
+                &:hover:not(:disabled) {
+                  background-color: #ff9f47;
+                  border-color: #ff9f47;
+                  transform: translateY(-1px);
+                  box-shadow: 0 2px 4px rgba(255, 179, 102, 0.3);
+                }
+
+                &.hasFile {
+                  background-color: #ff9f47;
+                  border-color: #ff9f47;
+                }
+              }
+
+              &.importButton {
+                background-color: #66c3ff;
+                color: white;
+                border-color: #66c3ff;
+                
+                &:hover:not(:disabled) {
+                  background-color: #47b3ff;
+                  border-color: #47b3ff;
+                  transform: translateY(-1px);
+                  box-shadow: 0 2px 4px rgba(102, 195, 255, 0.3);
+                }
+
+                &.hasFile {
+                  background-color: #47b3ff;
+                  border-color: #47b3ff;
                 }
               }
             }
@@ -173,5 +298,80 @@
     padding: 12px;
     color: #d13438;
     margin-bottom: 16px;
+  }
+}
+
+// Responsive design
+@media (max-width: 1200px) {
+  .convertFilesTable {
+    .table {
+      .tableHead .headerCell {
+        &:nth-child(4) {
+          width: 60px; // Very compact Actions column
+        }
+        
+        &:nth-child(5),
+        &:nth-child(6) {
+          width: 190px; // Responsive width
+        }
+      }
+
+      .tableBody .tableRow .tableCell {
+        &.actionsCell .actionButton {
+          padding: 1px 3px;
+          font-size: 8px;
+          min-width: 25px;
+          height: 18px;
+          margin-right: 1px;
+        }
+        
+        &.fileActionsCell .fileButton {
+          min-width: 170px;
+          font-size: 9px;
+          padding: 3px 6px;
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .convertFilesTable {
+    .table {
+      font-size: 12px;
+
+      .tableHead .headerCell {
+        padding: 6px 8px;
+        font-size: 11px;
+
+        &:nth-child(4) {
+          width: 50px; // Ultra compact Actions
+        }
+        
+        &:nth-child(5),
+        &:nth-child(6) {
+          width: 160px; // Mobile width
+        }
+      }
+
+      .tableBody .tableRow .tableCell {
+        padding: 6px 8px;
+
+        &.actionsCell .actionButton {
+          padding: 1px 2px;
+          font-size: 7px;
+          min-width: 20px;
+          height: 16px;
+          margin-right: 1px;
+        }
+
+        &.fileActionsCell .fileButton {
+          min-width: 140px;
+          font-size: 7px;
+          padding: 2px 4px;
+          height: 20px;
+        }
+      }
+    }
   }
 }
