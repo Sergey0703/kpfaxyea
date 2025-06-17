@@ -21,6 +21,12 @@
       margin: 0;
     }
 
+    .headerActions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     .addButton {
       background-color: #005a9e;
       color: white;
@@ -37,6 +43,42 @@
       &:disabled {
         background-color: #c8c6c4;
         cursor: not-allowed;
+      }
+    }
+  }
+
+  .error {
+    background-color: #fde7e9;
+    border: 1px solid #d13438;
+    border-radius: 2px;
+    padding: 8px 12px;
+    color: #d13438;
+    font-size: 12px;
+    margin: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .errorIcon {
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .errorMessage {
+      flex: 1;
+    }
+
+    .clearErrorButton {
+      background: none;
+      border: none;
+      color: #d13438;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px;
+      border-radius: 2px;
+      
+      &:hover {
+        background-color: rgba(209, 52, 56, 0.1);
       }
     }
   }
@@ -213,7 +255,15 @@
     background-color: white;
     
     .emptyMessage {
-      margin-bottom: 12px;
+      margin-bottom: 16px;
+    }
+
+    .emptyActions {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
     .addButton {
@@ -239,14 +289,48 @@
     font-size: 12px;
     background-color: white;
   }
+}
 
-  .error {
-    background-color: #fde7e9;
-    border: 1px solid #d13438;
-    border-radius: 2px;
-    padding: 8px 12px;
-    color: #d13438;
-    font-size: 12px;
-    margin: 8px 16px;
+// Responsive design
+@media (max-width: 768px) {
+  .convertFilesPropsTable {
+    .header {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+
+      .headerActions {
+        flex-direction: column;
+        gap: 6px;
+      }
+    }
+
+    .empty .emptyActions {
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .table {
+      font-size: 11px;
+
+      .tableHead .headerCell {
+        padding: 4px 6px;
+        font-size: 10px;
+      }
+
+      .tableBody .tableRow .tableCell {
+        padding: 4px 6px;
+        font-size: 10px;
+
+        &.actionsCell {
+          .actionButton {
+            min-width: 20px;
+            height: 18px;
+            font-size: 9px;
+            padding: 2px 4px;
+          }
+        }
+      }
+    }
   }
 }

@@ -1,4 +1,4 @@
-// src/webparts/xyea/components/Xyea.tsx
+// src/webparts/xyea/components/Xyea.tsx - Updated with Excel import functionality
 import * as React from 'react';
 import styles from './Xyea.module.scss';
 import { IXyeaProps } from './IXyeaProps';
@@ -10,6 +10,7 @@ import EditDialog from './EditDialog/EditDialog';
 import EditPropsDialog from './EditDialog/EditPropsDialog';
 import Tabs, { ITabItem } from './Tabs/Tabs';
 import SeparateFilesManagement from './SeparateFilesManagement/SeparateFilesManagement';
+import { IExcelImportData } from './ExcelImportButton/ExcelImportButton';
 
 export interface IXyeaState {
   convertFiles: IConvertFile[];
@@ -205,6 +206,38 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
     });
   }
 
+  // NEW: Handle Excel import for ConvertFilesProps
+  private handleExcelImport = async (convertFileId: number, excelData: IExcelImportData[]): Promise<void> => {
+    try {
+      console.log('[Xyea] Starting Excel import:', {
+        convertFileId,
+        dataCount: excelData.length
+      });
+
+      this.setState({ loading: true, error: undefined });
+
+      // Import data using the service
+      await this.convertFilesPropsService.importFromExcel(
+        convertFileId,
+        excelData,
+        this.state.convertFilesProps
+      );
+
+      console.log('[Xyea] Excel import completed successfully');
+
+      // Reload data to reflect changes
+      await this.loadData();
+
+    } catch (error) {
+      console.error('[Xyea] Excel import failed:', error);
+      this.setState({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Excel import failed'
+      });
+      throw error; // Re-throw to let the component handle it
+    }
+  }
+
   private handleToggleDeleted = async (id: number, isDeleted: boolean): Promise<void> => {
     try {
       this.setState({ loading: true });
@@ -356,6 +389,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
               onMoveUp={this.handleMoveUp}
               onMoveDown={this.handleMoveDown}
               onToggleDeleted={this.handleToggleDeleted}
+              onImportFromExcel={this.handleExcelImport} // NEW: Pass Excel import handler
             />
           );
         })}

@@ -2,6 +2,7 @@
 
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { IConvertFileProps } from '../../models';
+import { IExcelImportData } from '../ExcelImportButton/ExcelImportButton';
 
 export interface IConvertFilesPropsTableProps {
   context: WebPartContext;
@@ -16,4 +17,5 @@ export interface IConvertFilesPropsTableProps {
   onMoveUp: (id: number) => void;
   onMoveDown: (id: number) => void;
   onToggleDeleted: (id: number, isDeleted: boolean) => void;
+  onImportFromExcel?: (convertFileId: number, data: IExcelImportData[]) => Promise<void>; // New prop for Excel import
 }

@@ -1,0 +1,122 @@
+// src/webparts/xyea/components/ExcelImportButton/ExcelImportButton.module.scss
+
+.excelImportButton {
+  display: inline-block;
+  position: relative;
+
+  .importButton {
+    background-color: #107c10;
+    color: white;
+    border: none;
+    border-radius: 2px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+    min-width: 140px;
+    justify-content: center;
+    
+    &:hover:not(:disabled) {
+      background-color: #0e6e0e;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(16, 124, 16, 0.3);
+    }
+
+    &:disabled {
+      background-color: #c8c6c4;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .spinner {
+      width: 12px;
+      height: 12px;
+      border: 2px solid transparent;
+      border-top: 2px solid currentColor;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+  }
+
+  .error {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: #fde7e9;
+    border: 1px solid #d13438;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-top: 4px;
+    color: #d13438;
+    font-size: 11px;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    z-index: 1000;
+    min-width: 300px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+    .errorIcon {
+      font-size: 14px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .errorMessage {
+      flex: 1;
+      line-height: 1.4;
+    }
+
+    .clearErrorButton {
+      background: none;
+      border: none;
+      color: #d13438;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 0;
+      flex-shrink: 0;
+      border-radius: 2px;
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      
+      &:hover {
+        background-color: rgba(209, 52, 56, 0.1);
+      }
+    }
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .excelImportButton {
+    .importButton {
+      min-width: 120px;
+      font-size: 11px;
+      padding: 5px 10px;
+    }
+
+    .error {
+      min-width: 250px;
+      font-size: 10px;
+      padding: 6px 10px;
+    }
+  }
+}

@@ -5,6 +5,7 @@ import styles from './ConvertFilesPropsTable.module.scss';
 import { IConvertFilesPropsTableProps } from './IConvertFilesPropsTableProps';
 import { IConvertFileProps } from '../../models';
 import { PriorityHelper } from '../../utils';
+import ExcelImportButton, { IExcelImportData } from '../ExcelImportButton/ExcelImportButton';
 
 export interface IConvertFilesPropsTableState {
   error: string | undefined;
@@ -45,18 +46,44 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
     this.props.onAdd(this.props.convertFileId);
   }
 
+  private handleExcelImport = async (data: IExcelImportData[]): Promise<void> => {
+    try {
+      console.log('[ConvertFilesPropsTable] Starting Excel import:', {
+        convertFileId: this.props.convertFileId,
+        dataCount: data.length
+      });
+
+      // Call the new import handler from props
+      if (this.props.onImportFromExcel) {
+        await this.props.onImportFromExcel(this.props.convertFileId, data);
+      } else {
+        throw new Error('Excel import is not supported');
+      }
+
+      console.log('[ConvertFilesPropsTable] Excel import completed successfully');
+    } catch (error) {
+      console.error('[ConvertFilesPropsTable] Excel import failed:', error);
+      this.setState({ 
+        error: error instanceof Error ? error.message : 'Excel import failed' 
+      });
+      throw error; // Re-throw to let ExcelImportButton handle it
+    }
+  }
+
   private canMoveUp = (item: IConvertFileProps): boolean => {
-    // Allow moving deleted items too
     return PriorityHelper.canMoveUp(this.props.allItems, item.Id, this.props.convertFileId);
   }
 
   private canMoveDown = (item: IConvertFileProps): boolean => {
-    // Allow moving deleted items too
     return PriorityHelper.canMoveDown(this.props.allItems, item.Id, this.props.convertFileId);
   }
 
   private getSortedItems = (): IConvertFileProps[] => {
     return PriorityHelper.sortByPriority(this.props.items);
+  }
+
+  private clearError = (): void => {
+    this.setState({ error: undefined });
   }
 
   public render(): React.ReactElement<IConvertFilesPropsTableProps> {
@@ -68,18 +95,33 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
       <div className={styles.convertFilesPropsTable}>
         <div className={styles.header}>
           <h3 className={styles.title}>Properties for: {convertFileTitle}</h3>
-          <button 
-            className={styles.addButton}
-            onClick={this.handleAdd}
-            disabled={loading}
-          >
-            + Add Property
-          </button>
+          <div className={styles.headerActions}>
+            <ExcelImportButton
+              onImport={this.handleExcelImport}
+              disabled={loading}
+              existingItemsCount={sortedItems.length}
+            />
+            <button 
+              className={styles.addButton}
+              onClick={this.handleAdd}
+              disabled={loading}
+            >
+              + Add Property
+            </button>
+          </div>
         </div>
 
         {error && (
           <div className={styles.error}>
-            Error: {error}
+            <span className={styles.errorIcon}>⚠️</span>
+            <span className={styles.errorMessage}>Error: {error}</span>
+            <button 
+              className={styles.clearErrorButton}
+              onClick={this.clearError}
+              title="Clear error"
+            >
+              ✕
+            </button>
           </div>
         )}
 
@@ -90,12 +132,19 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
         ) : sortedItems.length === 0 ? (
           <div className={styles.empty}>
             <div className={styles.emptyMessage}>No properties found for this convert file.</div>
-            <button 
-              className={styles.addButton}
-              onClick={this.handleAdd}
-            >
-              Add First Property
-            </button>
+            <div className={styles.emptyActions}>
+              <ExcelImportButton
+                onImport={this.handleExcelImport}
+                disabled={loading}
+                existingItemsCount={0}
+              />
+              <button 
+                className={styles.addButton}
+                onClick={this.handleAdd}
+              >
+                Add First Property
+              </button>
+            </div>
           </div>
         ) : (
           <table className={styles.table}>

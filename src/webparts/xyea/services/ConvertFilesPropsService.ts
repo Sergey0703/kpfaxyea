@@ -1,9 +1,10 @@
-// src/webparts/xyea/services/ConvertFilesPropsService.ts
+// src/webparts/xyea/services/ConvertFilesPropsService.ts - Updated with bulk import methods
 
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { SharePointService } from './SharePointService';
 import { IConvertFileProps } from '../models';
 import { PriorityHelper } from '../utils';
+import { IExcelImportData } from '../components/ExcelImportButton/ExcelImportButton';
 
 // SharePoint API response types for better type safety
 interface ISharePointConvertFilePropsResponse {
@@ -101,6 +102,151 @@ export class ConvertFilesPropsService {
     }
   }
 
+  // NEW: Bulk import from Excel data with replacement of existing items
+  public async importFromExcel(
+    convertFilesId: number, 
+    excelData: IExcelImportData[],
+    allItems: IConvertFileProps[]
+  ): Promise<IConvertFileProps[]> {
+    try {
+      console.log(`[ConvertFilesPropsService] Starting Excel import for ConvertFiles ${convertFilesId}:`, {
+        dataCount: excelData.length,
+        convertFilesId
+      });
+
+      // Step 1: Delete all existing items for this ConvertFilesID
+      const existingItems = allItems.filter(item => item.ConvertFilesID === convertFilesId);
+      
+      if (existingItems.length > 0) {
+        console.log(`[ConvertFilesPropsService] Deleting ${existingItems.length} existing items`);
+        
+        // Delete items in batches to avoid overwhelming SharePoint
+        for (const item of existingItems) {
+          await this.deleteConvertFileProp(item.Id);
+        }
+      }
+
+      // Step 2: Create new items from Excel data
+      const createdItems: IConvertFileProps[] = [];
+      
+      for (let i = 0; i < excelData.length; i++) {
+        const data = excelData[i];
+        const priority = i + 1; // Sequential priority starting from 1
+
+        // Generate title from Prop value, fallback to row number
+        const title = data.prop.trim() || `Row ${i + 1}`;
+
+        console.log(`[ConvertFilesPropsService] Creating item ${i + 1}/${excelData.length}:`, {
+          title,
+          prop: data.prop,
+          prop2: data.prop2,
+          priority
+        });
+
+        try {
+          const createdItem = await this.createConvertFilePropDirect(
+            convertFilesId,
+            title,
+            data.prop,
+            data.prop2,
+            priority
+          );
+          
+          createdItems.push(createdItem);
+        } catch (error) {
+          console.error(`[ConvertFilesPropsService] Failed to create item ${i + 1}:`, error);
+          // Continue with other items even if one fails
+        }
+      }
+
+      console.log(`[ConvertFilesPropsService] Excel import completed. Created ${createdItems.length}/${excelData.length} items`);
+      
+      return createdItems;
+
+    } catch (error) {
+      console.error('[ConvertFilesPropsService] Excel import failed:', error);
+      throw new Error(`Excel import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // NEW: Direct creation method for bulk operations (bypasses priority calculation)
+  private async createConvertFilePropDirect(
+    convertFilesId: number,
+    title: string,
+    prop: string = '',
+    prop2: string = '',
+    priority: number
+  ): Promise<IConvertFileProps> {
+    try {
+      // Sanitize inputs
+      const sanitizedTitle = title.trim();
+      const sanitizedProp = prop.trim();
+      const sanitizedProp2 = prop2.trim();
+
+      // Validate that title is not empty
+      if (!sanitizedTitle) {
+        throw new Error('Title is required and cannot be empty');
+      }
+
+      // Create item with all fields including priority
+      const basicItem = {
+        Title: sanitizedTitle,
+        Prop: sanitizedProp,
+        Prop2: sanitizedProp2,
+        Priority: priority,
+        IsDeleted: 0
+      };
+
+      const createdItem = await this.spService.createListItem<ISharePointCreateResponse>(this.LIST_NAME, basicItem);
+      const itemId = createdItem.Id;
+
+      // Update with ConvertFilesID lookup
+      try {
+        const updateData = { ConvertFilesIDId: convertFilesId };
+        const updatedItem = await this.spService.updateListItem<ISharePointUpdateResponse>(this.LIST_NAME, itemId, updateData);
+        
+        return {
+          Id: itemId,
+          Title: sanitizedTitle,
+          ConvertFilesID: convertFilesId,
+          Prop: sanitizedProp,
+          Prop2: sanitizedProp2,
+          Priority: priority,
+          IsDeleted: false,
+          Created: createdItem.Created ? new Date(createdItem.Created) : undefined,
+          Modified: updatedItem?.Modified ? new Date(updatedItem.Modified) : (createdItem.Modified ? new Date(createdItem.Modified) : undefined)
+        };
+      } catch (lookupError) {
+        console.warn(`[ConvertFilesPropsService] Lookup update failed for item ${itemId}, but item was created`);
+        
+        return {
+          Id: itemId,
+          Title: sanitizedTitle,
+          ConvertFilesID: 0, // Lookup failed
+          Prop: sanitizedProp,
+          Prop2: sanitizedProp2,
+          Priority: priority,
+          IsDeleted: false,
+          Created: createdItem.Created ? new Date(createdItem.Created) : undefined,
+          Modified: createdItem.Modified ? new Date(createdItem.Modified) : undefined
+        };
+      }
+    } catch (error) {
+      console.error('[ConvertFilesPropsService] Error in createConvertFilePropDirect:', error);
+      throw error;
+    }
+  }
+
+  // NEW: Delete a convert file prop (hard delete)
+  private async deleteConvertFileProp(id: number): Promise<void> {
+    try {
+      await this.spService.deleteListItem(this.LIST_NAME, id);
+    } catch (error) {
+      console.error(`[ConvertFilesPropsService] Error deleting convert file prop ${id}:`, error);
+      throw error;
+    }
+  }
+
   // Создать новое свойство - updated to handle optional fields
   public async createConvertFileProp(
     convertFilesId: number,
@@ -118,93 +264,7 @@ export class ConvertFilesPropsService {
       // Вычисляем следующий приоритет
       const nextPriority = PriorityHelper.getNextPriority(allItems, convertFilesId);
 
-      // Sanitize inputs - allow empty strings for optional fields
-      const sanitizedTitle = title.trim();
-      const sanitizedProp = prop.trim();
-      const sanitizedProp2 = prop2.trim();
-
-      // Validate that title is not empty
-      if (!sanitizedTitle) {
-        throw new Error('Title is required and cannot be empty');
-      }
-
-      // Сначала создаем с основными полями
-      const basicItem = {
-        Title: sanitizedTitle,
-        Prop: sanitizedProp, // Can be empty
-        Prop2: sanitizedProp2, // Can be empty
-        Priority: nextPriority,
-        IsDeleted: 0  // Используем 0 для SharePoint (false)
-      };
-
-      console.log('Creating ConvertFileProps with all fields:', basicItem);
-      const createdItem = await this.spService.createListItem<ISharePointCreateResponse>(this.LIST_NAME, basicItem);
-      console.log('Created item:', createdItem);
-
-      // Теперь попробуем обновить с Lookup полем
-      const itemId = createdItem.Id;
-      
-      try {
-        console.log('Trying to update with ConvertFilesIDId...');
-        const updateData1 = {
-          ConvertFilesIDId: convertFilesId
-        };
-        
-        const updatedItem = await this.spService.updateListItem<ISharePointUpdateResponse>(this.LIST_NAME, itemId, updateData1);
-        console.log('Successfully updated with ConvertFilesIDId:', updatedItem);
-        
-        return {
-          Id: itemId,
-          Title: sanitizedTitle,
-          ConvertFilesID: convertFilesId,
-          Prop: sanitizedProp,
-          Prop2: sanitizedProp2,
-          Priority: nextPriority,
-          IsDeleted: false,
-          Created: createdItem.Created ? new Date(createdItem.Created) : undefined,
-          Modified: updatedItem?.Modified ? new Date(updatedItem.Modified) : (createdItem.Modified ? new Date(createdItem.Modified) : undefined)
-        };
-        
-      } catch (error1) {
-        console.log('ConvertFilesIDId update failed, trying ConvertFilesID...');
-        
-        try {
-          const updateData2 = {
-            ConvertFilesID: convertFilesId
-          };
-          
-          const updatedItem = await this.spService.updateListItem<ISharePointUpdateResponse>(this.LIST_NAME, itemId, updateData2);
-          console.log('Successfully updated with ConvertFilesID:', updatedItem);
-          
-          return {
-            Id: itemId,
-            Title: sanitizedTitle,
-            ConvertFilesID: convertFilesId,
-            Prop: sanitizedProp,
-            Prop2: sanitizedProp2,
-            Priority: nextPriority,
-            IsDeleted: false,
-            Created: createdItem.Created ? new Date(createdItem.Created) : undefined,
-            Modified: updatedItem?.Modified ? new Date(updatedItem.Modified) : (createdItem.Modified ? new Date(createdItem.Modified) : undefined)
-          };
-          
-        } catch (error2) {
-          console.log('Both lookup update attempts failed. Item created but without lookup.');
-          
-          // Возвращаем элемент без lookup
-          return {
-            Id: itemId,
-            Title: sanitizedTitle,
-            ConvertFilesID: 0, // Не удалось установить lookup
-            Prop: sanitizedProp,
-            Prop2: sanitizedProp2,
-            Priority: nextPriority,
-            IsDeleted: false,
-            Created: createdItem.Created ? new Date(createdItem.Created) : undefined,
-            Modified: createdItem.Modified ? new Date(createdItem.Modified) : undefined
-          };
-        }
-      }
+      return await this.createConvertFilePropDirect(convertFilesId, title, prop, prop2, nextPriority);
     } catch (error) {
       console.error('Error creating convert file prop:', error);
       throw error;
