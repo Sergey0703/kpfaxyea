@@ -1,7 +1,5 @@
 // src/webparts/xyea/components/EditDialog/EditPropsDialog.tsx
 
-// src/webparts/xyea/components/EditDialog/EditPropsDialog.tsx
-
 import * as React from 'react';
 import styles from './EditDialog.module.scss';
 import { ValidationHelper } from '../../utils';
@@ -11,7 +9,7 @@ export interface IEditPropsDialogProps {
   isOpen: boolean;
   isEditMode: boolean;
   convertFileId: number;
-  item?: IConvertFileProps | null;
+  item?: IConvertFileProps | undefined; // Changed from null to undefined
   title: string;
   loading?: boolean;
   onSave: (convertFileId: number, title: string, prop: string, prop2: string) => Promise<void>;
@@ -53,12 +51,15 @@ export default class EditPropsDialog extends React.Component<IEditPropsDialogPro
     }
   }
 
-  private handleInputChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>): void => {
-    const value = event.target.value;
-    this.setState({ 
-      [field]: value,
-      errors: { ...this.state.errors, [field]: '' } // Очистить ошибку при изменении
-    } as any);
+  private handleInputChange = (field: string): (event: React.ChangeEvent<HTMLInputElement>) => void => { // Added explicit return type
+    return (event: React.ChangeEvent<HTMLInputElement>): void => {
+      const value = event.target.value;
+      this.setState(prevState => ({ 
+        ...prevState,
+        [field]: value,
+        errors: { ...prevState.errors, [field]: '' } // Очистить ошибку при изменении
+      }));
+    };
   }
 
   private validateForm = (): boolean => {
@@ -88,7 +89,7 @@ export default class EditPropsDialog extends React.Component<IEditPropsDialogPro
     return true;
   }
 
-  private handleSave = async (): Promise<void> => {
+  private handleSave = (): void => {
     if (!this.validateForm()) {
       return;
     }
@@ -98,19 +99,22 @@ export default class EditPropsDialog extends React.Component<IEditPropsDialogPro
     const sanitizedProp = ValidationHelper.sanitizeString(prop);
     const sanitizedProp2 = ValidationHelper.sanitizeString(prop2);
 
-    try {
-      this.setState({ saving: true });
-      await this.props.onSave(this.props.convertFileId, sanitizedTitle, sanitizedProp, sanitizedProp2);
-      // Диалог закроется через onSave callback
-    } catch (error) {
-      console.error('Error saving:', error);
-      this.setState({
-        errors: {
-          general: error.message || 'Failed to save item'
-        },
-        saving: false
+    this.setState({ saving: true });
+    
+    // Handle the promise properly
+    this.props.onSave(this.props.convertFileId, sanitizedTitle, sanitizedProp, sanitizedProp2)
+      .then(() => {
+        // Dialog will close through onSave callback
+      })
+      .catch((error) => {
+        console.error('Error saving:', error);
+        this.setState({
+          errors: {
+            general: error instanceof Error ? error.message : 'Failed to save item'
+          },
+          saving: false
+        });
       });
-    }
   }
 
   private handleCancel = (): void => {
@@ -140,9 +144,9 @@ export default class EditPropsDialog extends React.Component<IEditPropsDialogPro
     }
   }
 
-  public render(): React.ReactElement<IEditPropsDialogProps> | null {
+  public render(): React.ReactElement<IEditPropsDialogProps> | undefined { // Changed from null to undefined
     if (!this.props.isOpen) {
-      return null;
+      return undefined;
     }
 
     const { title, prop, prop2, errors, saving } = this.state;

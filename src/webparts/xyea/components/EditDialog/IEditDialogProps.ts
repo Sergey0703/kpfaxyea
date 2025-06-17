@@ -5,7 +5,7 @@ import { IConvertFile } from '../../models';
 export interface IEditDialogProps {
   isOpen: boolean;
   isEditMode: boolean;
-  item?: IConvertFile | null;
+  item?: IConvertFile | undefined; // Changed from null to undefined
   title: string;
   loading?: boolean;
   onSave: (title: string) => Promise<void>;

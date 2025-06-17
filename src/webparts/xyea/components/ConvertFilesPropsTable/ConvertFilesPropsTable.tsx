@@ -7,7 +7,7 @@ import { IConvertFileProps } from '../../models';
 import { PriorityHelper } from '../../utils';
 
 export interface IConvertFilesPropsTableState {
-  error: string | null;
+  error: string | undefined; // Changed from null to undefined
 }
 
 export default class ConvertFilesPropsTable extends React.Component<IConvertFilesPropsTableProps, IConvertFilesPropsTableState> {
@@ -15,7 +15,7 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
   constructor(props: IConvertFilesPropsTableProps) {
     super(props);
     this.state = {
-      error: null
+      error: undefined // Changed from null to undefined
     };
   }
 

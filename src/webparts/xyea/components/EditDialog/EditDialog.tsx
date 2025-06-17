@@ -59,7 +59,7 @@ export default class EditDialog extends React.Component<IEditDialogProps, IEditD
     return true;
   }
 
-  private handleSave = async (): Promise<void> => {
+  private handleSave = (): void => {
     if (!this.validateForm()) {
       return;
     }
@@ -67,19 +67,22 @@ export default class EditDialog extends React.Component<IEditDialogProps, IEditD
     const { title } = this.state;
     const sanitizedTitle = ValidationHelper.sanitizeString(title);
 
-    try {
-      this.setState({ saving: true });
-      await this.props.onSave(sanitizedTitle);
-      // Диалог закроется через onSave callback
-    } catch (error) {
-      console.error('Error saving:', error);
-      this.setState({
-        errors: {
-          general: error.message || 'Failed to save item'
-        },
-        saving: false
+    this.setState({ saving: true });
+    
+    // Handle the promise properly
+    this.props.onSave(sanitizedTitle)
+      .then(() => {
+        // Dialog will close through onSave callback
+      })
+      .catch((error) => {
+        console.error('Error saving:', error);
+        this.setState({
+          errors: {
+            general: error instanceof Error ? error.message : 'Failed to save item'
+          },
+          saving: false
+        });
       });
-    }
   }
 
   private handleCancel = (): void => {
@@ -108,9 +111,9 @@ export default class EditDialog extends React.Component<IEditDialogProps, IEditD
     }
   }
 
-  public render(): React.ReactElement<IEditDialogProps> | null {
+  public render(): React.ReactElement<IEditDialogProps> | undefined { // Changed from null to undefined
     if (!this.props.isOpen) {
-      return null;
+      return undefined;
     }
 
     const { title, errors, saving } = this.state;
