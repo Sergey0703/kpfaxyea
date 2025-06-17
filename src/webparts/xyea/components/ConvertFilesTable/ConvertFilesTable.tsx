@@ -6,7 +6,7 @@ import { IConvertFilesTableProps } from './IConvertFilesTableProps';
 import { IConvertFile } from '../../models';
 
 export interface IConvertFilesTableState {
-  error: string | null;
+  error: string | undefined; // Changed from null to undefined
 }
 
 export default class ConvertFilesTable extends React.Component<IConvertFilesTableProps, IConvertFilesTableState> {
@@ -14,7 +14,7 @@ export default class ConvertFilesTable extends React.Component<IConvertFilesTabl
   constructor(props: IConvertFilesTableProps) {
     super(props);
     this.state = {
-      error: null
+      error: undefined // Changed from null to undefined
     };
   }
 
@@ -85,7 +85,7 @@ export default class ConvertFilesTable extends React.Component<IConvertFilesTabl
           <table className={styles.table}>
             <thead className={styles.tableHead}>
               <tr>
-                <th className={styles.headerCell}></th>
+                <th className={styles.headerCell} /> {/* Self-closing empty th */}
                 <th className={styles.headerCell}>ID</th>
                 <th className={styles.headerCell}>Title</th>
                 <th className={styles.headerCell}>Created</th>

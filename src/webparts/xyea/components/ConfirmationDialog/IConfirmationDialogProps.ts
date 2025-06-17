@@ -22,12 +22,9 @@ export interface IConfirmationDialogConfig {
   showIcon?: boolean;
 }
 
-// Хелпер для создания конфигураций диалогов
+// Simplified helper class
 export class ConfirmationDialogHelper {
   
-  /**
-   * Создает конфигурацию для подтверждения удаления
-   */
   public static createDeleteConfirmation(itemName: string): IConfirmationDialogConfig {
     return {
       title: 'Delete Item',
@@ -39,9 +36,6 @@ export class ConfirmationDialogHelper {
     };
   }
 
-  /**
-   * Создает конфигурацию для замены данных
-   */
   public static createReplaceDataConfirmation(
     currentDataInfo: string,
     replacementAction: string
@@ -56,23 +50,6 @@ export class ConfirmationDialogHelper {
     };
   }
 
-  /**
-   * Создает конфигурацию для потери несохраненных изменений
-   */
-  public static createUnsavedChangesConfirmation(): IConfirmationDialogConfig {
-    return {
-      title: 'Unsaved Changes',
-      message: 'You have unsaved changes that will be lost.\n\nAre you sure you want to continue without saving?',
-      confirmText: 'Yes, Discard Changes',
-      cancelText: 'Cancel',
-      type: 'warning',
-      showIcon: true
-    };
-  }
-
-  /**
-   * Создает конфигурацию для очистки фильтров
-   */
   public static createClearFiltersConfirmation(activeFiltersCount: number): IConfirmationDialogConfig {
     return {
       title: 'Clear All Filters',
@@ -84,9 +61,6 @@ export class ConfirmationDialogHelper {
     };
   }
 
-  /**
-   * Создает конфигурацию для экспорта больших файлов
-   */
   public static createLargeExportConfirmation(rowCount: number): IConfirmationDialogConfig {
     return {
       title: 'Large Export Warning',

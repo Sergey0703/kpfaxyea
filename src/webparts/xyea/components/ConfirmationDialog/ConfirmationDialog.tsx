@@ -1,7 +1,6 @@
 // src/webparts/xyea/components/ConfirmationDialog/ConfirmationDialog.tsx
 
 import * as React from 'react';
-import styles from './ConfirmationDialog.module.scss';
 
 export interface IConfirmationDialogProps {
   isOpen: boolean;
@@ -16,25 +15,7 @@ export interface IConfirmationDialogProps {
   showIcon?: boolean;
 }
 
-export default class ConfirmationDialog extends React.Component<IConfirmationDialogProps> {
-
-  private handleOverlayClick = (event: React.MouseEvent): void => {
-    if (event.target === event.currentTarget && !this.props.loading) {
-      this.props.onCancel();
-    }
-  }
-
-  private handleKeyDown = (event: React.KeyboardEvent): void => {
-    if (this.props.loading) return;
-
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      this.props.onConfirm();
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      this.props.onCancel();
-    }
-  }
+class ConfirmationDialog extends React.Component<IConfirmationDialogProps> {
 
   private getIcon = (): string => {
     const { type = 'warning' } = this.props;
@@ -51,29 +32,9 @@ export default class ConfirmationDialog extends React.Component<IConfirmationDia
     }
   }
 
-  private formatMessage = (message: string): React.ReactNode => {
-    // Разбиваем сообщение на параграфы по \n\n
-    const paragraphs = message.split('\n\n');
-    
-    return paragraphs.map((paragraph, index) => {
-      // Разбиваем параграф на строки по \n
-      const lines = paragraph.split('\n');
-      return (
-        <p key={index} className={styles.paragraph}>
-          {lines.map((line, lineIndex) => (
-            <React.Fragment key={lineIndex}>
-              {line}
-              {lineIndex < lines.length - 1 && <br />}
-            </React.Fragment>
-          ))}
-        </p>
-      );
-    });
-  }
-
-  public render(): React.ReactElement<IConfirmationDialogProps> | null {
+  public render(): JSX.Element {
     if (!this.props.isOpen) {
-      return null;
+      return <div style={{ display: 'none' }} />;
     }
 
     const { 
@@ -89,44 +50,104 @@ export default class ConfirmationDialog extends React.Component<IConfirmationDia
     } = this.props;
 
     return (
-      <div className={styles.dialogOverlay} onClick={this.handleOverlayClick}>
-        <div className={styles.dialog} onKeyDown={this.handleKeyDown}>
-          <div className={styles.header}>
-            <div className={styles.titleContainer}>
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000
+      }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '4px',
+          boxShadow: '0 4px 23px rgba(0, 0, 0, 0.2)',
+          minWidth: '400px',
+          maxWidth: '500px',
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            padding: '20px 24px 16px',
+            borderBottom: '1px solid #edebe9'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
               {showIcon && (
-                <span className={styles.icon}>{this.getIcon()}</span>
+                <span style={{ fontSize: '24px' }}>{this.getIcon()}</span>
               )}
-              <h3 className={styles.title}>{title}</h3>
+              <h3 style={{
+                margin: 0,
+                fontSize: '18px',
+                fontWeight: 600,
+                color: '#323130'
+              }}>
+                {title}
+              </h3>
             </div>
           </div>
 
-          <div className={styles.content}>
-            <div className={styles.message}>
-              {this.formatMessage(message)}
+          <div style={{
+            padding: '20px 24px'
+          }}>
+            <div style={{
+              margin: 0,
+              fontSize: '14px',
+              lineHeight: 1.5,
+              color: '#605e5c',
+              whiteSpace: 'pre-line'
+            }}>
+              {message}
             </div>
           </div>
 
-          <div className={styles.footer}>
+          <div style={{
+            padding: '16px 24px 20px',
+            borderTop: '1px solid #edebe9',
+            backgroundColor: '#faf9f8',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: '12px'
+          }}>
             <button
-              className={`${styles.button} ${styles.secondary}`}
+              style={{
+                padding: '8px 16px',
+                border: '1px solid #edebe9',
+                borderRadius: '2px',
+                backgroundColor: 'white',
+                color: '#323130',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                minWidth: '80px',
+                opacity: loading ? 0.6 : 1
+              }}
               onClick={onCancel}
               disabled={loading}
-              autoFocus={type !== 'danger'} // Для опасных действий фокус НЕ на Cancel
             >
               {loading ? 'Processing...' : cancelText}
             </button>
             <button
-              className={`${styles.button} ${styles.primary} ${styles[type]}`}
+              style={{
+                padding: '8px 16px',
+                border: '1px solid #0078d4',
+                borderRadius: '2px',
+                backgroundColor: type === 'danger' ? '#d13438' : '#0078d4',
+                color: 'white',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                minWidth: '80px',
+                opacity: loading ? 0.6 : 1
+              }}
               onClick={onConfirm}
               disabled={loading}
-              autoFocus={type === 'danger'} // Для опасных действий фокус на Confirm
             >
-              {loading ? (
-                <>
-                  <span className={styles.spinner}></span>
-                  Processing...
-                </>
-              ) : confirmText}
+              {loading ? 'Processing...' : confirmText}
             </button>
           </div>
         </div>
@@ -134,3 +155,5 @@ export default class ConfirmationDialog extends React.Component<IConfirmationDia
     );
   }
 }
+
+export default ConfirmationDialog;
