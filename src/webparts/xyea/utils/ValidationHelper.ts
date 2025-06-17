@@ -3,8 +3,8 @@
 export class ValidationHelper {
   
   // Проверить, что строка не пустая и не состоит только из пробелов
-  public static isNotEmpty(value: string | undefined | null): boolean {
-    return value !== undefined && value !== null && value.trim().length > 0;
+  public static isNotEmpty(value: string | undefined): boolean { // Changed from null to undefined
+    return value !== undefined && value.trim().length > 0;
   }
 
   // Проверить длину строки
@@ -22,8 +22,8 @@ export class ValidationHelper {
   }
 
   // Проверить валидность ID
-  public static isValidId(id: number | undefined | null): boolean {
-    return id !== undefined && id !== null && this.isPositiveNumber(id);
+  public static isValidId(id: number | undefined): boolean { // Changed from null to undefined
+    return id !== undefined && this.isPositiveNumber(id);
   }
 
   // Валидация ConvertFile
@@ -85,7 +85,7 @@ export class ValidationHelper {
   }
 
   // Очистить строку от лишних пробелов
-  public static sanitizeString(value: string | undefined | null): string {
+  public static sanitizeString(value: string | undefined): string { // Changed from null to undefined
     if (!value) {
       return '';
     }
