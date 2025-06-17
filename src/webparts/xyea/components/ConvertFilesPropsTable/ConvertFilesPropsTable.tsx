@@ -54,7 +54,9 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
     // Re-validate columns when files change or items change
     if (prevProps.selectedFiles !== this.props.selectedFiles || 
         prevProps.items !== this.props.items) {
-      void this.validateAllColumns();
+      this.validateAllColumns().catch(error => {
+        console.error('[ConvertFilesPropsTable] Validation error in componentDidUpdate:', error);
+      });
     }
   }
 
@@ -467,34 +469,40 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
       const cachedExport = this.state.filesCache.exportFile;
       const cachedImport = this.state.filesCache.importFile;
       
-      let exportData = cachedExport;
-      let importData = cachedImport;
+      // Create new variables for file data
+      const fileDataToProcess: {
+        exportFile?: { headers: string[]; data: string[][] };
+        importFile?: { headers: string[]; data: string[][] };
+      } = {
+        exportFile: cachedExport,
+        importFile: cachedImport
+      };
 
       // Read export file if selected and not cached
-      if (selectedFiles?.export && !exportData) {
+      if (selectedFiles?.export && !cachedExport) {
         console.log('[ConvertFilesPropsTable] Reading export file:', selectedFiles.export.name);
-        exportData = await this.readExcelFile(selectedFiles.export);
+        fileDataToProcess.exportFile = await this.readExcelFile(selectedFiles.export);
       }
       
       // Read import file if selected and not cached
-      if (selectedFiles?.import && !importData) {
+      if (selectedFiles?.import && !cachedImport) {
         console.log('[ConvertFilesPropsTable] Reading import file:', selectedFiles.import.name);
-        importData = await this.readExcelFile(selectedFiles.import);
+        fileDataToProcess.importFile = await this.readExcelFile(selectedFiles.import);
       }
 
       // Update cache with whatever we have
       this.setState({
         filesCache: {
-          exportFile: exportData,
-          importFile: importData
+          exportFile: fileDataToProcess.exportFile,
+          importFile: fileDataToProcess.importFile
         }
       });
 
       console.log('[ConvertFilesPropsTable] Available files:', {
-        hasExport: !!exportData,
-        hasImport: !!importData,
-        exportHeaders: exportData?.headers.length || 0,
-        importHeaders: importData?.headers.length || 0
+        hasExport: !!fileDataToProcess.exportFile,
+        hasImport: !!fileDataToProcess.importFile,
+        exportHeaders: fileDataToProcess.exportFile?.headers.length || 0,
+        importHeaders: fileDataToProcess.importFile?.headers.length || 0
       });
 
       // Validate all items with available data
@@ -512,8 +520,8 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
         
         // Check Prop in export file (if available)
         let propExists: boolean | undefined = undefined;
-        if (exportData && item.Prop.trim()) {
-          propExists = exportData.headers.some(header => {
+        if (fileDataToProcess.exportFile && item.Prop.trim()) {
+          propExists = fileDataToProcess.exportFile.headers.some(header => {
             const headerLower = header.toLowerCase().trim();
             const propLower = item.Prop.toLowerCase().trim();
             const matches = headerLower === propLower;
@@ -526,8 +534,8 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
         
         // Check Prop2 in import file (if available)
         let prop2Exists: boolean | undefined = undefined;
-        if (importData && item.Prop2.trim()) {
-          prop2Exists = importData.headers.some(header => {
+        if (fileDataToProcess.importFile && item.Prop2.trim()) {
+          prop2Exists = fileDataToProcess.importFile.headers.some(header => {
             const headerLower = header.toLowerCase().trim();
             const prop2Lower = item.Prop2.toLowerCase().trim();
             const matches = headerLower === prop2Lower;
