@@ -1,4 +1,4 @@
-// src/webparts/xyea/services/ConvertFilesPropsService.ts - Updated with ConvertType support
+// src/webparts/xyea/services/ConvertFilesPropsService.ts - Updated with ConvertType support and fixed linting errors
 
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { SharePointService } from './SharePointService';
@@ -373,7 +373,7 @@ export class ConvertFilesPropsService {
     }
   }
 
-  // Обновить свойство - updated to handle ConvertType fields
+  // Обновить свойство - updated to handle ConvertType fields with proper typing
   public async updateConvertFileProp(
     id: number,
     title: string,
@@ -393,7 +393,14 @@ export class ConvertFilesPropsService {
         throw new Error('Title is required and cannot be empty');
       }
 
-      const updateItem: any = {
+      // Use proper typing instead of any - FIXED linting error
+      const updateItem: {
+        Title: string;
+        Prop: string;
+        Prop2: string;
+        ConvertTypeId?: number;
+        ConvertType2Id?: number;
+      } = {
         Title: sanitizedTitle,
         Prop: sanitizedProp,
         Prop2: sanitizedProp2

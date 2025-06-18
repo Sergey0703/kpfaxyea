@@ -1,4 +1,4 @@
-// src/webparts/xyea/components/EditDialog/EditPropsDialog.tsx - Updated with ConvertType support
+// src/webparts/xyea/components/EditDialog/EditPropsDialog.tsx - Updated with ConvertType support and fixed linting errors
 
 import * as React from 'react';
 import { IConvertType } from '../../models/IConvertType';
@@ -221,7 +221,7 @@ class EditPropsDialog extends React.Component<IEditPropsDialogProps, IEditPropsD
               <span style={{ fontSize: '16px' }}>ℹ️</span>
               <div style={{ fontSize: '14px', color: '#005a9e' }}>
                 <strong>Required:</strong> Only the Title field is mandatory. 
-                Prop and Prop2 fields are optional. Convert types default to "String" (ID=1).
+                Prop and Prop2 fields are optional. Convert types default to &quot;String&quot; (ID=1).
               </div>
             </div>
 
