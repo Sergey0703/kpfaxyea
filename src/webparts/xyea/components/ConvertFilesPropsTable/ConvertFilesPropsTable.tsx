@@ -350,7 +350,7 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
     await this.downloadUpdatedFile(importData, importFile.name);
 
     // Show completion message with accumulation info
-    this.showConversionResults(processedRows, skippedRows, dataAccumulator);
+    this.showConversionResults(processedRows, skippedRows ); //dataAccumulator
   }
 
   // All file reading and validation methods remain the same...
