@@ -22,7 +22,7 @@ interface ISharePointConvertTypeResponse {
 
 export class ConvertTypesService {
   private spService: SharePointService;
-  private readonly LIST_NAME = 'converttypes';
+  private readonly LIST_NAME = 'convertypes'; // FIXED: Remove 't' - correct name
 
   constructor(context: WebPartContext) {
     this.spService = new SharePointService(context);

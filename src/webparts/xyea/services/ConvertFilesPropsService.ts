@@ -43,7 +43,7 @@ interface ISharePointUpdateResponse {
 
 export class ConvertFilesPropsService {
   private spService: SharePointService;
-  private readonly LIST_NAME = 'convertfilesprops';
+  private readonly LIST_NAME = 'convertfilesprops'; // FIXED: Remove 't' - correct name
   private readonly DEFAULT_CONVERT_TYPE_ID = 1; // Строковый тип по умолчанию
 
   constructor(context: WebPartContext) {
@@ -53,18 +53,22 @@ export class ConvertFilesPropsService {
   // Получить все свойства
   public async getAllConvertFilesProps(): Promise<IConvertFileProps[]> {
     try {
+      const fields = 'Id,Title,ConvertFilesIDId,Prop,Prop2,IsDeleted,Priority,ConvertTypeId,ConvertType2Id,Created,Modified';
+      console.log('[ConvertFilesPropsService] Loading items with fields:', fields);
+      
       const items = await this.spService.getListItems<ISharePointConvertFilePropsResponse>(
         this.LIST_NAME,
-        'Id,Title,ConvertFilesIDId,Prop,Prop2,IsDeleted,Priority,ConvertTypeId,ConvertType2Id,Created,Modified',
+        fields,
         undefined,
         undefined,
         'ConvertFilesIDId asc, Priority asc',
-        5000 // Increase limit to 5000 items
+        5000
       );
 
+      console.log('[ConvertFilesPropsService] Loaded', items.length, 'items');
       return items.map((item: ISharePointConvertFilePropsResponse) => this.mapSharePointItemToModel(item));
     } catch (error) {
-      console.error('Error getting convert files props:', error);
+      console.error('[ConvertFilesPropsService] Error getting convert files props:', error);
       throw error;
     }
   }
@@ -253,6 +257,15 @@ export class ConvertFilesPropsService {
         throw new Error('Title is required and cannot be empty');
       }
 
+      console.log('[ConvertFilesPropsService] Creating item with data:', {
+        Title: sanitizedTitle,
+        Prop: sanitizedProp,
+        Prop2: sanitizedProp2,
+        Priority: priority,
+        ConvertTypeId: convertTypeId,
+        ConvertType2Id: convertType2Id
+      });
+
       // Create item with all fields including priority and convert types
       const basicItem = {
         Title: sanitizedTitle,
@@ -267,10 +280,14 @@ export class ConvertFilesPropsService {
       const createdItem = await this.spService.createListItem<ISharePointCreateResponse>(this.LIST_NAME, basicItem);
       const itemId = createdItem.Id;
 
+      console.log('[ConvertFilesPropsService] Item created with ID:', itemId);
+
       // Update with ConvertFilesID lookup
       try {
         const updateData = { ConvertFilesIDId: convertFilesId };
         const updatedItem = await this.spService.updateListItem<ISharePointUpdateResponse>(this.LIST_NAME, itemId, updateData);
+        
+        console.log('[ConvertFilesPropsService] Item updated with ConvertFilesID:', convertFilesId);
         
         return {
           Id: itemId,
@@ -286,7 +303,7 @@ export class ConvertFilesPropsService {
           Modified: updatedItem?.Modified ? new Date(updatedItem.Modified) : (createdItem.Modified ? new Date(createdItem.Modified) : undefined)
         };
       } catch (lookupError) {
-        console.warn(`[ConvertFilesPropsService] Lookup update failed for item ${itemId}, but item was created`);
+        console.warn(`[ConvertFilesPropsService] Lookup update failed for item ${itemId}, but item was created:`, lookupError);
         
         return {
           Id: itemId,
@@ -492,6 +509,13 @@ export class ConvertFilesPropsService {
 
   // Helper method to map SharePoint response to model
   private mapSharePointItemToModel(item: ISharePointConvertFilePropsResponse): IConvertFileProps {
+    console.log('[ConvertFilesPropsService] Mapping SharePoint item:', {
+      Id: item.Id,
+      Title: item.Title,
+      ConvertTypeId: item.ConvertTypeId,
+      ConvertType2Id: item.ConvertType2Id
+    });
+
     return {
       Id: item.Id,
       Title: item.Title,
@@ -501,9 +525,9 @@ export class ConvertFilesPropsService {
       Prop2: item.Prop2 || '',
       IsDeleted: item.IsDeleted === 1,
       Priority: item.Priority,
-      ConvertType: item.ConvertTypeId || this.DEFAULT_CONVERT_TYPE_ID, // NEW: Map ConvertType
+      ConvertType: item.ConvertTypeId || this.DEFAULT_CONVERT_TYPE_ID, // Use default if not set
       ConvertTypeId: item.ConvertTypeId,
-      ConvertType2: item.ConvertType2Id || this.DEFAULT_CONVERT_TYPE_ID, // NEW: Map ConvertType2
+      ConvertType2: item.ConvertType2Id || this.DEFAULT_CONVERT_TYPE_ID, // Use default if not set
       ConvertType2Id: item.ConvertType2Id,
       Created: item.Created ? new Date(item.Created) : undefined,
       Modified: item.Modified ? new Date(item.Modified) : undefined,

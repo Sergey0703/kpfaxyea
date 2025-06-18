@@ -217,7 +217,7 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
 
   // All conversion logic methods remain the same...
   private performConversion = async (exportFile: File, importFile: File): Promise<void> => {
-    console.log('[ConvertFilesPropsTable] Starting conversion process');
+    console.log('[ConvertFilesPropsTable] Starting conversion process with data accumulation');
 
     const exportData = await this.readExcelFile(exportFile);
     const importData = await this.readExcelFile(importFile);
@@ -225,13 +225,19 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
     const processedRows: number[] = [];
     const skippedRows: Array<{ row: number; reason: string; column?: string; file?: string }> = [];
 
+    // NEW: Track data accumulation for each target column and row
+    const dataAccumulator: { [targetColumn: string]: { [rowIndex: number]: string[] } } = {};
+
     const sortedItems = this.getSortedItems().filter(item => !item.IsDeleted);
     
+    console.log('[ConvertFilesPropsTable] Processing', sortedItems.length, 'mapping rules');
+
     for (let i = 0; i < sortedItems.length; i++) {
       const item = sortedItems[i];
       const rowNumber = i + 1;
 
       try {
+        // Find source column in export file
         const sourceColumnIndex = exportData.headers.findIndex(header => 
           header.toLowerCase().trim() === item.Prop.toLowerCase().trim()
         );
@@ -246,6 +252,7 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
           continue;
         }
 
+        // Find target column in import file
         const targetColumnIndex = importData.headers.findIndex(header => 
           header.toLowerCase().trim() === item.Prop2.toLowerCase().trim()
         );
@@ -260,12 +267,20 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
           continue;
         }
 
-        const exportDataRows = exportData.data.slice(1);
+        // NEW: Initialize accumulator for this target column if not exists
+        const targetColumnName = item.Prop2;
+        if (!dataAccumulator[targetColumnName]) {
+          dataAccumulator[targetColumnName] = {};
+        }
+
+        // Process each data row from export file
+        const exportDataRows = exportData.data.slice(1); // Skip header row
         
         for (let dataRowIndex = 0; dataRowIndex < exportDataRows.length; dataRowIndex++) {
           const sourceValue = exportDataRows[dataRowIndex][sourceColumnIndex];
-          const importRowIndex = dataRowIndex + 1;
+          const importRowIndex = dataRowIndex + 1; // +1 to skip header row in import file
           
+          // Ensure import data has enough rows
           if (importRowIndex >= importData.data.length) {
             const newRow = new Array(importData.headers.length).fill('');
             importData.data.push(newRow);
@@ -275,17 +290,26 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
             importData.data[importRowIndex] = new Array(importData.headers.length).fill('');
           }
           
+          // Extend the row if necessary
           while (importData.data[importRowIndex].length <= targetColumnIndex) {
             importData.data[importRowIndex].push('');
           }
 
-          importData.data[importRowIndex][targetColumnIndex] = sourceValue || '';
-          
-          console.log(`[ConvertFilesPropsTable] Copied "${sourceValue}" from Export[${dataRowIndex + 1}][${sourceColumnIndex}] to Import[${importRowIndex}][${targetColumnIndex}]`);
+          // NEW: Initialize accumulator for this row if not exists
+          if (!dataAccumulator[targetColumnName][importRowIndex]) {
+            dataAccumulator[targetColumnName][importRowIndex] = [];
+          }
+
+          // NEW: Add source value to accumulator (only if not empty)
+          if (sourceValue !== undefined && sourceValue !== null && String(sourceValue).trim() !== '') {
+            dataAccumulator[targetColumnName][importRowIndex].push(String(sourceValue).trim());
+            
+            console.log(`[ConvertFilesPropsTable] Added "${sourceValue}" to accumulator for ${targetColumnName}[${importRowIndex}]`);
+          }
         }
 
         processedRows.push(rowNumber);
-        console.log(`[ConvertFilesPropsTable] Processed row ${rowNumber}: ${item.Prop} → ${item.Prop2}`);
+        console.log(`[ConvertFilesPropsTable] Processed row ${rowNumber}: ${item.Prop} → ${item.Prop2} (accumulating)`);
 
       } catch (error) {
         console.error(`[ConvertFilesPropsTable] Error processing row ${rowNumber}:`, error);
@@ -296,8 +320,37 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
       }
     }
 
+    // NEW: Apply accumulated data to import file
+    console.log('[ConvertFilesPropsTable] Applying accumulated data to import file');
+    
+    Object.keys(dataAccumulator).forEach(targetColumnName => {
+      const targetColumnIndex = importData.headers.findIndex(header => 
+        header.toLowerCase().trim() === targetColumnName.toLowerCase().trim()
+      );
+      
+      if (targetColumnIndex === -1) return;
+
+      const rowData = dataAccumulator[targetColumnName];
+      
+      Object.keys(rowData).forEach(rowIndexStr => {
+        const rowIndex = parseInt(rowIndexStr, 10);
+        const accumulatedValues = rowData[rowIndex];
+        
+        if (accumulatedValues && accumulatedValues.length > 0) {
+          // Join values with space separator
+          const finalValue = accumulatedValues.join(' ');
+          importData.data[rowIndex][targetColumnIndex] = finalValue;
+          
+          console.log(`[ConvertFilesPropsTable] Applied accumulated data to ${targetColumnName}[${rowIndex}]: "${finalValue}"`);
+        }
+      });
+    });
+
+    // Generate and download the updated import file
     await this.downloadUpdatedFile(importData, importFile.name);
-    this.showConversionResults(processedRows, skippedRows);
+
+    // Show completion message with accumulation info
+    this.showConversionResults(processedRows, skippedRows, dataAccumulator);
   }
 
   // All file reading and validation methods remain the same...
@@ -684,8 +737,8 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
                 <th className={styles.headerCell}>Priority</th>
                 <th className={styles.headerCell}>Title</th>
                 <th className={styles.headerCell}>Prop</th>
-                <th className={styles.headerCell}>Prop2</th>
                 <th className={styles.headerCell}>Convert Type</th>
+                <th className={styles.headerCell}>Prop2</th>
                 <th className={styles.headerCell}>Convert Type2</th>
                 <th className={styles.headerCell}>Status</th>
                 <th className={styles.headerCell}>Created</th>
@@ -713,6 +766,14 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
                   >
                     {item.Prop}
                   </td>
+                  <td className={`${styles.tableCell} ${styles.convertTypeCell}`}>
+                    <span 
+                      className={styles.convertTypeBadge}
+                      title={`Convert Type ID: ${item.ConvertType}`}
+                    >
+                      {this.getConvertTypeName(item.ConvertType, convertTypes)}
+                    </span>
+                  </td>
                   <td 
                     className={`${styles.tableCell} ${styles.propCell}`}
                     style={{
@@ -721,14 +782,6 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
                     }}
                   >
                     {item.Prop2}
-                  </td>
-                  <td className={`${styles.tableCell} ${styles.convertTypeCell}`}>
-                    <span 
-                      className={styles.convertTypeBadge}
-                      title={`Convert Type ID: ${item.ConvertType}`}
-                    >
-                      {this.getConvertTypeName(item.ConvertType, convertTypes)}
-                    </span>
                   </td>
                   <td className={`${styles.tableCell} ${styles.convertTypeCell}`}>
                     <span 
