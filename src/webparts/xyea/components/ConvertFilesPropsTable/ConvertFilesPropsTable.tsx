@@ -1,4 +1,4 @@
-// src/webparts/xyea/components/ConvertFilesPropsTable/ConvertFilesPropsTable.tsx
+// src/webparts/xyea/components/ConvertFilesPropsTable/ConvertFilesPropsTable.tsx - Updated with ConvertType support
 
 import * as React from 'react';
 import styles from './ConvertFilesPropsTable.module.scss';
@@ -110,12 +110,11 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
     }
   }
 
+  // All conversion-related methods remain the same...
   private handleConversion = (): void => {
-    // Check if both files are selected first
     const selectedFiles = this.props.selectedFiles?.[this.props.convertFileId];
     
     if (!selectedFiles?.export && !selectedFiles?.import) {
-      // Both files missing
       this.setState({
         showConversionDialog: true,
         conversionDialogConfig: {
@@ -131,7 +130,6 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
     }
     
     if (!selectedFiles?.export) {
-      // Export file missing
       this.setState({
         showConversionDialog: true,
         conversionDialogConfig: {
@@ -147,7 +145,6 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
     }
     
     if (!selectedFiles?.import) {
-      // Import file missing
       this.setState({
         showConversionDialog: true,
         conversionDialogConfig: {
@@ -162,7 +159,6 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
       return;
     }
     
-    // Both files are selected - show conversion confirmation
     this.setState({
       showConversionDialog: true,
       conversionDialogConfig: {
@@ -179,7 +175,6 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
   private handleConversionConfirm = async (): Promise<void> => {
     const { conversionDialogConfig } = this.state;
     
-    // If this is just an informational dialog (only OK button), just close it
     if (!conversionDialogConfig.cancelText || conversionDialogConfig.cancelText === '') {
       this.setState({
         showConversionDialog: false,
@@ -188,18 +183,15 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
       return;
     }
     
-    // This is the actual conversion confirmation
     this.setState({ conversionDialogLoading: true });
 
     try {
-      // Get selected files (we already validated they exist)
       const selectedFiles = this.props.selectedFiles?.[this.props.convertFileId];
       
       if (!selectedFiles?.export || !selectedFiles?.import) {
         throw new Error('Files are no longer available');
       }
 
-      // Start conversion process
       await this.performConversion(selectedFiles.export, selectedFiles.import);
 
       this.setState({
@@ -223,17 +215,16 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
     });
   }
 
+  // All conversion logic methods remain the same...
   private performConversion = async (exportFile: File, importFile: File): Promise<void> => {
     console.log('[ConvertFilesPropsTable] Starting conversion process');
 
-    // Read both files
     const exportData = await this.readExcelFile(exportFile);
     const importData = await this.readExcelFile(importFile);
 
     const processedRows: number[] = [];
     const skippedRows: Array<{ row: number; reason: string; column?: string; file?: string }> = [];
 
-    // Process each row in the properties table
     const sortedItems = this.getSortedItems().filter(item => !item.IsDeleted);
     
     for (let i = 0; i < sortedItems.length; i++) {
@@ -241,7 +232,6 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
       const rowNumber = i + 1;
 
       try {
-        // Find source column in export file (by Excel column name like A, B, C)
         const sourceColumnIndex = exportData.headers.findIndex(header => 
           header.toLowerCase().trim() === item.Prop.toLowerCase().trim()
         );
@@ -256,7 +246,6 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
           continue;
         }
 
-        // Find target column in import file (by Excel column name like A, B, C)
         const targetColumnIndex = importData.headers.findIndex(header => 
           header.toLowerCase().trim() === item.Prop2.toLowerCase().trim()
         );
@@ -271,36 +260,25 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
           continue;
         }
 
-        // Copy data from source to target column
-        // IMPORTANT: Both files have headers in row 0
-        // Skip row 0 in Export file (headers) and row 0 in Import file (headers)
-        // Copy from Export row 1+ to Import row 1+
-        const exportDataRows = exportData.data.slice(1); // Skip header row in export
+        const exportDataRows = exportData.data.slice(1);
         
         for (let dataRowIndex = 0; dataRowIndex < exportDataRows.length; dataRowIndex++) {
           const sourceValue = exportDataRows[dataRowIndex][sourceColumnIndex];
-          
-          // Calculate target row index: +1 to skip the header row in import file
           const importRowIndex = dataRowIndex + 1;
           
-          // Ensure import data has enough rows
           if (importRowIndex >= importData.data.length) {
-            // Add new rows as needed
             const newRow = new Array(importData.headers.length).fill('');
             importData.data.push(newRow);
           }
 
-          // Ensure import row exists and has enough columns
           if (!importData.data[importRowIndex]) {
             importData.data[importRowIndex] = new Array(importData.headers.length).fill('');
           }
           
-          // Extend the row if necessary
           while (importData.data[importRowIndex].length <= targetColumnIndex) {
             importData.data[importRowIndex].push('');
           }
 
-          // Copy the value to import file (both files skip header row 0)
           importData.data[importRowIndex][targetColumnIndex] = sourceValue || '';
           
           console.log(`[ConvertFilesPropsTable] Copied "${sourceValue}" from Export[${dataRowIndex + 1}][${sourceColumnIndex}] to Import[${importRowIndex}][${targetColumnIndex}]`);
@@ -318,13 +296,11 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
       }
     }
 
-    // Generate and download the updated import file
     await this.downloadUpdatedFile(importData, importFile.name);
-
-    // Show completion message
     this.showConversionResults(processedRows, skippedRows);
   }
 
+  // All file reading and validation methods remain the same...
   private readExcelFile = async (file: File): Promise<{ headers: string[]; data: string[][] }> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -343,11 +319,9 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
           console.log('[ConvertFilesPropsTable] Reading Excel file:', file.name);
           console.log('[ConvertFilesPropsTable] Worksheet range:', worksheet['!ref']);
           
-          // Get the range to determine number of columns
           const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1');
-          const numCols = range.e.c + 1; // +1 because it's 0-indexed
+          const numCols = range.e.c + 1;
           
-          // Generate Excel column headers (A, B, C, D, etc.)
           const excelHeaders: string[] = [];
           for (let col = 0; col < numCols; col++) {
             excelHeaders.push(this.getExcelColumnName(col));
@@ -355,7 +329,6 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
           
           console.log('[ConvertFilesPropsTable] Excel column headers:', excelHeaders);
           
-          // Convert to array format for data
           const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
             header: 1,
             defval: '',
@@ -370,9 +343,8 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
             return;
           }
 
-          // Use Excel column names as headers instead of first row content
           const headers = excelHeaders;
-          const data = jsonData; // Keep all data including first row
+          const data = jsonData;
           
           console.log('[ConvertFilesPropsTable] Final headers (Excel columns):', headers);
           console.log('[ConvertFilesPropsTable] Data rows count:', data.length);
@@ -389,7 +361,6 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
     });
   }
 
-  // Helper method to convert column index to Excel column name (0->A, 1->B, 25->Z, 26->AA, etc.)
   private getExcelColumnName = (columnIndex: number): string => {
     let columnName = '';
     while (columnIndex >= 0) {
@@ -400,23 +371,11 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
   }
 
   private downloadUpdatedFile = async (data: { headers: string[]; data: string[][] }, originalFileName: string): Promise<void> => {
-    // Create new workbook
     const workbook = XLSX.utils.book_new();
-    
-    // Since headers are now Excel column names (A, B, C), we use only the data
-    // The data already includes the original first row with actual headers
     const worksheetData = data.data;
-    
-    // Create worksheet from array of arrays
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-    
-    // Add worksheet to workbook
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
-    
-    // Generate filename
     const fileName = originalFileName.replace(/\.[^/.]+$/, '_converted.xlsx');
-    
-    // Download file
     XLSX.writeFile(workbook, fileName);
   }
 
@@ -455,7 +414,6 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
     }
     
     message += '\nThe updated Import file has been downloaded.';
-    
     alert(message);
   }
 
@@ -465,11 +423,9 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
     console.log('[ConvertFilesPropsTable] Starting column validation');
     
     try {
-      // Use local variables to avoid race conditions
       const cachedExport = this.state.filesCache.exportFile;
       const cachedImport = this.state.filesCache.importFile;
       
-      // Create new variables for file data
       const fileDataToProcess: {
         exportFile?: { headers: string[]; data: string[][] };
         importFile?: { headers: string[]; data: string[][] };
@@ -478,19 +434,16 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
         importFile: cachedImport
       };
 
-      // Read export file if selected and not cached
       if (selectedFiles?.export && !cachedExport) {
         console.log('[ConvertFilesPropsTable] Reading export file:', selectedFiles.export.name);
         fileDataToProcess.exportFile = await this.readExcelFile(selectedFiles.export);
       }
       
-      // Read import file if selected and not cached
       if (selectedFiles?.import && !cachedImport) {
         console.log('[ConvertFilesPropsTable] Reading import file:', selectedFiles.import.name);
         fileDataToProcess.importFile = await this.readExcelFile(selectedFiles.import);
       }
 
-      // Update cache with whatever we have
       this.setState({
         filesCache: {
           exportFile: fileDataToProcess.exportFile,
@@ -505,7 +458,6 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
         importHeaders: fileDataToProcess.importFile?.headers.length || 0
       });
 
-      // Validate all items with available data
       const validation: {
         [itemId: number]: {
           propValid: boolean;
@@ -518,7 +470,6 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
       this.props.items.forEach(item => {
         console.log(`[ConvertFilesPropsTable] Validating item ${item.Id}: Prop="${item.Prop}", Prop2="${item.Prop2}"`);
         
-        // Check Prop in export file (if available)
         let propExists: boolean | undefined = undefined;
         if (fileDataToProcess.exportFile && item.Prop.trim()) {
           propExists = fileDataToProcess.exportFile.headers.some(header => {
@@ -532,7 +483,6 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
           });
         }
         
-        // Check Prop2 in import file (if available)
         let prop2Exists: boolean | undefined = undefined;
         if (fileDataToProcess.importFile && item.Prop2.trim()) {
           prop2Exists = fileDataToProcess.importFile.headers.some(header => {
@@ -569,15 +519,12 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
     const validation = this.state.columnValidation[itemId];
     const selectedFiles = this.props.selectedFiles?.[this.props.convertFileId];
     
-    // Get the field value to check if it's empty
     const item = this.props.items.find(i => i.Id === itemId);
     const fieldValue = column === 'prop' ? item?.Prop : item?.Prop2;
     const isFieldEmpty = !fieldValue || fieldValue.trim() === '';
     
-    // Check if the corresponding file is available
     const hasFile = column === 'prop' ? !!selectedFiles?.export : !!selectedFiles?.import;
     
-    // Debug logging
     console.log(`[getColumnValidationStyle] Item ${itemId}, Column ${column}:`, {
       fieldValue,
       isFieldEmpty,
@@ -587,34 +534,30 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
       isValid: validation ? (column === 'prop' ? validation.propValid : validation.prop2Valid) : 'no validation'
     });
     
-    // If file is not selected OR field is empty, show gray
     if (!hasFile || isFieldEmpty) {
       console.log(`[getColumnValidationStyle] → GRAY (no file or empty field)`);
-      return { backgroundColor: '#e6e6e6' }; // No file selected OR empty field - light gray
+      return { backgroundColor: '#e6e6e6' };
     }
     
-    // If we don't have validation data yet, show gray
     if (!validation) {
       console.log(`[getColumnValidationStyle] → GRAY (no validation data)`);
-      return { backgroundColor: '#e6e6e6' }; // No validation data - light gray
+      return { backgroundColor: '#e6e6e6' };
     }
 
     const isValid = column === 'prop' ? validation.propValid : validation.prop2Valid;
     const exists = column === 'prop' ? validation.propExists : validation.prop2Exists;
     
-    // If exists is undefined, it means validation hasn't run for this field yet
     if (exists === undefined) {
       console.log(`[getColumnValidationStyle] → GRAY (exists is undefined)`);
-      return { backgroundColor: '#e6e6e6' }; // Validation not done - light gray
+      return { backgroundColor: '#e6e6e6' };
     }
     
-    // Show validation result: file is selected, field is filled, validation is done
     if (isValid) {
       console.log(`[getColumnValidationStyle] → GREEN (valid)`);
-      return { backgroundColor: '#d4edda' }; // Valid - light green
+      return { backgroundColor: '#d4edda' };
     } else {
       console.log(`[getColumnValidationStyle] → RED (invalid)`);
-      return { backgroundColor: '#f8d7da' }; // Invalid - light red
+      return { backgroundColor: '#f8d7da' };
     }
   }
 
@@ -634,8 +577,14 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
     this.setState({ error: undefined });
   }
 
+  // Helper method to get convert type name
+  private getConvertTypeName = (convertTypeId: number, convertTypes: { Id: number; Title: string }[] = []): string => {
+    const convertType = convertTypes.find(ct => ct.Id === convertTypeId);
+    return convertType ? convertType.Title : `Type ${convertTypeId}`;
+  }
+
   public render(): React.ReactElement<IConvertFilesPropsTableProps> {
-    const { convertFileTitle, loading } = this.props;
+    const { convertFileTitle, loading, convertTypes = [] } = this.props;
     const { error, showConversionDialog, conversionDialogConfig, conversionDialogLoading } = this.state;
     const sortedItems = this.getSortedItems();
 
@@ -736,6 +685,8 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
                 <th className={styles.headerCell}>Title</th>
                 <th className={styles.headerCell}>Prop</th>
                 <th className={styles.headerCell}>Prop2</th>
+                <th className={styles.headerCell}>Convert Type</th>
+                <th className={styles.headerCell}>Convert Type2</th>
                 <th className={styles.headerCell}>Status</th>
                 <th className={styles.headerCell}>Created</th>
                 <th className={styles.headerCell}>Actions</th>
@@ -770,6 +721,22 @@ export default class ConvertFilesPropsTable extends React.Component<IConvertFile
                     }}
                   >
                     {item.Prop2}
+                  </td>
+                  <td className={`${styles.tableCell} ${styles.convertTypeCell}`}>
+                    <span 
+                      className={styles.convertTypeBadge}
+                      title={`Convert Type ID: ${item.ConvertType}`}
+                    >
+                      {this.getConvertTypeName(item.ConvertType, convertTypes)}
+                    </span>
+                  </td>
+                  <td className={`${styles.tableCell} ${styles.convertTypeCell}`}>
+                    <span 
+                      className={styles.convertTypeBadge}
+                      title={`Convert Type2 ID: ${item.ConvertType2}`}
+                    >
+                      {this.getConvertTypeName(item.ConvertType2, convertTypes)}
+                    </span>
                   </td>
                   <td className={`${styles.tableCell} ${styles.statusCell}`}>
                     <span className={`${styles.statusBadge} ${item.IsDeleted ? styles.deleted : styles.active}`}>

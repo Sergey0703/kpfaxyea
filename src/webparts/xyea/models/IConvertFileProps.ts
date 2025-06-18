@@ -1,4 +1,4 @@
-// src/webparts/xyea/models/IConvertFileProps.ts
+// src/webparts/xyea/models/IConvertFileProps.ts - Updated with ConvertType fields
 
 export interface IConvertFileProps {
   Id: number;
@@ -8,7 +8,14 @@ export interface IConvertFileProps {
   Prop: string;
   Prop2: string;
   IsDeleted: boolean;
-  Priority: number; // Исправлено название поля (было Prioruty)
+  Priority: number;
+  
+  // NEW: ConvertType Lookup fields
+  ConvertType: number; // ID типа величины для Prop
+  ConvertTypeId?: number; // Поле из SharePoint API для Lookup
+  ConvertType2: number; // ID типа величины для Prop2
+  ConvertType2Id?: number; // Поле из SharePoint API для Lookup
+  
   // Дополнительные системные поля SharePoint
   Created?: Date;
   Modified?: Date;

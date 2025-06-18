@@ -1,4 +1,4 @@
-// src/webparts/xyea/services/ConvertFilesPropsService.ts
+// src/webparts/xyea/services/ConvertFilesPropsService.ts - Updated with ConvertType support
 
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { SharePointService } from './SharePointService';
@@ -15,6 +15,8 @@ interface ISharePointConvertFilePropsResponse {
   Prop2: string;
   IsDeleted: number; // SharePoint stores boolean as number (0/1)
   Priority: number;
+  ConvertTypeId: number; // NEW: ConvertType Lookup field
+  ConvertType2Id: number; // NEW: ConvertType2 Lookup field
   Created?: string; // ISO date string from SharePoint
   Modified?: string; // ISO date string from SharePoint
   Author?: {
@@ -42,6 +44,7 @@ interface ISharePointUpdateResponse {
 export class ConvertFilesPropsService {
   private spService: SharePointService;
   private readonly LIST_NAME = 'convertfilesprops';
+  private readonly DEFAULT_CONVERT_TYPE_ID = 1; // Строковый тип по умолчанию
 
   constructor(context: WebPartContext) {
     this.spService = new SharePointService(context);
@@ -52,14 +55,13 @@ export class ConvertFilesPropsService {
     try {
       const items = await this.spService.getListItems<ISharePointConvertFilePropsResponse>(
         this.LIST_NAME,
-        'Id,Title,ConvertFilesIDId,Prop,Prop2,IsDeleted,Priority,Created,Modified',
+        'Id,Title,ConvertFilesIDId,Prop,Prop2,IsDeleted,Priority,ConvertTypeId,ConvertType2Id,Created,Modified',
         undefined,
         undefined,
         'ConvertFilesIDId asc, Priority asc',
         5000 // Increase limit to 5000 items
       );
 
-      // Маппинг ConvertFilesIDId в ConvertFilesID и IsDeleted в boolean
       return items.map((item: ISharePointConvertFilePropsResponse) => this.mapSharePointItemToModel(item));
     } catch (error) {
       console.error('Error getting convert files props:', error);
@@ -72,14 +74,13 @@ export class ConvertFilesPropsService {
     try {
       const items = await this.spService.getListItems<ISharePointConvertFilePropsResponse>(
         this.LIST_NAME,
-        'Id,Title,ConvertFilesIDId,Prop,Prop2,IsDeleted,Priority,Created,Modified',
+        'Id,Title,ConvertFilesIDId,Prop,Prop2,IsDeleted,Priority,ConvertTypeId,ConvertType2Id,Created,Modified',
         undefined,
         `ConvertFilesIDId eq ${convertFilesId}`,
         'Priority asc',
         1000 // Increase limit for single ConvertFile
       );
 
-      // Маппинг ConvertFilesIDId в ConvertFilesID и IsDeleted в boolean
       return items.map((item: ISharePointConvertFilePropsResponse) => this.mapSharePointItemToModel(item));
     } catch (error) {
       console.error(`Error getting convert files props for ${convertFilesId}:`, error);
@@ -93,10 +94,9 @@ export class ConvertFilesPropsService {
       const item = await this.spService.getListItemById<ISharePointConvertFilePropsResponse>(
         this.LIST_NAME,
         id,
-        'Id,Title,ConvertFilesIDId,Prop,Prop2,IsDeleted,Priority,Created,Modified'
+        'Id,Title,ConvertFilesIDId,Prop,Prop2,IsDeleted,Priority,ConvertTypeId,ConvertType2Id,Created,Modified'
       );
 
-      // Маппинг ConvertFilesIDId в ConvertFilesID и IsDeleted в boolean
       return this.mapSharePointItemToModel(item);
     } catch (error) {
       console.error(`Error getting convert file prop ${id}:`, error);
@@ -178,7 +178,9 @@ export class ConvertFilesPropsService {
               title,
               data.prop,
               data.prop2,
-              priority
+              priority,
+              this.DEFAULT_CONVERT_TYPE_ID, // NEW: Default ConvertType
+              this.DEFAULT_CONVERT_TYPE_ID  // NEW: Default ConvertType2
             ).catch(error => {
               console.error(`[ConvertFilesPropsService] Failed to create item ${i + j + 1}:`, error);
               // Return a placeholder item to maintain count
@@ -190,6 +192,8 @@ export class ConvertFilesPropsService {
                 Prop2: data.prop2,
                 Priority: priority,
                 IsDeleted: false,
+                ConvertType: this.DEFAULT_CONVERT_TYPE_ID,
+                ConvertType2: this.DEFAULT_CONVERT_TYPE_ID,
                 Created: undefined,
                 Modified: undefined
               } as IConvertFileProps;
@@ -215,11 +219,6 @@ export class ConvertFilesPropsService {
 
       console.log(`[ConvertFilesPropsService] Excel import completed. Successfully created ${createdItems.length}/${excelData.length} items`);
       
-      // If we didn't create all items, log the discrepancy
-      if (createdItems.length < excelData.length) {
-        console.warn(`[ConvertFilesPropsService] Warning: Only ${createdItems.length} out of ${excelData.length} items were created successfully`);
-      }
-      
       return createdItems;
 
     } catch (error) {
@@ -239,7 +238,9 @@ export class ConvertFilesPropsService {
     title: string,
     prop: string = '',
     prop2: string = '',
-    priority: number
+    priority: number,
+    convertTypeId: number = this.DEFAULT_CONVERT_TYPE_ID,
+    convertType2Id: number = this.DEFAULT_CONVERT_TYPE_ID
   ): Promise<IConvertFileProps> {
     try {
       // Sanitize inputs
@@ -252,13 +253,15 @@ export class ConvertFilesPropsService {
         throw new Error('Title is required and cannot be empty');
       }
 
-      // Create item with all fields including priority
+      // Create item with all fields including priority and convert types
       const basicItem = {
         Title: sanitizedTitle,
         Prop: sanitizedProp,
         Prop2: sanitizedProp2,
         Priority: priority,
-        IsDeleted: 0
+        IsDeleted: 0,
+        ConvertTypeId: convertTypeId,
+        ConvertType2Id: convertType2Id
       };
 
       const createdItem = await this.spService.createListItem<ISharePointCreateResponse>(this.LIST_NAME, basicItem);
@@ -277,6 +280,8 @@ export class ConvertFilesPropsService {
           Prop2: sanitizedProp2,
           Priority: priority,
           IsDeleted: false,
+          ConvertType: convertTypeId,
+          ConvertType2: convertType2Id,
           Created: createdItem.Created ? new Date(createdItem.Created) : undefined,
           Modified: updatedItem?.Modified ? new Date(updatedItem.Modified) : (createdItem.Modified ? new Date(createdItem.Modified) : undefined)
         };
@@ -291,6 +296,8 @@ export class ConvertFilesPropsService {
           Prop2: sanitizedProp2,
           Priority: priority,
           IsDeleted: false,
+          ConvertType: convertTypeId,
+          ConvertType2: convertType2Id,
           Created: createdItem.Created ? new Date(createdItem.Created) : undefined,
           Modified: createdItem.Modified ? new Date(createdItem.Modified) : undefined
         };
@@ -311,12 +318,14 @@ export class ConvertFilesPropsService {
     }
   }
 
-  // Создать новое свойство - updated to handle optional fields
+  // Создать новое свойство - updated to handle ConvertType fields
   public async createConvertFileProp(
     convertFilesId: number,
     title: string,
-    prop: string = '', // Default to empty string
-    prop2: string = '', // Default to empty string
+    prop: string = '',
+    prop2: string = '',
+    convertTypeId?: number,
+    convertType2Id?: number,
     allItems?: IConvertFileProps[]
   ): Promise<IConvertFileProps> {
     try {
@@ -328,19 +337,33 @@ export class ConvertFilesPropsService {
       // Вычисляем следующий приоритет
       const nextPriority = PriorityHelper.getNextPriority(allItems, convertFilesId);
 
-      return await this.createConvertFilePropDirect(convertFilesId, title, prop, prop2, nextPriority);
+      // Используем переданные типы или дефолтные
+      const finalConvertTypeId = convertTypeId || this.DEFAULT_CONVERT_TYPE_ID;
+      const finalConvertType2Id = convertType2Id || this.DEFAULT_CONVERT_TYPE_ID;
+
+      return await this.createConvertFilePropDirect(
+        convertFilesId, 
+        title, 
+        prop, 
+        prop2, 
+        nextPriority, 
+        finalConvertTypeId, 
+        finalConvertType2Id
+      );
     } catch (error) {
       console.error('Error creating convert file prop:', error);
       throw error;
     }
   }
 
-  // Обновить свойство - updated to handle optional fields
+  // Обновить свойство - updated to handle ConvertType fields
   public async updateConvertFileProp(
     id: number,
     title: string,
-    prop: string = '', // Default to empty string
-    prop2: string = '' // Default to empty string
+    prop: string = '',
+    prop2: string = '',
+    convertTypeId?: number,
+    convertType2Id?: number
   ): Promise<IConvertFileProps> {
     try {
       // Sanitize inputs - allow empty strings for optional fields
@@ -353,11 +376,19 @@ export class ConvertFilesPropsService {
         throw new Error('Title is required and cannot be empty');
       }
 
-      const updateItem = {
+      const updateItem: any = {
         Title: sanitizedTitle,
-        Prop: sanitizedProp, // Can be empty
-        Prop2: sanitizedProp2 // Can be empty
+        Prop: sanitizedProp,
+        Prop2: sanitizedProp2
       };
+
+      // Add ConvertType fields if provided
+      if (convertTypeId !== undefined) {
+        updateItem.ConvertTypeId = convertTypeId;
+      }
+      if (convertType2Id !== undefined) {
+        updateItem.ConvertType2Id = convertType2Id;
+      }
 
       await this.spService.updateListItem<ISharePointUpdateResponse>(this.LIST_NAME, id, updateItem);
       
@@ -466,10 +497,14 @@ export class ConvertFilesPropsService {
       Title: item.Title,
       ConvertFilesID: item.ConvertFilesIDId,
       ConvertFilesIDId: item.ConvertFilesIDId,
-      Prop: item.Prop || '', // Ensure empty string instead of null/undefined
-      Prop2: item.Prop2 || '', // Ensure empty string instead of null/undefined
+      Prop: item.Prop || '',
+      Prop2: item.Prop2 || '',
       IsDeleted: item.IsDeleted === 1,
       Priority: item.Priority,
+      ConvertType: item.ConvertTypeId || this.DEFAULT_CONVERT_TYPE_ID, // NEW: Map ConvertType
+      ConvertTypeId: item.ConvertTypeId,
+      ConvertType2: item.ConvertType2Id || this.DEFAULT_CONVERT_TYPE_ID, // NEW: Map ConvertType2
+      ConvertType2Id: item.ConvertType2Id,
       Created: item.Created ? new Date(item.Created) : undefined,
       Modified: item.Modified ? new Date(item.Modified) : undefined,
       Author: item.Author,

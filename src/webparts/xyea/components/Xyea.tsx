@@ -1,9 +1,11 @@
-// src/webparts/xyea/components/Xyea.tsx - Updated with Excel import functionality
+// src/webparts/xyea/components/Xyea.tsx - Updated with ConvertType support
+
 import * as React from 'react';
 import styles from './Xyea.module.scss';
 import { IXyeaProps } from './IXyeaProps';
 import { IConvertFile, IConvertFileProps } from '../models';
-import { ConvertFilesService, ConvertFilesPropsService } from '../services';
+import { IConvertType } from '../models/IConvertType';
+import { ConvertFilesService, ConvertFilesPropsService, ConvertTypesService } from '../services';
 import ConvertFilesTable from './ConvertFilesTable/ConvertFilesTable';
 import ConvertFilesPropsTable from './ConvertFilesPropsTable/ConvertFilesPropsTable';
 import EditDialog from './EditDialog/EditDialog';
@@ -16,27 +18,29 @@ import { ISelectedFiles } from './ConvertFilesTable/IConvertFilesTableProps';
 export interface IXyeaState {
   convertFiles: IConvertFile[];
   convertFilesProps: IConvertFileProps[];
+  convertTypes: IConvertType[]; // NEW: Convert types
   loading: boolean;
-  error: string | undefined; // Changed from null to undefined
+  error: string | undefined;
   expandedRows: number[];
   // Состояние диалога для ConvertFiles
   dialogOpen: boolean;
   dialogEditMode: boolean;
-  dialogItem: IConvertFile | undefined; // Changed from null to undefined
+  dialogItem: IConvertFile | undefined;
   dialogLoading: boolean;
   // Состояние диалога для ConvertFilesProps
   propsDialogOpen: boolean;
   propsDialogEditMode: boolean;
-  propsDialogItem: IConvertFileProps | undefined; // Changed from null to undefined
+  propsDialogItem: IConvertFileProps | undefined;
   propsDialogConvertFileId: number;
   propsDialogLoading: boolean;
-  // NEW: Selected files state
+  // Selected files state
   selectedFiles: ISelectedFiles;
 }
 
 export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
   private convertFilesService: ConvertFilesService;
   private convertFilesPropsService: ConvertFilesPropsService;
+  private convertTypesService: ConvertTypesService; // NEW: Convert types service
 
   constructor(props: IXyeaProps) {
     super(props);
@@ -44,26 +48,28 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
     this.state = {
       convertFiles: [],
       convertFilesProps: [],
+      convertTypes: [], // NEW: Initialize convert types
       loading: true,
-      error: undefined, // Changed from null to undefined
+      error: undefined,
       expandedRows: [],
       // Диалог для ConvertFiles
       dialogOpen: false,
       dialogEditMode: false,
-      dialogItem: undefined, // Changed from null to undefined
+      dialogItem: undefined,
       dialogLoading: false,
       // Диалог для ConvertFilesProps
       propsDialogOpen: false,
       propsDialogEditMode: false,
-      propsDialogItem: undefined, // Changed from null to undefined
+      propsDialogItem: undefined,
       propsDialogConvertFileId: 0,
       propsDialogLoading: false,
-      // NEW: Selected files
+      // Selected files
       selectedFiles: {}
     };
 
     this.convertFilesService = new ConvertFilesService(this.props.context);
     this.convertFilesPropsService = new ConvertFilesPropsService(this.props.context);
+    this.convertTypesService = new ConvertTypesService(this.props.context); // NEW: Initialize service
   }
 
   public async componentDidMount(): Promise<void> {
@@ -74,18 +80,31 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
     try {
       this.setState({ loading: true, error: undefined });
       
-      const [convertFiles, convertFilesProps] = await Promise.all([
+      console.log('[Xyea] Starting data load...');
+      
+      // Load all data in parallel
+      const [convertFiles, convertFilesProps, convertTypes] = await Promise.all([
         this.convertFilesService.getAllConvertFiles(),
-        this.convertFilesPropsService.getAllConvertFilesProps()
+        this.convertFilesPropsService.getAllConvertFilesProps(),
+        this.convertTypesService.getAllConvertTypes() // This now handles errors internally
       ]);
+
+      console.log('[Xyea] All data loaded successfully:', {
+        convertFiles: convertFiles.length,
+        convertFilesProps: convertFilesProps.length,
+        convertTypes: convertTypes.length,
+        firstConvertType: convertTypes[0]
+      });
 
       this.setState({
         convertFiles,
         convertFilesProps,
+        convertTypes,
         loading: false
       });
+
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('[Xyea] Error loading data:', error);
       this.setState({
         loading: false,
         error: error instanceof Error ? error.message : 'Failed to load data'
@@ -116,28 +135,23 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
       this.setState({ dialogLoading: true });
 
       if (dialogEditMode && dialogItem) {
-        // Редактирование
         await this.convertFilesService.updateConvertFile(dialogItem.Id, title);
       } else {
-        // Создание
         await this.convertFilesService.createConvertFile(title);
       }
 
-      // Закрыть диалог и полностью сбросить состояние
       this.setState({
         dialogOpen: false,
         dialogEditMode: false,
         dialogItem: undefined,
-        dialogLoading: false // Важно! Сбросить loading состояние
+        dialogLoading: false
       });
 
-      // Обновить данные
       await this.loadData();
     } catch (error) {
       console.error('Error saving convert file:', error);
-      // При ошибке тоже сбрасываем loading, но диалог оставляем открытым
       this.setState({ dialogLoading: false });
-      throw error; // Пробросить ошибку в диалог
+      throw error;
     }
   }
 
@@ -150,8 +164,13 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
     });
   }
 
-  // Методы для работы с ConvertFilesProps
+  // ConvertFilesProps methods
   private handleAddConvertFileProp = (convertFileId: number): void => {
+    console.log('[Xyea] Opening add dialog with convertTypes:', {
+      convertTypesLength: this.state.convertTypes.length,
+      convertTypes: this.state.convertTypes.slice(0, 3)
+    });
+    
     this.setState({
       propsDialogOpen: true,
       propsDialogEditMode: false,
@@ -169,21 +188,43 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
     });
   }
 
-  private handlePropsDialogSave = async (convertFileId: number, title: string, prop: string, prop2: string): Promise<void> => {
+  // NEW: Updated to handle ConvertType parameters
+  private handlePropsDialogSave = async (
+    convertFileId: number, 
+    title: string, 
+    prop: string, 
+    prop2: string,
+    convertTypeId: number,
+    convertType2Id: number
+  ): Promise<void> => {
     const { propsDialogEditMode, propsDialogItem, convertFilesProps } = this.state;
 
     try {
       this.setState({ propsDialogLoading: true });
 
       if (propsDialogEditMode && propsDialogItem) {
-        // Редактирование
-        await this.convertFilesPropsService.updateConvertFileProp(propsDialogItem.Id, title, prop, prop2);
+        // Редактирование - pass convert type IDs
+        await this.convertFilesPropsService.updateConvertFileProp(
+          propsDialogItem.Id, 
+          title, 
+          prop, 
+          prop2,
+          convertTypeId,
+          convertType2Id
+        );
       } else {
-        // Создание
-        await this.convertFilesPropsService.createConvertFileProp(convertFileId, title, prop, prop2, convertFilesProps);
+        // Создание - pass convert type IDs
+        await this.convertFilesPropsService.createConvertFileProp(
+          convertFileId, 
+          title, 
+          prop, 
+          prop2,
+          convertTypeId,
+          convertType2Id,
+          convertFilesProps
+        );
       }
 
-      // Закрыть диалог и полностью сбросить состояние
       this.setState({
         propsDialogOpen: false,
         propsDialogEditMode: false,
@@ -192,7 +233,6 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
         propsDialogLoading: false
       });
 
-      // Обновить данные
       await this.loadData();
     } catch (error) {
       console.error('Error saving convert file prop:', error);
@@ -211,7 +251,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
     });
   }
 
-  // NEW: Handle Excel import for ConvertFilesProps
+  // Excel import for ConvertFilesProps
   private handleExcelImport = async (convertFileId: number, excelData: IExcelImportData[]): Promise<void> => {
     try {
       console.log('[Xyea] Starting Excel import:', {
@@ -221,7 +261,6 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
 
       this.setState({ loading: true, error: undefined });
 
-      // Import data using the service
       await this.convertFilesPropsService.importFromExcel(
         convertFileId,
         excelData,
@@ -229,8 +268,6 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
       );
 
       console.log('[Xyea] Excel import completed successfully');
-
-      // Reload data to reflect changes
       await this.loadData();
 
     } catch (error) {
@@ -239,7 +276,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
         loading: false,
         error: error instanceof Error ? error.message : 'Excel import failed'
       });
-      throw error; // Re-throw to let the component handle it
+      throw error;
     }
   }
 
@@ -309,27 +346,17 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
     const { expandedRows } = this.state;
     
     if (expandedRows.includes(convertFileId)) {
-      // Закрыть строку - убрать все раскрытые строки
-      this.setState({
-        expandedRows: []
-      });
+      this.setState({ expandedRows: [] });
     } else {
-      // Открыть только эту строку - заменить все раскрытые строки на эту одну
-      this.setState({
-        expandedRows: [convertFileId]
-      });
+      this.setState({ expandedRows: [convertFileId] });
     }
   }
 
-  // NEW: Handle selected files change
   private handleSelectedFilesChange = (selectedFiles: ISelectedFiles): void => {
     this.setState({ selectedFiles });
   }
 
-  // Provide empty implementation instead of empty arrow function
   private handleDeleteProp = (): void => {
-    // This method is used to satisfy the interface contract but actual deletion
-    // is handled through onToggleDeleted
     console.log('Delete operation handled through toggle deleted');
   }
 
@@ -337,6 +364,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
     const { 
       convertFiles, 
       convertFilesProps, 
+      convertTypes,
       loading, 
       error, 
       expandedRows, 
@@ -351,7 +379,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
       propsDialogLoading
     } = this.state;
 
-    // Создаем контент для первой вкладки (Convert Files)
+    // Convert Files content
     const convertFilesContent = (
       <>
         {error && (
@@ -379,7 +407,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
           onSelectedFilesChange={this.handleSelectedFilesChange}
         />
 
-        {/* Показать подчиненные таблицы для раскрытых строк */}
+        {/* Show child tables for expanded rows */}
         {expandedRows.map(convertFileId => {
           const convertFile = convertFiles.find(cf => cf.Id === convertFileId);
           const propsForFile = convertFilesProps.filter(cfp => cfp.ConvertFilesID === convertFileId);
@@ -395,21 +423,22 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
               items={propsForFile}
               allItems={convertFilesProps}
               loading={loading}
+              convertTypes={convertTypes} // NEW: Pass convert types
               onAdd={this.handleAddConvertFileProp}
               onEdit={this.handleEditConvertFileProp}
-              onDelete={this.handleDeleteProp} // Use proper function instead of empty arrow
+              onDelete={this.handleDeleteProp}
               onMoveUp={this.handleMoveUp}
               onMoveDown={this.handleMoveDown}
               onToggleDeleted={this.handleToggleDeleted}
-              onImportFromExcel={this.handleExcelImport} // NEW: Pass Excel import handler
-              selectedFiles={this.state.selectedFiles} // NEW: Pass selected files for validation
+              onImportFromExcel={this.handleExcelImport}
+              selectedFiles={this.state.selectedFiles}
             />
           );
         })}
       </>
     );
 
-    // Создаем элементы вкладок
+    // Tab items
     const tabItems: ITabItem[] = [
       {
         key: 'convert-files',
@@ -453,6 +482,7 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
             item={propsDialogItem}
             title={propsDialogEditMode ? 'Edit Property' : 'Create New Property'}
             loading={propsDialogLoading}
+            convertTypes={convertTypes} // NEW: Pass convert types to dialog
             onSave={this.handlePropsDialogSave}
             onCancel={this.handlePropsDialogCancel}
           />

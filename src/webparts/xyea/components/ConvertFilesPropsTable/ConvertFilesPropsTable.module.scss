@@ -1,4 +1,4 @@
-// src/webparts/xyea/components/ConvertFilesPropsTable/ConvertFilesPropsTable.module.scss
+// src/webparts/xyea/components/ConvertFilesPropsTable/ConvertFilesPropsTable.module.scss - Updated with ConvertType styles
 
 .convertFilesPropsTable {
   background-color: #f8f8f8;
@@ -153,6 +153,30 @@
             }
           }
 
+          // NEW: ConvertType cell styles
+          &.convertTypeCell {
+            width: 120px;
+            text-align: center;
+
+            .convertTypeBadge {
+              display: inline-block;
+              padding: 2px 8px;
+              border-radius: 12px;
+              font-size: 10px;
+              font-weight: 600;
+              background-color: #e1f5fe;
+              color: #0288d1;
+              border: 1px solid #b3e5fc;
+              cursor: help;
+              transition: all 0.2s ease;
+
+              &:hover {
+                background-color: #b3e5fc;
+                transform: scale(1.05);
+              }
+            }
+          }
+
           &.statusCell {
             width: 80px;
             text-align: center;
@@ -178,7 +202,7 @@
           }
 
           &.actionsCell {
-            width: 200px;
+            width: 220px; // Increased width to accommodate more buttons
             text-align: right;
 
             .actionButton {
@@ -306,6 +330,42 @@
 }
 
 // Responsive design
+@media (max-width: 1200px) {
+  .convertFilesPropsTable {
+    .table {
+      .tableHead .headerCell {
+        padding: 4px 6px;
+        font-size: 11px;
+      }
+
+      .tableBody .tableRow .tableCell {
+        padding: 4px 6px;
+        font-size: 11px;
+
+        &.convertTypeCell {
+          width: 100px;
+
+          .convertTypeBadge {
+            font-size: 9px;
+            padding: 1px 6px;
+          }
+        }
+
+        &.actionsCell {
+          width: 180px;
+
+          .actionButton {
+            min-width: 20px;
+            height: 18px;
+            font-size: 9px;
+            padding: 2px 4px;
+          }
+        }
+      }
+    }
+  }
+}
+
 @media (max-width: 768px) {
   .convertFilesPropsTable {
     .header {
@@ -325,23 +385,35 @@
     }
 
     .table {
-      font-size: 11px;
+      font-size: 10px;
 
       .tableHead .headerCell {
-        padding: 4px 6px;
-        font-size: 10px;
+        padding: 3px 4px;
+        font-size: 9px;
       }
 
       .tableBody .tableRow .tableCell {
-        padding: 4px 6px;
-        font-size: 10px;
+        padding: 3px 4px;
+        font-size: 9px;
+
+        &.convertTypeCell {
+          width: 80px;
+
+          .convertTypeBadge {
+            font-size: 8px;
+            padding: 1px 4px;
+          }
+        }
 
         &.actionsCell {
+          width: 150px;
+
           .actionButton {
-            min-width: 20px;
-            height: 18px;
-            font-size: 9px;
-            padding: 2px 4px;
+            min-width: 18px;
+            height: 16px;
+            font-size: 8px;
+            padding: 1px 3px;
+            margin-left: 1px;
           }
         }
       }
