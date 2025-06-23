@@ -1,0 +1,958 @@
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}// src/webparts/xyea/components/RenameFilesManagement/RenameFilesManagement.module.scss
+
+.renameFilesManagement {
+  padding: 20px;
+  background-color: #ffffff;
+  min-height: 500px;
+  font-family: "Segoe UI", "Segoe UI Web (West European)", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif;
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #edebe9;
+
+    .title {
+      flex: 1;
+
+      h2 {
+        margin: 0 0 5px 0;
+        font-size: 24px;
+        font-weight: 600;
+        color: #323130;
+      }
+
+    .renameControls {
+      margin-bottom: 20px;
+      padding: 16px;
+      background-color: #fff9c4;
+      border: 1px solid #ffb900;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+
+      .renameButton {
+        background-color: #107c10;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 10px 16px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+        min-width: 140px;
+        justify-content: center;
+
+        &:hover:not(:disabled) {
+          background-color: #0e6e0e;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 4px rgba(16, 124, 16, 0.3);
+        }
+
+        &:disabled {
+          background-color: #c8c6c4;
+          cursor: not-allowed;
+          transform: none;
+          box-shadow: none;
+        }
+
+        .spinner {
+          width: 14px;
+          height: 14px;
+          border: 2px solid transparent;
+          border-top: 2px solid currentColor;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+      }
+
+      .searchProgress {
+        color: #107c10;
+        font-size: 14px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        &::before {
+          content: '🔍';
+          animation: pulse 1.5s ease-in-out infinite;
+        }
+      }
+
+      .searchNote {
+        color: #605e5c;
+        font-style: italic;
+      }
+    }
+
+    .folderSelection {
+      margin-bottom: 20px;
+      padding: 16px;
+      background-color: #f8f9fa;
+      border: 1px solid #edebe9;
+      border-radius: 6px;
+
+      .folderControls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+
+        .selectFolderButton {
+          background-color: #0078d4;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          padding: 8px 16px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          transition: all 0.2s ease;
+
+          &:hover:not(:disabled) {
+            background-color: #106ebe;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 120, 212, 0.3);
+          }
+
+          &:disabled {
+            background-color: #c8c6c4;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+          }
+        }
+
+        .selectedFolder {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background-color: white;
+          border: 1px solid #0078d4;
+          border-radius: 4px;
+          padding: 6px 12px;
+          font-size: 14px;
+
+          .folderIcon {
+            font-size: 16px;
+          }
+
+          .folderName {
+            color: #0078d4;
+            font-weight: 500;
+          }
+
+          .clearFolderButton {
+            background: none;
+            border: none;
+            color: #605e5c;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 2px;
+            border-radius: 2px;
+            
+            &:hover {
+              background-color: rgba(96, 94, 92, 0.1);
+              color: #323130;
+            }
+          }
+        }
+      }
+
+      .folderInfo {
+        color: #605e5c;
+        font-size: 12px;
+        margin-left: 24px;
+      }
+    }
+
+      p {
+        margin: 0;
+        color: #605e5c;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-shrink: 0;
+
+      .uploadButton {
+        background-color: #0078d4;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 10px 16px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+        min-width: 140px;
+        justify-content: center;
+
+        &:hover:not(:disabled) {
+          background-color: #106ebe;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 4px rgba(0, 120, 212, 0.3);
+        }
+
+        &:disabled {
+          background-color: #c8c6c4;
+          cursor: not-allowed;
+          transform: none;
+          box-shadow: none;
+        }
+
+        .spinner {
+          width: 14px;
+          height: 14px;
+          border: 2px solid transparent;
+          border-top: 2px solid currentColor;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+      }
+
+      .addColumnButton {
+        background-color: #107c10;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 10px 16px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+
+        &:hover:not(:disabled) {
+          background-color: #0e6e0e;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 4px rgba(16, 124, 16, 0.3);
+        }
+
+        &:disabled {
+          background-color: #c8c6c4;
+          cursor: not-allowed;
+          transform: none;
+          box-shadow: none;
+        }
+      }
+    }
+  }
+
+  .progressContainer {
+    background-color: #f8f9fa;
+    border: 1px solid #0078d4;
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+    .progressMessage {
+      color: #0078d4;
+      font-weight: 600;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    .progressBar {
+      width: 100%;
+      height: 8px;
+      background-color: #edebe9;
+      border-radius: 4px;
+      overflow: hidden;
+
+      .progressFill {
+        height: 100%;
+        background-color: #0078d4;
+        transition: width 0.3s ease;
+        border-radius: 4px;
+      }
+    }
+  }
+
+  .error {
+    background-color: #fde7e9;
+    border: 1px solid #d13438;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    color: #d13438;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+    .errorIcon {
+      font-size: 16px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .errorMessage {
+      flex: 1;
+      line-height: 1.4;
+      font-size: 14px;
+    }
+
+    .clearErrorButton {
+      background: none;
+      border: none;
+      color: #d13438;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0;
+      flex-shrink: 0;
+      border-radius: 2px;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      
+      &:hover {
+        background-color: rgba(209, 52, 56, 0.1);
+      }
+    }
+  }
+
+  .content {
+    .tableInfo {
+      margin-bottom: 15px;
+      padding: 12px 16px;
+      background-color: #f8f9fa;
+      border-radius: 4px;
+      border-left: 4px solid #0078d4;
+
+      .fileInfo {
+        font-size: 14px;
+        color: #323130;
+        line-height: 1.4;
+
+        strong {
+          color: #0078d4;
+          margin-right: 5px;
+        }
+      }
+    }
+
+    .tableContainer {
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: 70vh;
+      border: 1px solid #edebe9;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+      .dataTable {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        background-color: white;
+
+        thead {
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          background-color: #f8f9fa;
+          
+          tr {
+            border-bottom: 2px solid #edebe9;
+          }
+
+          .rowHeader {
+            background-color: #f3f2f1;
+            color: #323130;
+            font-weight: 600;
+            padding: 12px 8px;
+            text-align: center;
+            border-right: 1px solid #edebe9;
+            min-width: 50px;
+            max-width: 50px;
+            width: 50px;
+            position: sticky;
+            left: 0;
+            z-index: 11;
+          }
+
+          .columnHeader {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #323130;
+            border-right: 1px solid #edebe9;
+            min-width: 80px;
+            max-width: none;
+            position: relative;
+            vertical-align: top;
+            resize: horizontal;
+            overflow: hidden;
+
+            &.customColumn {
+              background-color: #e1f5fe;
+              border-bottom: 3px solid #107c10;
+            }
+
+            &.excelColumn {
+              background-color: #f8f9fa;
+              border-bottom: 3px solid #0078d4;
+            }
+
+            .headerContent {
+              display: flex;
+              flex-direction: column;
+              gap: 4px;
+
+              .columnName {
+                font-size: 13px;
+                line-height: 1.3;
+                word-break: break-word;
+              }
+
+              .customBadge {
+                font-size: 10px;
+                background-color: #107c10;
+                color: white;
+                padding: 2px 6px;
+                border-radius: 10px;
+                align-self: flex-start;
+                font-weight: 500;
+              }
+            }
+
+            .resizeHandle {
+              position: absolute;
+              top: 0;
+              right: 0;
+              bottom: 0;
+              width: 4px;
+              cursor: col-resize;
+              background-color: transparent;
+              border-right: 2px solid transparent;
+              transition: background-color 0.2s ease;
+
+              &:hover {
+                background-color: rgba(0, 120, 212, 0.3);
+                border-right-color: #0078d4;
+              }
+
+              &:active {
+                background-color: rgba(0, 120, 212, 0.5);
+                border-right-color: #0078d4;
+              }
+            }
+          }
+        }
+
+        tbody {
+          .editedRow {
+            background-color: #fff4e6;
+          }
+
+          tr {
+            border-bottom: 1px solid #f3f2f1;
+
+            &:hover {
+              background-color: #f8f9fa;
+
+              &.editedRow {
+                background-color: #fff0e6;
+              }
+            }
+
+            .rowNumber {
+              background-color: #faf9f8;
+              color: #605e5c;
+              font-weight: 500;
+              padding: 8px;
+              text-align: center;
+              border-right: 1px solid #edebe9;
+              font-size: 12px;
+              min-width: 60px;
+              max-width: 60px;
+              width: 60px;
+              position: sticky;
+              left: 0;
+              z-index: 5;
+
+              .rowNumberContent {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 4px;
+
+                .rowNumberText {
+                  font-weight: 500;
+                }
+
+                .searchIndicator {
+                  font-size: 14px;
+                  line-height: 1;
+
+                  .searchingIndicator {
+                    color: #0078d4;
+                    animation: pulse 1.5s ease-in-out infinite;
+                  }
+
+                  .foundIndicator {
+                    color: #107c10;
+                    filter: drop-shadow(0 0 2px rgba(16, 124, 16, 0.3));
+                  }
+
+                  .notFoundIndicator {
+                    color: #d13438;
+                    filter: drop-shadow(0 0 2px rgba(209, 52, 56, 0.3));
+                  }
+                }
+              }
+            }
+
+            .tableCell {
+              padding: 4px;
+              border-right: 1px solid #f3f2f1;
+              vertical-align: top;
+              position: relative;
+
+              &.editedCell {
+                background-color: #fff9c4;
+                border-left: 3px solid #ffb900;
+              }
+
+              .cellInput {
+                width: 100%;
+                border: none;
+                background: transparent;
+                padding: 6px 8px;
+                font-size: 13px;
+                font-family: inherit;
+                color: #323130;
+                resize: none;
+                outline: none;
+                min-height: 20px;
+                line-height: 1.3;
+
+                &:focus {
+                  background-color: white;
+                  border: 2px solid #0078d4;
+                  border-radius: 2px;
+                  box-shadow: 0 0 0 1px #0078d4;
+                }
+
+                &::placeholder {
+                  color: #a19f9d;
+                  font-style: italic;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    .tableNote {
+      margin-top: 10px;
+      padding: 8px 12px;
+      background-color: #fff4ce;
+      border: 1px solid #ffb900;
+      border-radius: 4px;
+      color: #8a6914;
+      font-size: 12px;
+      text-align: center;
+    }
+  }
+
+  .emptyState {
+    text-align: center;
+    padding: 80px 20px;
+    color: #605e5c;
+
+    .emptyIcon {
+      font-size: 64px;
+      margin-bottom: 20px;
+      opacity: 0.6;
+    }
+
+    h3 {
+      margin: 0 0 10px 0;
+      font-size: 20px;
+      font-weight: 600;
+      color: #323130;
+    }
+
+    p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+  }
+}
+
+// Folder selection dialog styles
+.folderDialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2000;
+
+  .dialogOverlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.4);
+  }
+
+  .dialogContent {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    min-width: 500px;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow: hidden;
+    animation: slideIn 0.3s ease-out;
+
+    .dialogHeader {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid #edebe9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #323130;
+      }
+
+      .closeButton {
+        background: none;
+        border: none;
+        color: #605e5c;
+        cursor: pointer;
+        font-size: 16px;
+        padding: 4px;
+        border-radius: 2px;
+        
+        &:hover {
+          background-color: rgba(96, 94, 92, 0.1);
+          color: #323130;
+        }
+      }
+    }
+
+    .dialogBody {
+      max-height: 50vh;
+      overflow-y: auto;
+
+      .loadingFolders {
+        padding: 40px 24px;
+        text-align: center;
+        color: #605e5c;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+
+        .spinner {
+          width: 24px;
+          height: 24px;
+          border: 2px solid #f3f2f1;
+          border-top: 2px solid #0078d4;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+      }
+
+      .folderList {
+        padding: 8px 0;
+
+        .folderItem {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 24px;
+          cursor: pointer;
+          transition: background-color 0.2s ease;
+          border-bottom: 1px solid #f3f2f1;
+
+          &:hover {
+            background-color: #f8f9fa;
+          }
+
+          &:last-child {
+            border-bottom: none;
+          }
+
+          .folderIcon {
+            font-size: 20px;
+            flex-shrink: 0;
+          }
+
+          .folderDetails {
+            flex: 1;
+            min-width: 0;
+
+            .folderName {
+              font-weight: 500;
+              color: #323130;
+              margin-bottom: 2px;
+              word-break: break-word;
+            }
+
+            .folderPath {
+              font-size: 12px;
+              color: #605e5c;
+              word-break: break-all;
+            }
+          }
+        }
+      }
+    }
+
+    .dialogFooter {
+      padding: 16px 24px 20px;
+      border-top: 1px solid #edebe9;
+      background-color: #faf9f8;
+      display: flex;
+      justify-content: flex-end;
+
+      .cancelButton {
+        background-color: white;
+        border: 1px solid #edebe9;
+        border-radius: 4px;
+        padding: 8px 16px;
+        cursor: pointer;
+        font-size: 14px;
+        color: #323130;
+
+        &:hover {
+          background-color: #f8f8f8;
+          border-color: #c8c6c4;
+        }
+      }
+    }
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .renameFilesManagement {
+    padding: 15px;
+
+    .header {
+      flex-direction: column;
+      gap: 15px;
+
+      .actions {
+        align-self: stretch;
+
+        .uploadButton,
+        .addColumnButton {
+          flex: 1;
+          min-width: auto;
+        }
+      }
+    }
+
+    .content {
+      .tableContainer {
+        max-height: 50vh;
+
+        .dataTable {
+          font-size: 12px;
+
+          thead {
+            .columnHeader {
+              min-width: 100px;
+              padding: 8px;
+
+              .headerContent {
+                .columnName {
+                  font-size: 12px;
+                }
+
+                .customBadge {
+                  font-size: 9px;
+                  padding: 1px 4px;
+                }
+              }
+            }
+          }
+
+          tbody {
+            tr {
+              .tableCell {
+                .cellInput {
+                  font-size: 12px;
+                  padding: 4px 6px;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    .emptyState {
+      padding: 60px 15px;
+
+      .emptyIcon {
+        font-size: 48px;
+      }
+
+      h3 {
+        font-size: 18px;
+      }
+    }
+  }
+}
+
+// High contrast mode support
+@media (prefers-contrast: high) {
+  .renameFilesManagement {
+    .content {
+      .tableContainer {
+        .dataTable {
+          border: 2px solid #000;
+
+          thead {
+            .columnHeader {
+              &.customColumn {
+                border-bottom: 4px solid #000;
+              }
+
+              &.excelColumn {
+                border-bottom: 4px solid #000;
+              }
+            }
+          }
+
+          tbody {
+            .tableCell {
+              &.editedCell {
+                border-left: 4px solid #000;
+              }
+
+              .cellInput {
+                &:focus {
+                  border: 3px solid #000;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// Print styles
+@media print {
+  .renameFilesManagement {
+    .header {
+      .actions {
+        display: none;
+      }
+    }
+
+    .progressContainer,
+    .error {
+      display: none;
+    }
+
+    .content {
+      .tableContainer {
+        max-height: none;
+        overflow: visible;
+        border: 1px solid #000;
+
+        .dataTable {
+          thead {
+            .rowHeader,
+            .columnHeader {
+              position: static;
+            }
+          }
+
+          tbody {
+            tr {
+              .rowNumber {
+                position: static;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// Scrollbar styling
+.tableContainer::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.tableContainer::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.tableContainer::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.tableContainer::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.tableContainer::-webkit-scrollbar-corner {
+  background: #f1f1f1;
+}
