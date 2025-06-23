@@ -1162,3 +1162,461 @@
 .dialogBody::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }
+
+// NEW: Mobile-specific styles for stage indicators
+        .searchProgressInfo {
+          .stageIndicators {
+            flex-direction: column;
+            gap: 12px;
+
+            &::before {
+              display: none;
+            }
+
+            .stageIndicator {
+              flex-direction: row;
+              justify-content: flex-start;
+              align-items: center;
+              max-width: none;
+
+              .stageNumber {
+                margin-bottom: 0;
+                margin-right: 12px;
+                width: 24px;
+                height: 24px;
+                font-size: 12px;
+              }
+
+              .stageName {
+                text-align: left;
+                font-size: 13px;
+              }
+            }
+          }
+
+          .searchStats {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+
+            .stat {
+              padding: 6px 8px;
+
+              .statLabel {
+                font-size: 10px;
+              }
+
+              .statValue {
+                font-size: 16px;
+              }
+            }
+          }
+
+          .operationDetails {
+            padding: 10px;
+
+            .currentOperation,
+            .currentDirectory,
+            .rowProgress {
+              font-size: 12px;
+            }
+          }
+        }@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}    
+  
+// NEW: Mobile-specific styles for stage indicators
+        .searchProgressInfo {
+          .stageIndicators {
+            flex-direction: column;
+            gap: 12px;
+
+            &::before {
+              display: none;
+            }
+
+            .stageIndicator {
+              flex-direction: row;
+              justify-content: flex-start;
+              align-items: center;
+              max-width: none;
+
+              .stageNumber {
+                margin-bottom: 0;
+                margin-right: 12px;
+                width: 24px;
+                height: 24px;
+                font-size: 12px;
+              }
+
+              .stageName {
+                text-align: left;
+                font-size: 13px;
+              }
+            }
+          }
+
+          .searchStats {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+
+            .stat {
+              padding: 6px 8px;
+
+              .statLabel {
+                font-size: 10px;
+              }
+
+              .statValue {
+                font-size: 16px;
+              }
+            }
+          }
+
+          .operationDetails {
+            padding: 10px;
+
+            .currentOperation,
+            .currentDirectory,
+            .rowProgress {
+              font-size: 12px;
+            }
+          }
+        }@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}      // NEW: Enhanced search progress with three stages
+      .searchProgressInfo {
+        background-color: white;
+        border: 1px solid #0078d4;
+        border-radius: 6px;
+        padding: 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 2px 8px rgba(0, 120, 212, 0.1);
+
+        // Stage indicators
+        .stageIndicators {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 16px;
+          position: relative;
+
+          &::before {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 30px;
+            right: 30px;
+            height: 2px;
+            background-color: #edebe9;
+            z-index: 1;
+          }
+
+          .stageIndicator {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+            flex: 1;
+            max-width: 120px;
+
+            .stageNumber {
+              width: 30px;
+              height: 30px;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: 600;
+              font-size: 14px;
+              margin-bottom: 8px;
+              transition: all 0.3s ease;
+            }
+
+            .stageName {
+              font-size: 11px;
+              text-align: center;
+              line-height: 1.3;
+              font-weight: 500;
+              transition: color 0.3s ease;
+            }
+
+            &.pending {
+              .stageNumber {
+                background-color: #f3f2f1;
+                color: #605e5c;
+                border: 2px solid #edebe9;
+              }
+              .stageName {
+                color: #605e5c;
+              }
+            }
+
+            &.active {
+              .stageNumber {
+                background-color: #0078d4;
+                color: white;
+                border: 2px solid #0078d4;
+                box-shadow: 0 0 0 4px rgba(0, 120, 212, 0.2);
+                animation: pulse 2s infinite;
+              }
+              .stageName {
+                color: #0078d4;
+                font-weight: 600;
+              }
+            }
+
+            &.completed {
+              .stageNumber {
+                background-color: #107c10;
+                color: white;
+                border: 2px solid #107c10;
+              }
+              .stageName {
+                color: #107c10;
+                font-weight: 600;
+              }
+            }
+          }
+        }
+
+        // Stage header
+        .stageHeader {
+          margin-bottom: 16px;
+          text-align: center;
+
+          .stageTitle {
+            margin: 0 0 4px 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #323130;
+
+            .stageProgress {
+              color: #0078d4;
+              font-weight: 500;
+              margin-left: 8px;
+            }
+          }
+
+          .stageDescription {
+            margin: 0;
+            font-size: 13px;
+            color: #605e5c;
+            line-height: 1.4;
+          }
+        }
+
+        // Progress container
+        .progressContainer {
+          margin-bottom: 16px;
+
+          .progressText {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 14px;
+
+            .overallProgress {
+              color: #323130;
+              font-weight: 600;
+            }
+
+            .timeRemaining {
+              color: #605e5c;
+              font-size: 12px;
+              font-style: italic;
+            }
+          }
+
+          .progressBar {
+            width: 100%;
+            height: 10px;
+            background-color: #edebe9;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 12px;
+            position: relative;
+
+            .progressFill {
+              height: 100%;
+              background-color: #0078d4;
+              transition: width 0.5s ease;
+              border-radius: 5px;
+              position: relative;
+
+              &::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: linear-gradient(
+                  90deg,
+                  transparent,
+                  rgba(255, 255, 255, 0.4),
+                  transparent
+                );
+                animation: shimmer 2s infinite;
+              }
+            }
+          }
+
+          .stageProgressContainer {
+            .stageProgressLabel {
+              font-size: 12px;
+              color: #605e5c;
+              margin-bottom: 4px;
+              font-weight: 500;
+            }
+
+            .stageProgressBar {
+              width: 100%;
+              height: 6px;
+              background-color: #f3f2f1;
+              border-radius: 3px;
+              overflow: hidden;
+
+              .stageProgressFill {
+                height: 100%;
+                background-color: #107c10;
+                transition: width 0.3s ease;
+                border-radius: 3px;
+              }
+            }
+          }
+        }
+
+        // Operation details
+        .operationDetails {
+          background-color: #f8f9fa;
+          border-radius: 4px;
+          padding: 12px;
+          margin-bottom: 12px;
+          border-left: 4px solid #0078d4;
+
+          .currentOperation,
+          .currentDirectory,
+          .rowProgress {
+            margin-bottom: 6px;
+            font-size: 13px;
+            line-height: 1.4;
+
+            &:last-child {
+              margin-bottom: 0;
+            }
+
+            strong {
+              color: #323130;
+              margin-right: 6px;
+            }
+          }
+
+          .currentOperation {
+            color: #0078d4;
+            font-weight: 500;
+          }
+
+          .currentDirectory {
+            color: #605e5c;
+            word-break: break-all;
+          }
+
+          .rowProgress {
+            color: #323130;
+          }
+        }
+
+        // Search statistics
+        .searchStats {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+          gap: 12px;
+          margin-bottom: 12px;
+
+          .stat {
+            background-color: #f8f9fa;
+            border: 1px solid #edebe9;
+            border-radius: 4px;
+            padding: 8px 12px;
+            text-align: center;
+
+            .statLabel {
+              display: block;
+              font-size: 11px;
+              color: #605e5c;
+              margin-bottom: 4px;
+              font-weight: 500;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+
+            .statValue {
+              display: block;
+              font-size: 18px;
+              font-weight: 600;
+              color: #323130;
+            }
+          }
+        }
+
+        // Error and warning lists
+        .errorList,
+        .warningList {
+          margin-bottom: 12px;
+
+          h5 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            font-weight: 600;
+          }
+
+          .errorItem {
+            background-color: #fde7e9;
+            border: 1px solid #d13438;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            color: #d13438;
+            font-size: 12px;
+            line-height: 1.4;
+          }
+
+          .warningItem {
+            background-color: #fff4ce;
+            border: 1px solid #ffb900;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            color: #8a6914;
+            font-size: 12px;
+            line-height: 1.4;
+          }
+        }
+      }
+
+      // Search status
+      .searchStatus {
+        margin-bottom: 12px;
+
+        .searchStatusText {
+          background-color: #f8f9fa;
+          border: 1px solid #0078d4;
+          border-radius: 4px;
+          padding: 10px 14px;
+          color: #323130;
+          font-size: 14px;
+          font-weight: 500;
+          text-align: center;
+        }
+      }

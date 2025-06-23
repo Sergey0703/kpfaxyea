@@ -106,6 +106,92 @@ export interface ISharePointFolder {
 }
 
 /**
+ * NEW: Search stages enum
+ */
+export enum SearchStage {
+  IDLE = 'idle',
+  ANALYZING_DIRECTORIES = 'analyzing_directories',
+  CHECKING_EXISTENCE = 'checking_existence', 
+  SEARCHING_FILES = 'searching_files',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled',
+  ERROR = 'error'
+}
+
+/**
+ * NEW: Interface for search stage information
+ */
+export interface ISearchStageInfo {
+  stage: SearchStage;
+  title: string;
+  description: string;
+  progressMin: number; // minimum progress percentage for this stage
+  progressMax: number; // maximum progress percentage for this stage
+}
+
+/**
+ * NEW: Enhanced search progress interface with stages
+ */
+export interface ISearchProgress {
+  // Stage information
+  currentStage: SearchStage;
+  stageProgress: number; // Progress within current stage (0-100)
+  overallProgress: number; // Overall progress across all stages (0-100)
+  
+  // Current operation details
+  currentRow: number;
+  totalRows: number;
+  currentFileName: string;
+  currentDirectory?: string; // NEW: Current directory being processed
+  
+  // Stage-specific stats
+  directoriesAnalyzed?: number;
+  totalDirectories?: number;
+  directoriesChecked?: number;
+  existingDirectories?: number;
+  filesSearched?: number;
+  filesFound?: number;
+  
+  // Timing information
+  stageStartTime?: Date;
+  estimatedTimeRemaining?: number; // in seconds
+  
+  // Error information
+  errors?: string[];
+  warnings?: string[];
+  
+  // NEW: Search plan reference
+  searchPlan?: ISearchPlan;
+}
+
+/**
+ * NEW: Directory analysis result
+ */
+export interface IDirectoryAnalysis {
+  directoryPath: string;
+  normalizedPath: string;
+  exists: boolean;
+  fileCount: number;
+  rowIndexes: number[];
+  fullSharePointPath: string;
+  hasValidPath: boolean;
+}
+
+/**
+ * NEW: Search plan interface
+ */
+export interface ISearchPlan {
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  totalDirectories: number;
+  existingDirectories: number;
+  missingDirectories: number;
+  directoryGroups: IDirectoryAnalysis[];
+  estimatedDuration: number; // in seconds
+}
+
+/**
  * Interface for component state
  */
 export interface IRenameFilesState {
@@ -140,14 +226,11 @@ export interface IRenameFilesState {
   availableFolders: ISharePointFolder[];
   loadingFolders: boolean;
   
-  // File searching and renaming
+  // File searching and renaming - UPDATED with new progress interface
   searchingFiles: boolean;
   fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' };
-  searchProgress: {
-    currentRow: number;
-    totalRows: number;
-    currentFileName: string;
-  };
+  searchProgress: ISearchProgress; // UPDATED: Enhanced progress tracking
+  searchPlan?: ISearchPlan; // NEW: Search plan for optimization
 }
 
 /**
@@ -216,4 +299,133 @@ export interface IFileSearchResult {
   searchStatus: 'found' | 'not-found' | 'searching';
   foundPath?: string;
   searchTime?: number;
+}
+
+/**
+ * NEW: Constants for search stages
+ */
+export const SEARCH_STAGES: { [key in SearchStage]: ISearchStageInfo } = {
+  [SearchStage.IDLE]: {
+    stage: SearchStage.IDLE,
+    title: 'Ready',
+    description: 'Ready to start search',
+    progressMin: 0,
+    progressMax: 0
+  },
+  [SearchStage.ANALYZING_DIRECTORIES]: {
+    stage: SearchStage.ANALYZING_DIRECTORIES,
+    title: 'Analyzing Directories',
+    description: 'Extracting and analyzing directory structure from your data...',
+    progressMin: 0,
+    progressMax: 25
+  },
+  [SearchStage.CHECKING_EXISTENCE]: {
+    stage: SearchStage.CHECKING_EXISTENCE,
+    title: 'Checking Directory Existence', 
+    description: 'Verifying which directories exist in SharePoint...',
+    progressMin: 25,
+    progressMax: 50
+  },
+  [SearchStage.SEARCHING_FILES]: {
+    stage: SearchStage.SEARCHING_FILES,
+    title: 'Searching Files',
+    description: 'Looking for files in existing directories...',
+    progressMin: 50,
+    progressMax: 100
+  },
+  [SearchStage.COMPLETED]: {
+    stage: SearchStage.COMPLETED,
+    title: 'Search Completed',
+    description: 'File search completed successfully',
+    progressMin: 100,
+    progressMax: 100
+  },
+  [SearchStage.CANCELLED]: {
+    stage: SearchStage.CANCELLED,
+    title: 'Search Cancelled',
+    description: 'Search operation was cancelled',
+    progressMin: 0,
+    progressMax: 0
+  },
+  [SearchStage.ERROR]: {
+    stage: SearchStage.ERROR,
+    title: 'Search Error',
+    description: 'An error occurred during search',
+    progressMin: 0,
+    progressMax: 0
+  }
+};
+
+/**
+ * NEW: Helper functions for search progress
+ */
+export class SearchProgressHelper {
+  
+  /**
+   * Calculate overall progress based on stage and stage progress
+   */
+  public static calculateOverallProgress(stage: SearchStage, stageProgress: number): number {
+    const stageInfo = SEARCH_STAGES[stage];
+    const stageRange = stageInfo.progressMax - stageInfo.progressMin;
+    const stageContribution = (stageProgress / 100) * stageRange;
+    return Math.min(100, Math.max(0, stageInfo.progressMin + stageContribution));
+  }
+  
+  /**
+   * Create initial search progress
+   */
+  public static createInitialProgress(): ISearchProgress {
+    return {
+      currentStage: SearchStage.IDLE,
+      stageProgress: 0,
+      overallProgress: 0,
+      currentRow: 0,
+      totalRows: 0,
+      currentFileName: '',
+      stageStartTime: new Date(),
+      errors: [],
+      warnings: []
+    };
+  }
+  
+  /**
+   * Update progress for a specific stage
+   */
+  public static updateStageProgress(
+    currentProgress: ISearchProgress,
+    newStageProgress: number,
+    updates?: Partial<ISearchProgress>
+  ): ISearchProgress {
+    const overallProgress = SearchProgressHelper.calculateOverallProgress(
+      currentProgress.currentStage, 
+      newStageProgress
+    );
+    
+    return {
+      ...currentProgress,
+      stageProgress: newStageProgress,
+      overallProgress,
+      ...updates
+    };
+  }
+  
+  /**
+   * Transition to next stage
+   */
+  public static transitionToStage(
+    currentProgress: ISearchProgress,
+    newStage: SearchStage,
+    updates?: Partial<ISearchProgress>
+  ): ISearchProgress {
+    const stageInfo = SEARCH_STAGES[newStage];
+    
+    return {
+      ...currentProgress,
+      currentStage: newStage,
+      stageProgress: 0,
+      overallProgress: stageInfo.progressMin,
+      stageStartTime: new Date(),
+      ...updates
+    };
+  }
 }

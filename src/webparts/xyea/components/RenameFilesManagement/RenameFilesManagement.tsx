@@ -2,7 +2,13 @@
 
 import * as React from 'react';
 import styles from './RenameFilesManagement.module.scss';
-import { IRenameFilesManagementProps, IRenameFilesState } from './types/RenameFilesTypes';
+import { 
+  IRenameFilesManagementProps, 
+  IRenameFilesState,
+  SearchStage,
+  ISearchProgress,
+  SearchProgressHelper
+} from './types/RenameFilesTypes';
 import { ExcelFileProcessor } from './services/ExcelFileProcessor';
 import { SharePointFolderService } from './services/SharePointFolderService';
 import { FileSearchService } from './services/FileSearchService';
@@ -61,11 +67,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       loadingFolders: false,
       searchingFiles: false,
       fileSearchResults: {},
-      searchProgress: {
-        currentRow: 0,
-        totalRows: 0,
-        currentFileName: ''
-      }
+      searchProgress: SearchProgressHelper.createInitialProgress() // NEW: Use helper to create initial progress
     };
 
     this.fileInputRef = React.createRef<HTMLInputElement>();
@@ -84,6 +86,11 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
 
   public componentWillUnmount(): void {
     this.columnResizeHandler.removeEventListeners();
+    
+    // Cancel any active search
+    if (this.state.searchingFiles) {
+      this.fileSearchService.cancelSearch();
+    }
   }
 
   // File handling methods
@@ -117,13 +124,23 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
           stage: 'uploading',
           progress: 0,
           message: 'Reading file...'
-        }
+        },
+        // Reset search state when loading new file
+        searchingFiles: false,
+        fileSearchResults: {},
+        searchProgress: SearchProgressHelper.createInitialProgress()
       });
 
       const processedData = await this.excelProcessor.processFile(
         file, 
         this.handleUploadProgress
       );
+
+      console.log('[RenameFilesManagement] File processed successfully:', {
+        totalRows: processedData.totalRows,
+        columns: processedData.columns.length,
+        customColumns: processedData.customColumns.length
+      });
 
       this.setState({
         data: processedData,
@@ -216,7 +233,8 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     this.setState({ 
       selectedFolder: folder,
       showFolderDialog: false,
-      fileSearchResults: {} // Clear previous search results
+      fileSearchResults: {}, // Clear previous search results
+      searchProgress: SearchProgressHelper.createInitialProgress() // Reset progress
     });
   }
 
@@ -227,11 +245,12 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
   private clearSelectedFolder = (): void => {
     this.setState({ 
       selectedFolder: undefined,
-      fileSearchResults: {}
+      fileSearchResults: {},
+      searchProgress: SearchProgressHelper.createInitialProgress()
     });
   }
 
-  // File search methods
+  // NEW: Enhanced file search methods with three-stage progress
   private handleSearchFiles = async (): Promise<void> => {
     const { selectedFolder, data } = this.state;
     
@@ -245,15 +264,20 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       return;
     }
     
+    console.log('[RenameFilesManagement] Starting three-stage file search...');
+    
     this.setState({ 
       searchingFiles: true, 
       error: undefined,
       fileSearchResults: {},
-      searchProgress: {
-        currentRow: 0,
-        totalRows: data.rows.length,
-        currentFileName: ''
-      }
+      searchProgress: SearchProgressHelper.transitionToStage(
+        this.state.searchProgress,
+        SearchStage.ANALYZING_DIRECTORIES,
+        {
+          totalRows: data.rows.length,
+          currentFileName: 'Preparing search...'
+        }
+      )
     });
     
     try {
@@ -264,19 +288,39 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
         this.updateSearchProgress
       );
       
+      console.log('[RenameFilesManagement] Search completed with results:', {
+        totalResults: Object.keys(results).length,
+        foundFiles: Object.values(results).filter(r => r === 'found').length,
+        notFoundFiles: Object.values(results).filter(r => r === 'not-found').length
+      });
+      
+      // Final update with completion
       this.setState({ 
         fileSearchResults: results,
-        searchProgress: {
-          currentRow: data.rows.length,
-          totalRows: data.rows.length,
-          currentFileName: 'Search completed'
-        }
+        searchProgress: SearchProgressHelper.transitionToStage(
+          this.state.searchProgress,
+          SearchStage.COMPLETED,
+          {
+            currentFileName: 'Search completed successfully',
+            overallProgress: 100,
+            filesFound: Object.values(results).filter(r => r === 'found').length,
+            filesSearched: Object.keys(results).length
+          }
+        )
       });
       
     } catch (error) {
       console.error('Error searching files:', error);
       this.setState({ 
-        error: error instanceof Error ? error.message : 'Failed to search files' 
+        error: error instanceof Error ? error.message : 'Failed to search files',
+        searchProgress: SearchProgressHelper.transitionToStage(
+          this.state.searchProgress,
+          SearchStage.ERROR,
+          {
+            currentFileName: 'Search failed',
+            errors: [error instanceof Error ? error.message : 'Unknown error']
+          }
+        )
       });
     } finally {
       this.setState({ searchingFiles: false });
@@ -284,24 +328,33 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
   }
 
   private handleCancelSearch = (): void => {
+    console.log('[RenameFilesManagement] Cancelling search...');
+    
     this.fileSearchService.cancelSearch();
+    
     this.setState({ 
       searchingFiles: false,
-      searchProgress: {
-        currentRow: 0,
-        totalRows: 0,
-        currentFileName: 'Search cancelled'
-      }
+      searchProgress: SearchProgressHelper.transitionToStage(
+        this.state.searchProgress,
+        SearchStage.CANCELLED,
+        {
+          currentFileName: 'Search cancelled by user'
+        }
+      )
     });
   }
 
-  private updateSearchProgress = (currentRow: number, totalRows: number, fileName: string): void => {
+  // NEW: Enhanced progress update method
+  private updateSearchProgress = (progress: ISearchProgress): void => {
+    console.log('[RenameFilesManagement] Search progress update:', {
+      stage: progress.currentStage,
+      stageProgress: progress.stageProgress,
+      overallProgress: progress.overallProgress,
+      currentFile: progress.currentFileName
+    });
+    
     this.setState({
-      searchProgress: {
-        currentRow,
-        totalRows,
-        currentFileName: fileName
-      }
+      searchProgress: progress
     });
   }
 
@@ -319,15 +372,23 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
   }
 
   public render(): React.ReactElement<IRenameFilesManagementProps> {
-    const { data, loading, error, uploadProgress } = this.state;
+    const { data, loading, error, uploadProgress, searchProgress } = this.state;
     const hasData = data.originalFile !== undefined;
+
+    // Calculate search statistics for display
+    const searchStats = {
+      totalFiles: Object.keys(this.state.fileSearchResults).length,
+      foundFiles: Object.values(this.state.fileSearchResults).filter(r => r === 'found').length,
+      notFoundFiles: Object.values(this.state.fileSearchResults).filter(r => r === 'not-found').length,
+      searchingFiles: Object.values(this.state.fileSearchResults).filter(r => r === 'searching').length
+    };
 
     return (
       <div className={styles.renameFilesManagement}>
         <div className={styles.header}>
           <div className={styles.title}>
             <h2>Rename Files Management</h2>
-            <p>Upload Excel files and manage column order with custom columns</p>
+            <p>Upload Excel files with filename and directory columns to search and rename files in SharePoint</p>
           </div>
           
           <div className={styles.actions}>
@@ -383,13 +444,22 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
                 <strong> Rows:</strong> {data.totalRows} | 
                 <strong> Columns:</strong> {data.columns.length} |
                 <strong> Edited Cells:</strong> {data.editedCellsCount}
+                {searchStats.totalFiles > 0 && (
+                  <>
+                    {' | '}
+                    <strong> Search Results:</strong> {searchStats.foundFiles} found, {searchStats.notFoundFiles} not found
+                    {searchStats.searchingFiles > 0 && (
+                      <>, {searchStats.searchingFiles} searching</>
+                    )}
+                  </>
+                )}
               </div>
             </div>
 
             <RenameControlsPanel
               selectedFolder={this.state.selectedFolder}
               searchingFiles={this.state.searchingFiles}
-              searchProgress={this.state.searchProgress}
+              searchProgress={searchProgress} // NEW: Pass enhanced progress
               loading={loading}
               onSelectFolder={this.handleSelectFolder}
               onClearFolder={this.clearSelectedFolder}
@@ -403,12 +473,43 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
               columnResizeHandler={this.columnResizeHandler}
               onCellEdit={this.updateCellData}
             />
+
+            {/* Additional info for debugging/development */}
+            {process.env.NODE_ENV === 'development' && searchProgress.searchPlan && (
+              <div style={{
+                marginTop: '20px',
+                padding: '12px 16px',
+                backgroundColor: '#f3f2f1',
+                border: '1px solid #c8c6c4',
+                borderRadius: '4px',
+                fontFamily: "'Courier New', monospace",
+                fontSize: '11px',
+                color: '#605e5c'
+              }}>
+                <h4 style={{
+                  margin: '0 0 8px 0',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#323130',
+                  fontFamily: '"Segoe UI", "Segoe UI Web (West European)", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif'
+                }}>Debug Information</h4>
+                <p style={{ margin: '4px 0', lineHeight: 1.4 }}>
+                  <strong style={{ color: '#323130' }}>Search Plan:</strong> {searchProgress.searchPlan.totalDirectories} directories, {searchProgress.searchPlan.existingDirectories} exist
+                </p>
+                <p style={{ margin: '4px 0', lineHeight: 1.4 }}>
+                  <strong style={{ color: '#323130' }}>Stage:</strong> {searchProgress.currentStage} ({searchProgress.stageProgress.toFixed(1)}%)
+                </p>
+                <p style={{ margin: '4px 0', lineHeight: 1.4 }}>
+                  <strong style={{ color: '#323130' }}>Overall:</strong> {searchProgress.overallProgress.toFixed(1)}%
+                </p>
+              </div>
+            )}
           </div>
         ) : (
           <div className={styles.emptyState}>
             <div className={styles.emptyIcon}>📊</div>
             <h3>No Excel File Loaded</h3>
-            <p>Click "Open Excel File" to start working with your data</p>
+            <p>Click "Open Excel File" to start working with your data. The file should contain columns with file paths that will be automatically split into filename and directory columns.</p>
           </div>
         )}
 
