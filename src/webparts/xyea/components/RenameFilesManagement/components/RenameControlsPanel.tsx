@@ -12,11 +12,12 @@ import {
 export interface IRenameControlsPanelProps {
   selectedFolder: ISharePointFolder | undefined;
   searchingFiles: boolean;
-  searchProgress: ISearchProgress; // Updated to use new progress interface
+  searchProgress: ISearchProgress;
   loading: boolean;
   onSelectFolder: () => void;
   onClearFolder: () => void;
-  onSearchFiles: () => void;
+  onAnalyzeDirectories: () => void; // NEW: Stages 1-2
+  onSearchFiles: () => void; // NEW: Stage 3 only
   onCancelSearch: () => void;
 }
 
@@ -27,6 +28,7 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
   loading,
   onSelectFolder,
   onClearFolder,
+  onAnalyzeDirectories,
   onSearchFiles,
   onCancelSearch
 }) => {
@@ -87,16 +89,16 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
           const percentage = ((found / total) * 100).toFixed(1);
           return `Search completed: ${found}/${total} files found (${percentage}%)`;
         }
-        return 'Search completed successfully';
+        return 'Analysis completed successfully';
         
       case SearchStage.CANCELLED:
-        return 'Search was cancelled';
+        return 'Operation was cancelled';
         
       case SearchStage.ERROR:
-        return searchProgress.errors?.[0] || 'An error occurred during search';
+        return searchProgress.errors?.[0] || 'An error occurred';
         
       default:
-        return 'Ready to start search';
+        return 'Ready to start analysis';
     }
   };
 
@@ -136,6 +138,23 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
         })}
       </div>
     );
+  };
+
+  /**
+   * Determine which buttons to show based on current state
+   */
+  const getButtonState = () => {
+    const hasSearchPlan = searchProgress.searchPlan && searchProgress.searchPlan.totalDirectories > 0;
+    const isAnalysisComplete = searchProgress.currentStage === SearchStage.CHECKING_EXISTENCE || 
+                              (searchProgress.searchPlan && searchProgress.existingDirectories !== undefined);
+    
+    return {
+      showAnalyzeButton: !hasSearchPlan && !searchingFiles,
+      showSearchButton: hasSearchPlan && isAnalysisComplete && !searchingFiles,
+      showCancelButton: searchingFiles,
+      analyzeButtonText: searchingFiles ? 'Analyzing...' : '🔍 Analyze Directories',
+      searchButtonText: searchingFiles ? 'Searching...' : '🔍 Search Files'
+    };
   };
 
   /**
@@ -280,6 +299,8 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
     );
   };
 
+  const buttonState = getButtonState();
+
   return (
     <>
       {/* SharePoint folder selection */}
@@ -318,27 +339,51 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
         )}
       </div>
 
-      {/* Rename Files Controls */}
+      {/* Rename Files Controls with TWO BUTTONS */}
       <div className={styles.renameControls}>
         <div className={styles.renameButtons}>
-          <button
-            className={styles.renameButton}
-            onClick={onSearchFiles}
-            disabled={loading || searchingFiles || !selectedFolder}
-          >
-            {searchingFiles ? (
-              <>
-                <span className={styles.spinner} />
-                Searching...
-              </>
-            ) : (
-              <>
-                🔍 Rename
-              </>
-            )}
-          </button>
+          {/* BUTTON 1: Analyze Directories (Stages 1-2) */}
+          {buttonState.showAnalyzeButton && (
+            <button
+              className={styles.renameButton}
+              onClick={onAnalyzeDirectories}
+              disabled={loading || searchingFiles || !selectedFolder}
+            >
+              {searchingFiles ? (
+                <>
+                  <span className={styles.spinner} />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  🔍 Analyze Directories
+                </>
+              )}
+            </button>
+          )}
+
+          {/* BUTTON 2: Search Files (Stage 3) */}
+          {buttonState.showSearchButton && (
+            <button
+              className={styles.renameButton}
+              onClick={onSearchFiles}
+              disabled={loading || searchingFiles}
+            >
+              {searchingFiles ? (
+                <>
+                  <span className={styles.spinner} />
+                  Searching...
+                </>
+              ) : (
+                <>
+                  🔍 Search Files
+                </>
+              )}
+            </button>
+          )}
           
-          {searchingFiles && (
+          {/* Cancel button */}
+          {buttonState.showCancelButton && (
             <button
               className={styles.cancelButton}
               onClick={onCancelSearch}
@@ -358,9 +403,21 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
         {/* Detailed progress */}
         {renderDetailedProgress()}
         
+        {/* Helper text */}
         {!selectedFolder && !searchingFiles && (
           <div className={styles.searchNote}>
             <small>Please select a SharePoint folder first</small>
+          </div>
+        )}
+
+        {/* Show analysis results summary */}
+        {searchProgress.searchPlan && !searchingFiles && (
+          <div className={styles.searchNote}>
+            <small>
+              Analysis complete: {searchProgress.searchPlan.totalDirectories} directories found, 
+              {' '}{searchProgress.existingDirectories || 0} exist in SharePoint.
+              {buttonState.showSearchButton && ' Ready to search files.'}
+            </small>
           </div>
         )}
       </div>

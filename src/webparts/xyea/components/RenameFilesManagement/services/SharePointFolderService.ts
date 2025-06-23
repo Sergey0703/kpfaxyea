@@ -187,8 +187,8 @@ export class SharePointFolderService {
   }
 
   /**
-   * NEW METHOD: Load all subfolders recursively and cache them
-   * This should be called when user selects a main folder for searching
+   * ENHANCED: Load all subfolders recursively and cache them
+   * With better error handling and timeout protection
    */
   public async loadAllSubfolders(
     baseFolderPath: string, 
@@ -200,31 +200,44 @@ export class SharePointFolderService {
       return this.cachedFolders;
     }
 
-    console.log(`[SharePointFolderService] Starting to load all subfolders from: ${baseFolderPath}`);
+    console.log(`[SharePointFolderService] Starting to load all subfolders from: "${baseFolderPath}"`);
     
     this.isLoadingAllFolders = true;
     this.cachedFolders = [];
     this.allFoldersLoaded = false;
 
     try {
-      await this.loadFoldersRecursively(baseFolderPath, progressCallback);
+      // NEW: Set a global timeout for the entire loading process
+      const loadingPromise = this.loadFoldersRecursively(baseFolderPath, progressCallback);
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Folder loading timeout after 30 seconds')), 30000);
+      });
+      
+      await Promise.race([loadingPromise, timeoutPromise]);
       
       this.allFoldersLoaded = true;
-      console.log(`[SharePointFolderService] Finished loading ${this.cachedFolders.length} folders`);
+      console.log(`[SharePointFolderService] ✅ Successfully loaded ${this.cachedFolders.length} folders`);
       
-      // Log some examples for debugging
-      if (this.cachedFolders.length > 0) {
-        console.log('[SharePointFolderService] First 5 cached folders:');
-        this.cachedFolders.slice(0, 5).forEach((folder, index) => {
-          console.log(`  ${index + 1}. ${folder.FullPath}`);
-        });
+      // Log detailed folder cache for debugging
+      console.log('[SharePointFolderService] Cached folders detail:');
+      this.cachedFolders.slice(0, 10).forEach((folder, index) => {
+        console.log(`  ${index + 1}. "${folder.FullPath}" (Original: "${folder.ServerRelativeUrl}")`);
+      });
+      if (this.cachedFolders.length > 10) {
+        console.log(`  ... and ${this.cachedFolders.length - 10} more folders`);
       }
       
       return this.cachedFolders;
       
     } catch (error) {
-      console.error('[SharePointFolderService] Error loading all subfolders:', error);
-      throw error;
+      console.error('[SharePointFolderService] ❌ Error loading subfolders:', error);
+      
+      // NEW: Set allFoldersLoaded to true even on error, so fallback logic kicks in
+      this.allFoldersLoaded = true;
+      
+      console.warn('[SharePointFolderService] ⚠️ Folder loading failed, will use direct API checks as fallback');
+      return this.cachedFolders; // Return empty cache, fallback will handle checks
+      
     } finally {
       this.isLoadingAllFolders = false;
     }
@@ -253,6 +266,8 @@ export class SharePointFolderService {
       const webUrl = this.context.pageContext.web.absoluteUrl;
       const foldersUrl = `${webUrl}/_api/web/getFolderByServerRelativeUrl('${folderPath}')/folders?$select=Name,ServerRelativeUrl,ItemCount,TimeCreated,TimeLastModified`;
       
+      console.log(`[SharePointFolderService] Loading folders from: ${folderPath}`);
+      
       const response = await fetch(foldersUrl, {
         method: 'GET',
         headers: {
@@ -264,12 +279,16 @@ export class SharePointFolderService {
         const data = await response.json();
         const folders = data.d?.results || data.value || [];
         
+        console.log(`[SharePointFolderService] Found ${folders.length} folders in ${folderPath}`);
+        
         // Filter out system folders
         const userFolders = folders.filter((folder: any) => 
           !folder.Name.startsWith('_') && 
           !folder.Name.startsWith('Forms') &&
           folder.Name !== 'Forms'
         );
+
+        console.log(`[SharePointFolderService] After filtering: ${userFolders.length} user folders`);
 
         // Add folders to cache
         for (const folder of userFolders) {
@@ -283,7 +302,7 @@ export class SharePointFolderService {
           };
 
           this.cachedFolders.push(cachedFolder);
-          console.log(`[SharePointFolderService] Cached folder: ${cachedFolder.FullPath}`);
+          console.log(`[SharePointFolderService] Cached folder: "${cachedFolder.FullPath}" (Original: "${cachedFolder.ServerRelativeUrl}")`);
         }
 
         // Recursively load subfolders
@@ -294,7 +313,7 @@ export class SharePointFolderService {
           await this.delay(50);
         }
       } else {
-        console.warn(`[SharePointFolderService] Failed to load folders from ${folderPath}: ${response.status}`);
+        console.warn(`[SharePointFolderService] Failed to load folders from ${folderPath}: ${response.status} ${response.statusText}`);
       }
       
     } catch (error) {
@@ -303,44 +322,115 @@ export class SharePointFolderService {
   }
 
   /**
-   * Check if a specific directory path exists in the cached folders
+   * ENHANCED: Check if a specific directory path exists in the cached folders
+   * With fallback to direct API check if cache is empty
    */
   public checkDirectoryExists(directoryPath: string): boolean {
+    console.log(`[SharePointFolderService] ========= DIRECTORY CHECK DEBUG =========`);
+    console.log(`[SharePointFolderService] Checking directory: "${directoryPath}"`);
+    console.log(`[SharePointFolderService] Folders loaded: ${this.allFoldersLoaded}`);
+    console.log(`[SharePointFolderService] Cached folders count: ${this.cachedFolders.length}`);
+    
+    // NEW: If cache is empty but folders are supposedly loaded, this indicates a loading failure
+    if (this.allFoldersLoaded && this.cachedFolders.length === 0) {
+      console.warn('[SharePointFolderService] ⚠️ Cache is empty despite folders being "loaded" - possible loading failure');
+      console.log('[SharePointFolderService] 🔄 Falling back to direct API check...');
+      
+      // Fallback to direct API check
+      return this.checkDirectoryExistsDirectly(directoryPath);
+    }
+    
     if (!this.allFoldersLoaded) {
-      console.warn('[SharePointFolderService] Folders not loaded yet, cannot check directory existence');
-      return false;
+      console.warn('[SharePointFolderService] ⚠️ Folders not loaded yet, falling back to direct API check');
+      return this.checkDirectoryExistsDirectly(directoryPath);
     }
 
     const normalizedPath = this.normalizePath(directoryPath);
-    const exists = this.cachedFolders.some(folder => 
-      folder.FullPath === normalizedPath || 
-      folder.FullPath.endsWith(normalizedPath)
-    );
+    console.log(`[SharePointFolderService] Normalized input path: "${normalizedPath}"`);
+    
+    // Log all cached folder paths for comparison
+    console.log(`[SharePointFolderService] Comparing against ${this.cachedFolders.length} cached folders:`);
+    this.cachedFolders.forEach((folder, index) => {
+      const matches = folder.FullPath === normalizedPath || folder.FullPath.endsWith(normalizedPath);
+      console.log(`  ${index + 1}. "${folder.FullPath}" -> Match: ${matches}`);
+    });
+    
+    const exists = this.cachedFolders.some(folder => {
+      const exactMatch = folder.FullPath === normalizedPath;
+      const endsWithMatch = folder.FullPath.endsWith(normalizedPath);
+      
+      if (exactMatch || endsWithMatch) {
+        console.log(`[SharePointFolderService] ✅ FOUND MATCH: "${folder.FullPath}" (${exactMatch ? 'exact' : 'ends-with'})`);
+        return true;
+      }
+      return false;
+    });
 
-    console.log(`[SharePointFolderService] Directory exists check: "${normalizedPath}" -> ${exists}`);
+    console.log(`[SharePointFolderService] Final result for "${normalizedPath}": ${exists ? '✅ EXISTS' : '❌ NOT FOUND'}`);
+    console.log(`[SharePointFolderService] ========================================`);
+    
     return exists;
+  }
+
+  /**
+   * NEW: Direct API check for directory existence (synchronous fallback)
+   */
+  private checkDirectoryExistsDirectly(directoryPath: string): boolean {
+    console.log(`[SharePointFolderService] 🚀 DIRECT API CHECK for: "${directoryPath}"`);
+    
+    try {
+      const { context } = this;
+      const webUrl = context.pageContext.web.absoluteUrl;
+      
+      // Use XMLHttpRequest for synchronous call (not ideal but necessary for fallback)
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', `${webUrl}/_api/web/getFolderByServerRelativeUrl('${directoryPath}')`, false);
+      xhr.setRequestHeader('Accept', 'application/json;odata=verbose');
+      xhr.send();
+      
+      const exists = xhr.status === 200;
+      console.log(`[SharePointFolderService] 🎯 DIRECT API result: ${exists ? '✅ EXISTS' : '❌ NOT FOUND'} (Status: ${xhr.status})`);
+      
+      return exists;
+      
+    } catch (error) {
+      console.error(`[SharePointFolderService] ❌ DIRECT API error:`, error);
+      return false;
+    }
   }
 
   /**
    * Get the full SharePoint path for a directory
    */
   public getFullDirectoryPath(relativePath: string, basePath: string): string {
+    console.log(`[SharePointFolderService] Building full path:`);
+    console.log(`  Base path: "${basePath}"`);
+    console.log(`  Relative path: "${relativePath}"`);
+    
     // Convert RelativePath format (e.g., "634\2025\6") to SharePoint format
     const normalizedRelative = relativePath.replace(/\\/g, '/');
     const fullPath = `${basePath}/${normalizedRelative}`;
+    const normalizedFullPath = this.normalizePath(fullPath);
     
-    return this.normalizePath(fullPath);
+    console.log(`  Normalized relative: "${normalizedRelative}"`);
+    console.log(`  Combined path: "${fullPath}"`);
+    console.log(`  Final normalized: "${normalizedFullPath}"`);
+    
+    return normalizedFullPath;
   }
 
   /**
-   * Normalize path for consistent comparison
+   * ENHANCED: Normalize path for consistent comparison
    */
   private normalizePath(path: string): string {
-    return path
+    const normalized = path
       .replace(/\\/g, '/')           // Convert backslashes to forward slashes
       .replace(/\/+/g, '/')          // Remove duplicate slashes
       .toLowerCase()                 // Case insensitive
       .replace(/\/$/, '');           // Remove trailing slash
+    
+    console.log(`[SharePointFolderService] Path normalization: "${path}" -> "${normalized}"`);
+    return normalized;
   }
 
   /**
@@ -377,6 +467,8 @@ export class SharePointFolderService {
       const { context } = this;
       const webUrl = context.pageContext.web.absoluteUrl;
       
+      console.log(`[SharePointFolderService] Getting contents of folder: "${folderPath}"`);
+      
       // Get both files and folders
       const [filesResponse, foldersResponse] = await Promise.all([
         fetch(`${webUrl}/_api/web/getFolderByServerRelativeUrl('${folderPath}')/files?$select=Name,ServerRelativeUrl,TimeCreated,TimeLastModified,Length`, {
@@ -396,6 +488,9 @@ export class SharePointFolderService {
       const files = filesResponse.ok ? (await filesResponse.json()).d?.results || [] : [];
       const folders = foldersResponse.ok ? (await foldersResponse.json()).d?.results || [] : [];
 
+      console.log(`[SharePointFolderService] Folder contents: ${files.length} files, ${folders.length} folders`);
+      console.log(`[SharePointFolderService] Files found:`, files.map((f: any) => f.Name).slice(0, 5));
+
       return {
         files: files.filter((file: any) => !file.Name.startsWith('~')), // Filter out temp files
         folders: folders.filter((folder: any) => !folder.Name.startsWith('_') && !folder.Name.startsWith('Forms'))
@@ -411,6 +506,8 @@ export class SharePointFolderService {
       const { context } = this;
       const webUrl = context.pageContext.web.absoluteUrl;
       
+      console.log(`[SharePointFolderService] Direct API check for folder: "${folderPath}"`);
+      
       const response = await fetch(`${webUrl}/_api/web/getFolderByServerRelativeUrl('${folderPath}')`, {
         method: 'GET',
         headers: {
@@ -418,8 +515,12 @@ export class SharePointFolderService {
         }
       });
 
-      return response.ok;
+      const exists = response.ok;
+      console.log(`[SharePointFolderService] Direct API result for "${folderPath}": ${exists ? 'EXISTS' : 'NOT FOUND'} (${response.status})`);
+      
+      return exists;
     } catch (error) {
+      console.error(`[SharePointFolderService] Direct API error for "${folderPath}":`, error);
       return false;
     }
   }

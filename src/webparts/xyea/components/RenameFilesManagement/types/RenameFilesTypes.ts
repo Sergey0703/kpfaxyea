@@ -317,40 +317,40 @@ export const SEARCH_STAGES: { [key in SearchStage]: ISearchStageInfo } = {
     title: 'Analyzing Directories',
     description: 'Extracting and analyzing directory structure from your data...',
     progressMin: 0,
-    progressMax: 25
+    progressMax: 50 // NEW: Changed to 50% for two-button approach
   },
   [SearchStage.CHECKING_EXISTENCE]: {
     stage: SearchStage.CHECKING_EXISTENCE,
     title: 'Checking Directory Existence', 
     description: 'Verifying which directories exist in SharePoint...',
-    progressMin: 25,
-    progressMax: 50
+    progressMin: 50, // NEW: Changed to start at 50%
+    progressMax: 100 // NEW: Changed to end at 100% for analysis phase
   },
   [SearchStage.SEARCHING_FILES]: {
     stage: SearchStage.SEARCHING_FILES,
     title: 'Searching Files',
     description: 'Looking for files in existing directories...',
-    progressMin: 50,
-    progressMax: 100
+    progressMin: 0, // NEW: Reset to 0% for separate search phase
+    progressMax: 100 // NEW: Full 100% for file search
   },
   [SearchStage.COMPLETED]: {
     stage: SearchStage.COMPLETED,
-    title: 'Search Completed',
-    description: 'File search completed successfully',
+    title: 'Completed',
+    description: 'Operation completed successfully',
     progressMin: 100,
     progressMax: 100
   },
   [SearchStage.CANCELLED]: {
     stage: SearchStage.CANCELLED,
-    title: 'Search Cancelled',
-    description: 'Search operation was cancelled',
+    title: 'Cancelled',
+    description: 'Operation was cancelled',
     progressMin: 0,
     progressMax: 0
   },
   [SearchStage.ERROR]: {
     stage: SearchStage.ERROR,
-    title: 'Search Error',
-    description: 'An error occurred during search',
+    title: 'Error',
+    description: 'An error occurred during operation',
     progressMin: 0,
     progressMax: 0
   }

@@ -67,7 +67,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       loadingFolders: false,
       searchingFiles: false,
       fileSearchResults: {},
-      searchProgress: SearchProgressHelper.createInitialProgress() // NEW: Use helper to create initial progress
+      searchProgress: SearchProgressHelper.createInitialProgress()
     };
 
     this.fileInputRef = React.createRef<HTMLInputElement>();
@@ -250,8 +250,8 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     });
   }
 
-  // NEW: Enhanced file search methods with three-stage progress
-  private handleSearchFiles = async (): Promise<void> => {
+  // NEW: Handle directory analysis (Stages 1-2)
+  private handleAnalyzeDirectories = async (): Promise<void> => {
     const { selectedFolder, data } = this.state;
     
     if (!selectedFolder) {
@@ -260,11 +260,11 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     }
     
     if (data.rows.length === 0) {
-      this.setState({ error: 'No data rows to search' });
+      this.setState({ error: 'No data rows to analyze' });
       return;
     }
     
-    console.log('[RenameFilesManagement] Starting three-stage file search...');
+    console.log('[RenameFilesManagement] Starting directory analysis...');
     
     this.setState({ 
       searchingFiles: true, 
@@ -275,52 +275,89 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
         SearchStage.ANALYZING_DIRECTORIES,
         {
           totalRows: data.rows.length,
-          currentFileName: 'Preparing search...'
+          currentFileName: 'Starting directory analysis...'
         }
       )
     });
     
     try {
-      const results = await this.fileSearchService.searchFiles(
+      const analysisProgress = await this.fileSearchService.analyzeDirectories(
         selectedFolder.ServerRelativeUrl,
+        data.rows,
+        this.updateSearchProgress
+      );
+      
+      console.log('[RenameFilesManagement] Directory analysis completed:', {
+        totalDirectories: analysisProgress.searchPlan?.totalDirectories,
+        existingDirectories: analysisProgress.searchPlan?.existingDirectories
+      });
+      
+      this.setState({ 
+        searchProgress: analysisProgress
+      });
+      
+    } catch (error) {
+      console.error('Error analyzing directories:', error);
+      this.setState({ 
+        error: error instanceof Error ? error.message : 'Failed to analyze directories',
+        searchProgress: SearchProgressHelper.transitionToStage(
+          this.state.searchProgress,
+          SearchStage.ERROR,
+          {
+            currentFileName: 'Analysis failed',
+            errors: [error instanceof Error ? error.message : 'Unknown error']
+          }
+        )
+      });
+    } finally {
+      this.setState({ searchingFiles: false });
+    }
+  }
+
+  // NEW: Handle file search (Stage 3 only)
+  private handleSearchFiles = async (): Promise<void> => {
+    const { data, searchProgress } = this.state;
+    
+    if (!searchProgress.searchPlan) {
+      this.setState({ error: 'Please analyze directories first' });
+      return;
+    }
+    
+    if (data.rows.length === 0) {
+      this.setState({ error: 'No data rows to search' });
+      return;
+    }
+    
+    console.log('[RenameFilesManagement] Starting file search...');
+    
+    this.setState({ 
+      searchingFiles: true, 
+      error: undefined,
+      fileSearchResults: {}
+    });
+    
+    try {
+      const results = await this.fileSearchService.searchFilesInDirectories(
+        searchProgress,
         data.rows,
         this.updateSearchResult,
         this.updateSearchProgress
       );
       
-      console.log('[RenameFilesManagement] Search completed with results:', {
+      console.log('[RenameFilesManagement] File search completed:', {
         totalResults: Object.keys(results).length,
         foundFiles: Object.values(results).filter(r => r === 'found').length,
         notFoundFiles: Object.values(results).filter(r => r === 'not-found').length
       });
       
-      // Final update with completion
       this.setState({ 
-        fileSearchResults: results,
-        searchProgress: SearchProgressHelper.transitionToStage(
-          this.state.searchProgress,
-          SearchStage.COMPLETED,
-          {
-            currentFileName: 'Search completed successfully',
-            overallProgress: 100,
-            filesFound: Object.values(results).filter(r => r === 'found').length,
-            filesSearched: Object.keys(results).length
-          }
-        )
+        fileSearchResults: results
       });
       
     } catch (error) {
       console.error('Error searching files:', error);
       this.setState({ 
-        error: error instanceof Error ? error.message : 'Failed to search files',
-        searchProgress: SearchProgressHelper.transitionToStage(
-          this.state.searchProgress,
-          SearchStage.ERROR,
-          {
-            currentFileName: 'Search failed',
-            errors: [error instanceof Error ? error.message : 'Unknown error']
-          }
-        )
+        error: error instanceof Error ? error.message : 'Failed to search files'
       });
     } finally {
       this.setState({ searchingFiles: false });
@@ -338,13 +375,12 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
         this.state.searchProgress,
         SearchStage.CANCELLED,
         {
-          currentFileName: 'Search cancelled by user'
+          currentFileName: 'Operation cancelled by user'
         }
       )
     });
   }
 
-  // NEW: Enhanced progress update method
   private updateSearchProgress = (progress: ISearchProgress): void => {
     console.log('[RenameFilesManagement] Search progress update:', {
       stage: progress.currentStage,
@@ -459,11 +495,12 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
             <RenameControlsPanel
               selectedFolder={this.state.selectedFolder}
               searchingFiles={this.state.searchingFiles}
-              searchProgress={searchProgress} // NEW: Pass enhanced progress
+              searchProgress={searchProgress}
               loading={loading}
               onSelectFolder={this.handleSelectFolder}
               onClearFolder={this.clearSelectedFolder}
-              onSearchFiles={this.handleSearchFiles}
+              onAnalyzeDirectories={this.handleAnalyzeDirectories} // NEW: Stage 1-2
+              onSearchFiles={this.handleSearchFiles} // NEW: Stage 3
               onCancelSearch={this.handleCancelSearch}
             />
 
