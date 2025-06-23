@@ -18,10 +18,10 @@ export class FileSearchService {
   private isCancelled: boolean = false;
   private currentSearchId: string | null = null;
 
-  // NEW: Timeout settings
-  private readonly DIRECTORY_CHECK_TIMEOUT = 5000; // 5 seconds per directory
-  private readonly FOLDER_LOAD_TIMEOUT = 10000; // 10 seconds for folder loading
-  private readonly FILE_SEARCH_TIMEOUT = 8000; // 8 seconds per directory file search
+  // AGGRESSIVE: Much shorter timeouts to prevent hanging
+  private readonly DIRECTORY_CHECK_TIMEOUT = 3000; // 3 seconds per directory
+  private readonly FOLDER_LOAD_TIMEOUT = 8000; // 8 seconds for folder loading
+  private readonly BATCH_TIMEOUT = 2000; // 2 seconds per batch
 
   constructor(context: any) {
     this.context = context;
@@ -403,7 +403,7 @@ export class FileSearchService {
   }
 
   /**
-   * STAGE 3: Search files with timeout protection
+   * STAGE 3: Search files with CORRECT LOGIC - only search files belonging to each directory
    */
   private async executeStage3_SearchFiles(
     currentProgress: ISearchProgress,
@@ -413,7 +413,7 @@ export class FileSearchService {
     statusCallback?: (progress: ISearchProgress) => void
   ): Promise<void> {
     
-    console.log('[FileSearchService] STAGE 3: Searching for files with timeout protection...');
+    console.log('[FileSearchService] STAGE 3: Searching files with CORRECTED LOGIC...');
     
     let progress = SearchProgressHelper.transitionToStage(
       currentProgress,
@@ -433,8 +433,8 @@ export class FileSearchService {
     let filesFound = 0;
     const totalRowsToProcess = searchPlan.validRows;
 
-    const BATCH_SIZE = 50;
-    const TIME_BATCH = 3000;
+    const BATCH_SIZE = 50; // Increased since we're processing correctly now
+    const TIME_BATCH = 2000;
     let filesProcessedSinceUpdate = 0;
     let lastUpdateTime = Date.now();
 
@@ -460,15 +460,36 @@ export class FileSearchService {
         
         filesProcessedSinceUpdate = 0;
         lastUpdateTime = Date.now();
+        
+        console.log(`[FileSearchService] ⏱️ Progress update: ${processedRows}/${totalRowsToProcess} files (${filesFound} found)`);
       }
     };
 
-    // Process each directory group with timeout
-    for (const dirGroup of searchPlan.directoryGroups) {
+    // NEW: Log all directories before processing with CORRECT file counts
+    console.log(`[FileSearchService] 📁 CORRECTED DIRECTORY PROCESSING PLAN:`);
+    searchPlan.directoryGroups.forEach((dirGroup, index) => {
+      console.log(`  ${index + 1}. "${dirGroup.directoryPath}" -> ${dirGroup.exists ? '✅ EXISTS' : '❌ MISSING'} (${dirGroup.fileCount} files from Excel)`);
+      console.log(`     Full path: "${dirGroup.fullSharePointPath}"`);
+      console.log(`     Row indexes: [${dirGroup.rowIndexes.slice(0, 5).join(', ')}${dirGroup.rowIndexes.length > 5 ? '...' : ''}]`);
+    });
+
+    // Process each directory group with CORRECTED logic
+    for (let dirIndex = 0; dirIndex < searchPlan.directoryGroups.length; dirIndex++) {
+      const dirGroup = searchPlan.directoryGroups[dirIndex];
+      
       if (this.isCancelled) break;
 
+      console.log(`[FileSearchService] 🚀 STARTING DIRECTORY ${dirIndex + 1}/${searchPlan.directoryGroups.length}:`);
+      console.log(`   Path: "${dirGroup.directoryPath}"`);
+      console.log(`   Full SharePoint path: "${dirGroup.fullSharePointPath}"`);
+      console.log(`   Exists: ${dirGroup.exists ? '✅ YES' : '❌ NO'}`);
+      console.log(`   Excel rows for this directory: ${dirGroup.fileCount} (rows: ${dirGroup.rowIndexes.slice(0, 3).join(', ')}...)`);
+
       if (!dirGroup.exists) {
-        // Skip non-existing directory
+        // Skip non-existing directory - mark ONLY files from this directory
+        console.log(`[FileSearchService] ⏭️ SKIPPING non-existing directory: ${dirGroup.directoryPath}`);
+        console.log(`   Marking ${dirGroup.rowIndexes.length} files as not-found (only files from this directory)`);
+        
         for (const rowIndex of dirGroup.rowIndexes) {
           if (!this.isCancelled) {
             results[rowIndex] = 'not-found';
@@ -479,21 +500,28 @@ export class FileSearchService {
         }
         
         updateProgressIfNeeded();
+        console.log(`[FileSearchService] ✅ COMPLETED skipping directory: ${dirGroup.directoryPath}`);
         
       } else {
-        // Search in existing directory with timeout
-        console.log(`[FileSearchService] Searching in directory: ${dirGroup.directoryPath} (${dirGroup.fileCount} files)`);
+        // Search in existing directory - ONLY for files belonging to this directory
+        console.log(`[FileSearchService] 🔍 SEARCHING in existing directory: ${dirGroup.directoryPath}`);
+        console.log(`   Will process ${dirGroup.rowIndexes.length} Excel rows that belong to this directory`);
+        console.log(`📞 About to call getFolderContents for: "${dirGroup.fullSharePointPath}"`);
+        
+        const directoryStartTime = Date.now();
         
         try {
-          const searchPromise = this.searchInSpecificDirectoryBatch(
+          const foundInDirectory = await this.searchInSpecificDirectoryDetailed(
             dirGroup,
             rows,
             results,
             progressCallback,
-            (batchProcessed, batchFound, currentFile) => {
+            (batchProcessed: number, batchFound: number, currentFile: string) => {
               processedRows += batchProcessed;
               filesFound += batchFound;
               filesProcessedSinceUpdate += batchProcessed;
+              
+              console.log(`[FileSearchService] 📦 Batch completed in ${dirGroup.directoryPath}: +${batchProcessed} files, +${batchFound} found. Current file: "${currentFile}"`);
               
               progress = SearchProgressHelper.updateStageProgress(
                 progress,
@@ -511,33 +539,45 @@ export class FileSearchService {
             }
           );
 
-          // Apply timeout to directory search
-          await Promise.race([
-            searchPromise,
-            this.createTimeoutPromise(this.FILE_SEARCH_TIMEOUT, 'Directory search timeout')
-          ]);
+          const directoryEndTime = Date.now();
+          const directoryDuration = directoryEndTime - directoryStartTime;
+          console.log(`[FileSearchService] ✅ COMPLETED directory: ${dirGroup.directoryPath} in ${directoryDuration}ms`);
+          console.log(`   Found ${foundInDirectory} files out of ${dirGroup.rowIndexes.length} Excel rows for this directory`);
 
         } catch (error) {
-          console.warn(`[FileSearchService] Search in directory ${dirGroup.directoryPath} failed or timed out:`, error);
+          const directoryEndTime = Date.now();
+          const directoryDuration = directoryEndTime - directoryStartTime;
           
-          // Mark remaining files in this directory as not found
+          console.error(`[FileSearchService] ❌ FAILED directory: ${dirGroup.directoryPath} after ${directoryDuration}ms`);
+          console.error(`[FileSearchService] Error details:`, error);
+          
+          // Mark remaining files in this directory as not found - ONLY files from this directory
+          let markedCount = 0;
           for (const rowIndex of dirGroup.rowIndexes) {
             if (results[rowIndex] === 'searching') {
               results[rowIndex] = 'not-found';
               progressCallback(rowIndex, 'not-found');
               processedRows++;
               filesProcessedSinceUpdate++;
+              markedCount++;
             }
           }
           
+          console.log(`[FileSearchService] 🔄 Marked ${markedCount} files from this directory as not-found due to error`);
           updateProgressIfNeeded();
         }
       }
 
-      await this.delay(25);
+      console.log(`[FileSearchService] 📊 DIRECTORY ${dirIndex + 1} SUMMARY:`);
+      console.log(`   Total processed so far: ${processedRows}/${totalRowsToProcess}`);
+      console.log(`   Total found so far: ${filesFound}`);
+      console.log(`   Remaining directories: ${searchPlan.directoryGroups.length - dirIndex - 1}`);
+      console.log(`[FileSearchService] ➡️ Moving to next directory...\n`);
+
+      await this.delay(100);
     }
 
-    // Handle unprocessed rows
+    // Handle unprocessed rows - these should be minimal now with correct logic
     const processedRowIndexes = new Set<number>();
     searchPlan.directoryGroups.forEach((g: IDirectoryAnalysis) => {
       g.rowIndexes.forEach((index: number) => processedRowIndexes.add(index));
@@ -545,24 +585,28 @@ export class FileSearchService {
     
     const unprocessedRows = rows.filter(row => !processedRowIndexes.has(row.rowIndex));
     
-    for (const row of unprocessedRows) {
-      if (this.isCancelled) break;
+    if (unprocessedRows.length > 0) {
+      console.log(`[FileSearchService] ⚠️ Found ${unprocessedRows.length} unprocessed rows (should be minimal with correct logic)`);
       
-      results[row.rowIndex] = 'not-found';
-      progressCallback(row.rowIndex, 'not-found');
-      processedRows++;
-      filesProcessedSinceUpdate++;
-      
-      updateProgressIfNeeded();
+      for (const row of unprocessedRows) {
+        if (this.isCancelled) break;
+        
+        results[row.rowIndex] = 'not-found';
+        progressCallback(row.rowIndex, 'not-found');
+        processedRows++;
+        filesProcessedSinceUpdate++;
+        
+        updateProgressIfNeeded();
+      }
     }
 
     updateProgressIfNeeded(true);
 
-    console.log('[FileSearchService] STAGE 3 completed with timeout protection:', {
-      processedRows,
-      filesFound,
-      successRate: processedRows > 0 ? (filesFound / processedRows * 100).toFixed(1) + '%' : '0%'
-    });
+    console.log('[FileSearchService] 🎯 STAGE 3 FINAL SUMMARY (CORRECTED LOGIC):');
+    console.log(`   Total files processed: ${processedRows}`);
+    console.log(`   Total files found: ${filesFound}`);
+    console.log(`   Success rate: ${processedRows > 0 ? (filesFound / processedRows * 100).toFixed(1) + '%' : '0%'}`);
+    console.log(`   Directories processed: ${searchPlan.directoryGroups.length}`);
   }
 
   /**
@@ -582,9 +626,9 @@ export class FileSearchService {
   }
 
   /**
-   * Search in specific directory with batch updates
+   * NEW: Search in specific directory with DETAILED logging
    */
-  private async searchInSpecificDirectoryBatch(
+  private async searchInSpecificDirectoryDetailed(
     dirGroup: IDirectoryAnalysis,
     allRows: IRenameTableRow[],
     results: { [rowIndex: number]: 'found' | 'not-found' | 'searching' },
@@ -592,32 +636,60 @@ export class FileSearchService {
     batchCallback?: (batchProcessed: number, batchFound: number, currentFile: string) => void
   ): Promise<number> {
     
+    console.log(`[FileSearchService] 🔍 DETAILED batch search starting for: "${dirGroup.fullSharePointPath}"`);
+    
     let totalFilesFound = 0;
     
     try {
-      const folderContents = await this.folderService.getFolderContents(dirGroup.fullSharePointPath);
+      console.log(`[FileSearchService] 📞 Calling folderService.getFolderContents("${dirGroup.fullSharePointPath}")...`);
+      const contentStartTime = Date.now();
+      
+      // Get folder contents with timeout
+      const contentPromise = this.folderService.getFolderContents(dirGroup.fullSharePointPath);
+      const folderContents = await Promise.race([
+        contentPromise,
+        this.createTimeoutPromise(this.BATCH_TIMEOUT, { files: [], folders: [] })
+      ]) as {files: any[], folders: any[]};
+      
+      const contentEndTime = Date.now();
+      const contentDuration = contentEndTime - contentStartTime;
+      
       const files = folderContents.files;
       
+      console.log(`[FileSearchService] ✅ getFolderContents completed in ${contentDuration}ms`);
+      console.log(`[FileSearchService] 📁 Found ${files.length} files in SharePoint directory "${dirGroup.directoryPath}"`);
+      console.log(`[FileSearchService] 📊 Need to check ${dirGroup.rowIndexes.length} Excel rows against these ${files.length} SharePoint files`);
+      
+      // Create a map of filenames for fast lookup (case-insensitive)
       const fileMap = new Map<string, any>();
       files.forEach(file => {
         fileMap.set(file.Name.toLowerCase(), file);
       });
       
-      const BATCH_SIZE = 25;
+      console.log(`[FileSearchService] 🗂️ Created file lookup map with ${fileMap.size} entries`);
+      
+      // Process files in smaller batches with detailed logging
+      const BATCH_SIZE = 10;
       let batchProcessed = 0;
       let batchFound = 0;
       let currentFileName = '';
+      
+      console.log(`[FileSearchService] 🔄 Starting to process ${dirGroup.rowIndexes.length} files in batches of ${BATCH_SIZE}...`);
       
       for (let i = 0; i < dirGroup.rowIndexes.length; i++) {
         if (this.isCancelled) break;
         
         const rowIndex = dirGroup.rowIndexes[i];
         const row = allRows.find(r => r.rowIndex === rowIndex);
-        if (!row) continue;
+        if (!row) {
+          console.warn(`[FileSearchService] ⚠️ Row not found for index ${rowIndex}`);
+          continue;
+        }
         
         const fileName = String(row.cells['custom_0']?.value || '');
         currentFileName = fileName;
         
+        // Check if file exists (case-insensitive)
         const fileExists = fileMap.has(fileName.toLowerCase());
         const result = fileExists ? 'found' : 'not-found';
         results[rowIndex] = result;
@@ -626,34 +698,50 @@ export class FileSearchService {
         if (fileExists) {
           batchFound++;
           totalFilesFound++;
+          console.log(`[FileSearchService] ✅ FOUND: "${fileName}" (row ${rowIndex + 1})`);
+        } else {
+          console.log(`[FileSearchService] ❌ NOT FOUND: "${fileName}" (row ${rowIndex + 1})`);
         }
         
         batchProcessed++;
         
+        // Batch callback every BATCH_SIZE files OR at the end
         if (batchProcessed >= BATCH_SIZE || i === dirGroup.rowIndexes.length - 1) {
+          console.log(`[FileSearchService] 📦 Batch ${Math.floor(i / BATCH_SIZE) + 1} completed: ${batchProcessed} processed, ${batchFound} found`);
+          
           batchCallback?.(batchProcessed, batchFound, currentFileName);
           batchProcessed = 0;
           batchFound = 0;
           
+          // Shorter delay between batches
           if (i < dirGroup.rowIndexes.length - 1) {
-            await this.delay(10);
+            await this.delay(50);
           }
         }
       }
       
     } catch (error) {
-      console.error(`[FileSearchService] Error searching in directory ${dirGroup.fullSharePointPath}:`, error);
+      console.error(`[FileSearchService] ❌ CRITICAL ERROR in directory ${dirGroup.fullSharePointPath}:`, error);
+      console.error(`[FileSearchService] Error type: ${error?.constructor?.name || 'Unknown'}`);
+      console.error(`[FileSearchService] Error message: ${error instanceof Error ? error.message : String(error)}`);
       
+      // Mark all files in this directory as not found
+      let errorMarkedCount = 0;
       for (const rowIndex of dirGroup.rowIndexes) {
         if (!this.isCancelled) {
           results[rowIndex] = 'not-found';
           progressCallback(rowIndex, 'not-found');
+          errorMarkedCount++;
         }
       }
       
+      console.log(`[FileSearchService] 🔄 Marked ${errorMarkedCount} files as not-found due to error`);
+      
+      // Error callback
       batchCallback?.(dirGroup.rowIndexes.length, 0, `Error in ${dirGroup.directoryPath}`);
     }
     
+    console.log(`[FileSearchService] ✅ Completed search in ${dirGroup.directoryPath}: ${totalFilesFound} files found out of ${dirGroup.rowIndexes.length} checked`);
     return totalFilesFound;
   }
 
