@@ -110,6 +110,9 @@ export class ExcelFileProcessor {
     const headers = jsonData[0] || [];
     const dataRows = jsonData.slice(1);
 
+    console.log(`[ExcelFileProcessor] Starting to process ${dataRows.length} data rows...`);
+    console.log(`[ExcelFileProcessor] Headers found:`, headers);
+
     // Create filename column as the first custom column
     const filenameColumn: ICustomColumn = {
       id: 'custom_0',
@@ -146,9 +149,6 @@ export class ExcelFileProcessor {
         dataType: this.detectDataType(dataRows, index)
       });
     });
-
-    console.log(`[ExcelFileProcessor] Starting to process ${dataRows.length} data rows...`);
-    console.log(`[ExcelFileProcessor] Headers found:`, headers);
 
     // Create table rows
     const rows: IRenameTableRow[] = dataRows.map((row, rowIndex) => {
@@ -341,6 +341,202 @@ export class ExcelFileProcessor {
     return datePatterns.some(pattern => pattern.test(value));
   }
 
+  public extractFileName(relativePath: string, rowIndex?: number): string {
+    const logPrefix = rowIndex !== undefined ? `[ExcelFileProcessor] Row ${rowIndex + 1}` : '[ExcelFileProcessor]';
+    
+    if (!relativePath) {
+      console.log(`${logPrefix}: No relative path provided`);
+      return '';
+    }
+    
+    console.log(`${logPrefix}: Extracting filename from path: "${relativePath}"`);
+    
+    // Extract filename from path (e.g., "634\2022\10\634-AS Food Hygiene.pdf" -> "634-AS Food Hygiene.pdf")
+    const pathParts = relativePath.split(/[\\\/]/);
+    const fileName = pathParts[pathParts.length - 1] || '';
+    
+    console.log(`${logPrefix}: Path split into ${pathParts.length} parts:`, pathParts);
+    console.log(`${logPrefix}: Extracted filename: "${fileName}"`);
+    
+    return fileName;
+  }
+
+  public extractDirectoryPath(relativePath: string): string {
+    if (!relativePath) return '';
+    
+    console.log(`[ExcelFileProcessor] Extracting directory from path: "${relativePath}"`);
+    
+    // Split the path by both backslashes and forward slashes
+    const pathParts = relativePath.split(/[\\\/]/);
+    
+    // Remove the filename (last part) to get directory path
+    const directoryParts = pathParts.slice(0, -1);
+    
+    // Join back with forward slashes (SharePoint format)
+    const directoryPath = directoryParts.join('/');
+    
+    console.log(`[ExcelFileProcessor] Path parts:`, pathParts);
+    console.log(`[ExcelFileProcessor] Directory parts:`, directoryParts);
+    console.log(`[ExcelFileProcessor] Extracted directory: "${directoryPath}"`);
+    
+    return directoryPath;
+  }
+
+  public extractDirectoryPathFromRow(row: IRenameTableRow): string {
+    console.log(`[ExcelFileProcessor] Extracting directory path from row ${row.rowIndex}`);
+    
+    // Log all cells in the row for debugging
+    Object.entries(row.cells).forEach(([columnId, cell]) => {
+      console.log(`  Column ${columnId}: "${cell.value}"`);
+    });
+    
+    // LOOK FOR RelativePath DATA - check both column ID and cell content
+    const relativePathCell = Object.values(row.cells).find(cell => {
+      const columnIdLower = cell.columnId.toLowerCase();
+      const cellValue = String(cell.value || '');
+      
+      // Method 1: Check if column ID contains "relativepath"
+      if (columnIdLower.includes('relativepath') || columnIdLower.includes('relative_path')) {
+        return true;
+      }
+      
+      // Method 2: Check if this cell contains a path-like value (backup method)
+      if (cellValue && 
+          (cellValue.includes('\\') || cellValue.includes('/')) && 
+          cellValue.includes('.') && // has file extension
+          cellValue.length > 10 && // reasonable length
+          this.looksLikeFilePath(cellValue)) {
+        console.log(`[ExcelFileProcessor] Found path-like content in column ${cell.columnId}: "${cellValue}"`);
+        return true;
+      }
+      
+      return false;
+    });
+    
+    if (!relativePathCell || !relativePathCell.value) {
+      console.log(`[ExcelFileProcessor] No RelativePath found in row ${row.rowIndex}`);
+      console.log(`[ExcelFileProcessor] Available columns:`, Object.keys(row.cells));
+      return '';
+    }
+    
+    const relativePath = String(relativePathCell.value);
+    console.log(`[ExcelFileProcessor] Found RelativePath in row ${row.rowIndex}: "${relativePath}"`);
+    
+    // Only proceed if this actually looks like a file path
+    if (!relativePath.includes('\\') && !relativePath.includes('/')) {
+      console.log(`[ExcelFileProcessor] RelativePath doesn't contain path separators: "${relativePath}"`);
+      return '';
+    }
+    
+    const directoryPath = this.extractDirectoryPath(relativePath);
+    
+    console.log(`[ExcelFileProcessor] Row ${row.rowIndex}: RelativePath="${relativePath}" -> Directory="${directoryPath}"`);
+    
+    return directoryPath;
+  }
+
+  public validateDirectoryStructure(data: IRenameFilesData): Array<{
+    rowIndex: number;
+    fileName: string;
+    relativePath: string;
+    directoryPath: string;
+    hasValidPath: boolean;
+  }> {
+    console.log(`[ExcelFileProcessor] Validating directory structure for ${data.rows.length} rows`);
+    
+    const validationResults: Array<{
+      rowIndex: number;
+      fileName: string;
+      relativePath: string;
+      directoryPath: string;
+      hasValidPath: boolean;
+    }> = [];
+
+    data.rows.forEach(row => {
+      // Get filename from first column
+      const fileName = String(row.cells['custom_0']?.value || '');
+      
+      // Extract RelativePath and directory
+      const relativePath = this.extractRelativePath(row);
+      const directoryPath = this.extractDirectoryPathFromRow(row);
+      
+      // Check if path structure is valid
+      const hasValidPath = relativePath !== '' && directoryPath !== '' && fileName !== '';
+      
+      const result = {
+        rowIndex: row.rowIndex,
+        fileName,
+        relativePath,
+        directoryPath,
+        hasValidPath
+      };
+      
+      validationResults.push(result);
+      
+      console.log(`[ExcelFileProcessor] Row ${row.rowIndex}: FileName="${fileName}", Directory="${directoryPath}", Valid=${hasValidPath}`);
+    });
+
+    const validRows = validationResults.filter(r => r.hasValidPath).length;
+    console.log(`[ExcelFileProcessor] Validation complete: ${validRows}/${validationResults.length} rows have valid paths`);
+    
+    return validationResults;
+  }
+
+  public getDirectoryStatistics(data: IRenameFilesData): Array<{
+    directoryPath: string;
+    fileCount: number;
+    rowIndexes: number[];
+  }> {
+    console.log(`[ExcelFileProcessor] Calculating directory statistics`);
+    
+    const directoryMap = new Map<string, { count: number; rowIndexes: number[] }>();
+    
+    data.rows.forEach(row => {
+      const directoryPath = this.extractDirectoryPathFromRow(row);
+      
+      if (directoryPath) {
+        const existing = directoryMap.get(directoryPath);
+        if (existing) {
+          existing.count++;
+          existing.rowIndexes.push(row.rowIndex);
+        } else {
+          directoryMap.set(directoryPath, {
+            count: 1,
+            rowIndexes: [row.rowIndex]
+          });
+        }
+      }
+    });
+    
+    const statistics = Array.from(directoryMap.entries()).map(([directoryPath, data]) => ({
+      directoryPath,
+      fileCount: data.count,
+      rowIndexes: data.rowIndexes
+    }));
+    
+    // Sort by file count descending
+    statistics.sort((a, b) => b.fileCount - a.fileCount);
+    
+    console.log(`[ExcelFileProcessor] Directory statistics:`, statistics);
+    
+    return statistics;
+  }
+
+  public splitPathAndFilename(fullPath: string): { directoryPath: string; fileName: string } {
+    if (!fullPath) {
+      return { directoryPath: '', fileName: '' };
+    }
+    
+    const pathParts = fullPath.split(/[\\\/]/);
+    const fileName = pathParts[pathParts.length - 1] || '';
+    const directoryParts = pathParts.slice(0, -1);
+    const directoryPath = directoryParts.join('/');
+    
+    console.log(`[ExcelFileProcessor] Split "${fullPath}" -> Directory: "${directoryPath}", File: "${fileName}"`);
+    
+    return { directoryPath, fileName };
+  }
+
   public addCustomColumn(data: IRenameFilesData): IRenameFilesData {
     const newColumnId = `custom_${data.customColumns.length}`;
     
@@ -424,25 +620,5 @@ export class ExcelFileProcessor {
     }
     
     return String(relativePathCell.value);
-  }
-
-  public extractFileName(relativePath: string, rowIndex?: number): string {
-    const logPrefix = rowIndex !== undefined ? `[ExcelFileProcessor] Row ${rowIndex + 1}` : '[ExcelFileProcessor]';
-    
-    if (!relativePath) {
-      console.log(`${logPrefix}: No relative path provided`);
-      return '';
-    }
-    
-    console.log(`${logPrefix}: Extracting filename from path: "${relativePath}"`);
-    
-    // Extract filename from path (e.g., "634\2022\10\634-AS Food Hygiene.pdf" -> "634-AS Food Hygiene.pdf")
-    const pathParts = relativePath.split(/[\\\/]/);
-    const fileName = pathParts[pathParts.length - 1] || '';
-    
-    console.log(`${logPrefix}: Path split into ${pathParts.length} parts:`, pathParts);
-    console.log(`${logPrefix}: Extracted filename: "${fileName}"`);
-    
-    return fileName;
   }
 }
