@@ -1,17 +1,14 @@
 // src/webparts/xyea/components/RenameFilesManagement/services/FileSearchService.ts
 
 import { IRenameTableRow } from '../types/RenameFilesTypes';
-import { ExcelFileProcessor } from './ExcelFileProcessor';
 
 export class FileSearchService {
   private context: any;
-  private excelProcessor: ExcelFileProcessor;
   private isCancelled: boolean = false;
   private currentSearchId: string | null = null;
 
   constructor(context: any) {
     this.context = context;
-    this.excelProcessor = new ExcelFileProcessor();
   }
 
   public async searchFiles(
@@ -47,9 +44,10 @@ export class FileSearchService {
       const row = rows[i];
       
       try {
-        // Extract filename for status callback
-        const relativePath = this.excelProcessor.extractRelativePath(row);
-        const fileName = relativePath ? this.excelProcessor.extractFileName(relativePath) : '';
+        // Get filename directly from the first column (custom_0) which was populated during Excel processing
+        const fileName = String(row.cells['custom_0']?.value || '');
+        
+        console.log(`[FileSearchService] Row ${row.rowIndex + 1}: Using filename from first column: "${fileName}"`);
         
         // Update status
         if (statusCallback) {
@@ -106,23 +104,15 @@ export class FileSearchService {
     if (this.isCancelled) return false;
     
     try {
-      // Extract RelativePath from the row
-      const relativePath = this.excelProcessor.extractRelativePath(row);
-      
-      if (!relativePath) {
-        console.log(`No RelativePath found for row ${row.rowIndex}`);
-        return false;
-      }
-      
-      // Extract filename from path
-      const fileName = this.excelProcessor.extractFileName(relativePath);
+      // Get filename directly from the first column (custom_0)
+      const fileName = String(row.cells['custom_0']?.value || '');
       
       if (!fileName) {
-        console.log(`No filename extracted from path: ${relativePath}`);
+        console.log(`[FileSearchService] No filename found in first column for row ${row.rowIndex}`);
         return false;
       }
       
-      console.log(`Searching for filename: ${fileName} in row ${row.rowIndex}`);
+      console.log(`[FileSearchService] Searching for filename: "${fileName}" in row ${row.rowIndex}`);
       
       // Search for the file recursively in the selected folder
       const found = await this.searchFileRecursively(baseFolderPath, fileName);
@@ -164,7 +154,7 @@ export class FileSearchService {
         );
         
         if (fileFound) {
-          console.log(`File "${fileName}" found in folder: ${folderPath}`);
+          console.log(`[FileSearchService] File "${fileName}" found in folder: ${folderPath}`);
           return true;
         }
       }
@@ -211,7 +201,7 @@ export class FileSearchService {
       return false;
       
     } catch (error) {
-      console.error(`Error searching in folder ${folderPath}:`, error);
+      console.error(`[FileSearchService] Error searching in folder ${folderPath}:`, error);
       return false;
     }
   }
@@ -222,7 +212,7 @@ export class FileSearchService {
 
   public async searchSingleFile(folderPath: string, fileName: string): Promise<{ found: boolean; path?: string }> {
     try {
-      console.log(`Searching for single file: ${fileName} in ${folderPath}`);
+      console.log(`[FileSearchService] Searching for single file: ${fileName} in ${folderPath}`);
       
       const found = await this.searchFileRecursively(folderPath, fileName);
       
@@ -232,7 +222,7 @@ export class FileSearchService {
       };
       
     } catch (error) {
-      console.error('Error in single file search:', error);
+      console.error('[FileSearchService] Error in single file search:', error);
       return { found: false };
     }
   }
@@ -255,7 +245,7 @@ export class FileSearchService {
 
       return null;
     } catch (error) {
-      console.error('Error getting file details:', error);
+      console.error('[FileSearchService] Error getting file details:', error);
       return null;
     }
   }
@@ -270,5 +260,15 @@ export class FileSearchService {
     // Check for invalid characters in SharePoint file names
     const invalidChars = /[<>:"/\\|?*]/;
     return !invalidChars.test(fileName) && fileName.trim().length > 0;
+  }
+
+  // Legacy method for backward compatibility - now uses filename from first column
+  public getFileNameFromRow(row: IRenameTableRow): string {
+    // Get filename directly from the first column (custom_0)
+    const fileName = String(row.cells['custom_0']?.value || '');
+    
+    console.log(`[FileSearchService] getFileNameFromRow for row ${row.rowIndex}: "${fileName}"`);
+    
+    return fileName;
   }
 }

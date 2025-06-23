@@ -110,25 +110,25 @@ export class ExcelFileProcessor {
     const headers = jsonData[0] || [];
     const dataRows = jsonData.slice(1);
 
-    // Create initial empty custom column
-    const emptyCustomColumn: ICustomColumn = {
+    // Create filename column as the first custom column
+    const filenameColumn: ICustomColumn = {
       id: 'custom_0',
-      name: 'New Column',
+      name: 'Filename',
       isEditable: true,
       defaultValue: '',
-      width: 150
+      width: 200
     };
 
-    // Create column configurations - first the empty column, then Excel columns
+    // Create column configurations - first the filename column, then Excel columns
     const columns: IColumnConfiguration[] = [
       {
-        id: emptyCustomColumn.id,
-        name: emptyCustomColumn.name,
+        id: filenameColumn.id,
+        name: filenameColumn.name,
         currentIndex: 0,
         isVisible: true,
         isCustom: true,
         isEditable: true,
-        width: 150,
+        width: 200,
         dataType: 'text'
       }
     ];
@@ -139,7 +139,7 @@ export class ExcelFileProcessor {
         id: `excel_${index}`,
         name: String(header || `Column ${index + 1}`),
         originalIndex: index,
-        currentIndex: index + 1, // +1 because of empty column at position 0
+        currentIndex: index + 1, // +1 because of filename column at position 0
         isVisible: true,
         isCustom: false,
         isEditable: true,
@@ -147,15 +147,24 @@ export class ExcelFileProcessor {
       });
     });
 
+    console.log(`[ExcelFileProcessor] Starting to process ${dataRows.length} data rows...`);
+    console.log(`[ExcelFileProcessor] Headers found:`, headers);
+
     // Create table rows
     const rows: IRenameTableRow[] = dataRows.map((row, rowIndex) => {
       const cells: { [columnId: string]: ITableCell } = {};
 
-      // Add empty cell for custom column
-      cells[emptyCustomColumn.id] = {
-        value: '',
+      // Extract filename from the row data and populate the filename column
+      const relativePath = this.extractRelativePathFromRowData(row, headers, rowIndex);
+      const fileName = relativePath ? this.extractFileName(relativePath, rowIndex) || '' : '';
+      
+      console.log(`[ExcelFileProcessor] Row ${rowIndex + 1}: RelativePath="${relativePath}" -> Filename="${fileName}"`);
+
+      cells[filenameColumn.id] = {
+        value: fileName,
         isEdited: false,
-        columnId: emptyCustomColumn.id,
+        originalValue: fileName,
+        columnId: filenameColumn.id,
         rowIndex
       };
 
@@ -197,10 +206,100 @@ export class ExcelFileProcessor {
       currentSheet: sheet,
       columns,
       rows,
-      customColumns: [emptyCustomColumn],
+      customColumns: [filenameColumn],
       totalRows: dataRows.length,
       editedCellsCount: 0
     };
+  }
+
+  private extractRelativePathFromRowData(
+    row: (string | number | boolean | undefined)[], 
+    headers: (string | number | boolean | undefined)[],
+    rowIndex: number
+  ): string {
+    console.log(`[ExcelFileProcessor] Processing row ${rowIndex + 1} with ${row.length} cells:`);
+    
+    // Log all headers for debugging
+    headers.forEach((header, index) => {
+      const cellValue = String(row[index] || '');
+      console.log(`  Header[${index}]: "${header}" -> Value: "${cellValue}"`);
+    });
+    
+    // FIRST: Look specifically for RelativePath column by header name
+    for (let i = 0; i < headers.length; i++) {
+      const header = String(headers[i] || '').toLowerCase();
+      const cellValue = String(row[i] || '');
+      
+      if (header.includes('relativepath') || 
+          header.includes('relative_path')) {
+        console.log(`[ExcelFileProcessor] Found RelativePath by header "${header}" in column ${i}: "${cellValue}"`);
+        return cellValue;
+      }
+    }
+    
+    // SECOND: Look for other path-related headers
+    for (let i = 0; i < headers.length; i++) {
+      const header = String(headers[i] || '').toLowerCase();
+      const cellValue = String(row[i] || '');
+      
+      if (header.includes('path') || header.includes('filepath') || header.includes('file_path')) {
+        console.log(`[ExcelFileProcessor] Found path by header "${header}" in column ${i}: "${cellValue}"`);
+        return cellValue;
+      }
+    }
+    
+    // THIRD: Only if no path headers found, look for content that looks like a file path
+    // But be more strict - must have file extension and proper path structure
+    for (let i = 0; i < row.length; i++) {
+      const cellValue = String(row[i] || '');
+      if (cellValue && 
+          (cellValue.includes('\\') || cellValue.includes('/')) && 
+          cellValue.includes('.') && // must have file extension
+          cellValue.length > 10 && // reasonable minimum length for a file path
+          this.looksLikeFilePath(cellValue)) { // additional validation
+        console.log(`[ExcelFileProcessor] Found path by content pattern in column ${i}: "${cellValue}"`);
+        return cellValue;
+      }
+    }
+    
+    console.log(`[ExcelFileProcessor] No path found in row ${rowIndex + 1}`);
+    return '';
+  }
+
+  private looksLikeFilePath(value: string): boolean {
+    // Additional validation to ensure this really looks like a file path
+    // and not just text that happens to contain slashes
+    
+    // Must contain at least one directory separator
+    if (!value.includes('\\') && !value.includes('/')) {
+      return false;
+    }
+    
+    // Must have a file extension at the end
+    const parts = value.split(/[\\\/]/);
+    const lastPart = parts[parts.length - 1];
+    if (!lastPart || !lastPart.includes('.')) {
+      return false;
+    }
+    
+    // The file extension should be reasonable (2-5 characters after the last dot)
+    const extensionMatch = lastPart.match(/\.([a-zA-Z0-9]{2,5})$/);
+    if (!extensionMatch) {
+      return false;
+    }
+    
+    // Should have multiple path components (not just a filename)
+    if (parts.length < 2) {
+      return false;
+    }
+    
+    // Reject if it looks like a person's name (contains parentheses with common abbreviations)
+    if (value.includes('(') && value.includes(')') && 
+        (value.includes('INST') || value.includes('DRV') || value.includes('MGR'))) {
+      return false;
+    }
+    
+    return true;
   }
 
   private detectDataType(dataRows: (string | number | boolean | undefined)[][], columnIndex: number): 'text' | 'number' | 'date' | 'boolean' {
@@ -307,31 +406,43 @@ export class ExcelFileProcessor {
     };
   }
 
-  public extractRelativePath(row: IRenameTableRow): string | null {
+  public extractRelativePath(row: IRenameTableRow): string {
     // Find cell that contains RelativePath data
     const relativePathCell = Object.values(row.cells).find(cell => {
       const cellValue = String(cell.value || '');
       return (
         cell.columnId.toLowerCase().includes('relativepath') ||
         cell.columnId.toLowerCase().includes('relative_path') ||
+        cell.columnId.toLowerCase().includes('path') ||
         cellValue.includes('\\') || 
         cellValue.includes('/')
       );
     });
     
     if (!relativePathCell || !relativePathCell.value) {
-      return null;
+      return '';
     }
     
     return String(relativePathCell.value);
   }
 
-  public extractFileName(relativePath: string): string | null {
-    if (!relativePath) return null;
+  public extractFileName(relativePath: string, rowIndex?: number): string {
+    const logPrefix = rowIndex !== undefined ? `[ExcelFileProcessor] Row ${rowIndex + 1}` : '[ExcelFileProcessor]';
+    
+    if (!relativePath) {
+      console.log(`${logPrefix}: No relative path provided`);
+      return '';
+    }
+    
+    console.log(`${logPrefix}: Extracting filename from path: "${relativePath}"`);
     
     // Extract filename from path (e.g., "634\2022\10\634-AS Food Hygiene.pdf" -> "634-AS Food Hygiene.pdf")
-    const fileName = relativePath.split(/[\\\/]/).pop() || '';
+    const pathParts = relativePath.split(/[\\\/]/);
+    const fileName = pathParts[pathParts.length - 1] || '';
     
-    return fileName || null;
+    console.log(`${logPrefix}: Path split into ${pathParts.length} parts:`, pathParts);
+    console.log(`${logPrefix}: Extracted filename: "${fileName}"`);
+    
+    return fileName;
   }
 }
