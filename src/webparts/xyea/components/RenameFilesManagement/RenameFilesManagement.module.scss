@@ -1,13 +1,4 @@
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.7;
-    transform: scale(1.1);
-  }
-}// src/webparts/xyea/components/RenameFilesManagement/RenameFilesManagement.module.scss
+// src/webparts/xyea/components/RenameFilesManagement/RenameFilesManagement.module.scss
 
 .renameFilesManagement {
   padding: 20px;
@@ -15,6 +6,7 @@
   min-height: 500px;
   font-family: "Segoe UI", "Segoe UI Web (West European)", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif;
 
+  // Header Section
   .header {
     display: flex;
     justify-content: space-between;
@@ -32,159 +24,6 @@
         font-weight: 600;
         color: #323130;
       }
-
-    .renameControls {
-      margin-bottom: 20px;
-      padding: 16px;
-      background-color: #fff9c4;
-      border: 1px solid #ffb900;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-
-      .renameButton {
-        background-color: #107c10;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        padding: 10px 16px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        transition: all 0.2s ease;
-        min-width: 140px;
-        justify-content: center;
-
-        &:hover:not(:disabled) {
-          background-color: #0e6e0e;
-          transform: translateY(-1px);
-          box-shadow: 0 2px 4px rgba(16, 124, 16, 0.3);
-        }
-
-        &:disabled {
-          background-color: #c8c6c4;
-          cursor: not-allowed;
-          transform: none;
-          box-shadow: none;
-        }
-
-        .spinner {
-          width: 14px;
-          height: 14px;
-          border: 2px solid transparent;
-          border-top: 2px solid currentColor;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-      }
-
-      .searchProgress {
-        color: #107c10;
-        font-size: 14px;
-        font-weight: 500;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-
-        &::before {
-          content: '🔍';
-          animation: pulse 1.5s ease-in-out infinite;
-        }
-      }
-
-      .searchNote {
-        color: #605e5c;
-        font-style: italic;
-      }
-    }
-
-    .folderSelection {
-      margin-bottom: 20px;
-      padding: 16px;
-      background-color: #f8f9fa;
-      border: 1px solid #edebe9;
-      border-radius: 6px;
-
-      .folderControls {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 8px;
-
-        .selectFolderButton {
-          background-color: #0078d4;
-          color: white;
-          border: none;
-          border-radius: 4px;
-          padding: 8px 16px;
-          cursor: pointer;
-          font-size: 14px;
-          font-weight: 600;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          transition: all 0.2s ease;
-
-          &:hover:not(:disabled) {
-            background-color: #106ebe;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0, 120, 212, 0.3);
-          }
-
-          &:disabled {
-            background-color: #c8c6c4;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-          }
-        }
-
-        .selectedFolder {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          background-color: white;
-          border: 1px solid #0078d4;
-          border-radius: 4px;
-          padding: 6px 12px;
-          font-size: 14px;
-
-          .folderIcon {
-            font-size: 16px;
-          }
-
-          .folderName {
-            color: #0078d4;
-            font-weight: 500;
-          }
-
-          .clearFolderButton {
-            background: none;
-            border: none;
-            color: #605e5c;
-            cursor: pointer;
-            font-size: 12px;
-            padding: 2px;
-            border-radius: 2px;
-            
-            &:hover {
-              background-color: rgba(96, 94, 92, 0.1);
-              color: #323130;
-            }
-          }
-        }
-      }
-
-      .folderInfo {
-        color: #605e5c;
-        font-size: 12px;
-        margin-left: 24px;
-      }
-    }
 
       p {
         margin: 0;
@@ -268,6 +107,7 @@
     }
   }
 
+  // Progress and Error Components
   .progressContainer {
     background-color: #f8f9fa;
     border: 1px solid #0078d4;
@@ -344,6 +184,7 @@
     }
   }
 
+  // Content Area
   .content {
     .tableInfo {
       margin-bottom: 15px;
@@ -364,6 +205,242 @@
       }
     }
 
+    // SharePoint Folder Selection
+    .folderSelection {
+      margin-bottom: 20px;
+      padding: 16px;
+      background-color: #f8f9fa;
+      border: 1px solid #edebe9;
+      border-radius: 6px;
+
+      .folderControls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+
+        .selectFolderButton {
+          background-color: #0078d4;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          padding: 10px 16px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          transition: all 0.2s ease;
+          min-width: 140px;
+          justify-content: center;
+
+          &:hover:not(:disabled) {
+            background-color: #106ebe;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 120, 212, 0.3);
+          }
+
+          &:disabled {
+            background-color: #c8c6c4;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+          }
+        }
+
+        .selectedFolder {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background-color: white;
+          border: 1px solid #0078d4;
+          border-radius: 4px;
+          padding: 6px 12px;
+          font-size: 14px;
+
+          .folderIcon {
+            font-size: 16px;
+          }
+
+          .folderName {
+            color: #0078d4;
+            font-weight: 500;
+          }
+
+          .clearFolderButton {
+            background: none;
+            border: none;
+            color: #605e5c;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 2px;
+            border-radius: 2px;
+            
+            &:hover {
+              background-color: rgba(96, 94, 92, 0.1);
+              color: #323130;
+            }
+
+            &:disabled {
+              opacity: 0.5;
+              cursor: not-allowed;
+            }
+          }
+        }
+      }
+
+      .folderInfo {
+        color: #605e5c;
+        font-size: 12px;
+        margin-left: 24px;
+      }
+    }
+
+    // Rename Controls Panel
+    .renameControls {
+      margin-bottom: 20px;
+      padding: 16px;
+      background-color: #fff9c4;
+      border: 1px solid #ffb900;
+      border-radius: 6px;
+
+      .renameButtons {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .renameButton {
+        background-color: #107c10;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 10px 16px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+        min-width: 140px;
+        justify-content: center;
+
+        &:hover:not(:disabled) {
+          background-color: #0e6e0e;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 4px rgba(16, 124, 16, 0.3);
+        }
+
+        &:disabled {
+          background-color: #c8c6c4;
+          cursor: not-allowed;
+          transform: none;
+          box-shadow: none;
+        }
+
+        .spinner {
+          width: 14px;
+          height: 14px;
+          border: 2px solid transparent;
+          border-top: 2px solid currentColor;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+      }
+
+      .cancelButton {
+        background-color: #d13438;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 10px 16px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+
+        &:hover {
+          background-color: #a4262c;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 4px rgba(209, 52, 56, 0.3);
+        }
+      }
+
+      .searchProgressInfo {
+        background-color: white;
+        border: 1px solid #ffb900;
+        border-radius: 4px;
+        padding: 12px;
+        margin-bottom: 8px;
+
+        .progressText {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 8px;
+          font-size: 14px;
+
+          .currentFile {
+            color: #605e5c;
+            font-size: 12px;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+        }
+
+        .progressBar {
+          width: 100%;
+          height: 8px;
+          background-color: #edebe9;
+          border-radius: 4px;
+          overflow: hidden;
+          margin-bottom: 6px;
+
+          .progressFill {
+            height: 100%;
+            background-color: #107c10;
+            transition: width 0.3s ease;
+            border-radius: 4px;
+          }
+        }
+
+        .progressStats {
+          text-align: center;
+          font-size: 12px;
+          color: #605e5c;
+          font-weight: 500;
+        }
+      }
+
+      .searchProgress {
+        color: #107c10;
+        font-size: 14px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        &::before {
+          content: '🔍';
+          animation: pulse 1.5s ease-in-out infinite;
+        }
+      }
+
+      .searchNote {
+        color: #605e5c;
+        font-style: italic;
+      }
+    }
+
+    // Data Table Container
     .tableContainer {
       overflow-x: auto;
       overflow-y: auto;
@@ -395,9 +472,9 @@
             padding: 12px 8px;
             text-align: center;
             border-right: 1px solid #edebe9;
-            min-width: 50px;
-            max-width: 50px;
-            width: 50px;
+            min-width: 60px;
+            max-width: 60px;
+            width: 60px;
             position: sticky;
             left: 0;
             z-index: 11;
@@ -589,6 +666,7 @@
     }
   }
 
+  // Empty State
   .emptyState {
     text-align: center;
     padding: 80px 20px;
@@ -615,7 +693,7 @@
   }
 }
 
-// Folder selection dialog styles
+// Folder Selection Dialog
 .folderDialog {
   position: fixed;
   top: 0;
@@ -771,6 +849,7 @@
   }
 }
 
+// Animations
 @keyframes spin {
   from {
     transform: rotate(0deg);
@@ -780,7 +859,29 @@
   }
 }
 
-// Responsive design
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translate(-50%, -50%) translateY(-30px) scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%) translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+// Responsive Design
 @media (max-width: 768px) {
   .renameFilesManagement {
     padding: 15px;
@@ -801,6 +902,42 @@
     }
 
     .content {
+      .folderSelection {
+        .folderControls {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 8px;
+
+          .selectFolderButton {
+            width: 100%;
+          }
+        }
+      }
+
+      .renameControls {
+        .renameButtons {
+          flex-direction: column;
+          align-items: stretch;
+
+          .renameButton,
+          .cancelButton {
+            width: 100%;
+          }
+        }
+
+        .searchProgressInfo {
+          .progressText {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+
+            .currentFile {
+              max-width: 100%;
+            }
+          }
+        }
+      }
+
       .tableContainer {
         max-height: 50vh;
 
@@ -851,9 +988,55 @@
       }
     }
   }
+
+  .folderDialog {
+    .dialogContent {
+      min-width: 320px;
+      max-width: 90vw;
+      margin: 20px;
+
+      .dialogHeader {
+        padding: 16px 20px 12px;
+
+        h3 {
+          font-size: 16px;
+        }
+      }
+
+      .dialogBody {
+        .folderList {
+          .folderItem {
+            padding: 10px 20px;
+
+            .folderIcon {
+              font-size: 18px;
+            }
+
+            .folderDetails {
+              .folderName {
+                font-size: 14px;
+              }
+
+              .folderPath {
+                font-size: 11px;
+              }
+            }
+          }
+        }
+      }
+
+      .dialogFooter {
+        padding: 12px 20px 16px;
+
+        .cancelButton {
+          width: 100%;
+        }
+      }
+    }
+  }
 }
 
-// High contrast mode support
+// High Contrast Mode Support
 @media (prefers-contrast: high) {
   .renameFilesManagement {
     .content {
@@ -892,7 +1075,7 @@
   }
 }
 
-// Print styles
+// Print Styles
 @media print {
   .renameFilesManagement {
     .header {
@@ -902,7 +1085,9 @@
     }
 
     .progressContainer,
-    .error {
+    .error,
+    .folderSelection,
+    .renameControls {
       display: none;
     }
 
@@ -931,9 +1116,13 @@
       }
     }
   }
+
+  .folderDialog {
+    display: none;
+  }
 }
 
-// Scrollbar styling
+// Scrollbar Styling
 .tableContainer::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -955,4 +1144,21 @@
 
 .tableContainer::-webkit-scrollbar-corner {
   background: #f1f1f1;
+}
+
+.dialogBody::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dialogBody::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.dialogBody::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.dialogBody::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }

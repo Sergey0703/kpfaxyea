@@ -143,6 +143,11 @@ export interface IRenameFilesState {
   // File searching and renaming
   searchingFiles: boolean;
   fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' };
+  searchProgress: {
+    currentRow: number;
+    totalRows: number;
+    currentFileName: string;
+  };
 }
 
 /**

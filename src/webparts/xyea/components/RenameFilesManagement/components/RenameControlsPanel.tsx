@@ -7,19 +7,27 @@ import { ISharePointFolder } from '../types/RenameFilesTypes';
 export interface IRenameControlsPanelProps {
   selectedFolder: ISharePointFolder | undefined;
   searchingFiles: boolean;
+  searchProgress: {
+    currentRow: number;
+    totalRows: number;
+    currentFileName: string;
+  };
   loading: boolean;
   onSelectFolder: () => void;
   onClearFolder: () => void;
   onSearchFiles: () => void;
+  onCancelSearch: () => void;
 }
 
 export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
   selectedFolder,
   searchingFiles,
+  searchProgress,
   loading,
   onSelectFolder,
   onClearFolder,
-  onSearchFiles
+  onSearchFiles,
+  onCancelSearch
 }) => {
   return (
     <>
@@ -29,7 +37,7 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
           <button
             className={styles.selectFolderButton}
             onClick={onSelectFolder}
-            disabled={loading}
+            disabled={loading || searchingFiles}
           >
             📁 Select SharePoint Folder
           </button>
@@ -44,6 +52,7 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
                 className={styles.clearFolderButton}
                 onClick={onClearFolder}
                 title="Clear selection"
+                disabled={searchingFiles}
               >
                 ✕
               </button>
@@ -60,30 +69,59 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
 
       {/* Rename Files Controls */}
       <div className={styles.renameControls}>
-        <button
-          className={styles.renameButton}
-          onClick={onSearchFiles}
-          disabled={loading || searchingFiles || !selectedFolder}
-        >
-          {searchingFiles ? (
-            <>
-              <span className={styles.spinner} />
-              Searching Files...
-            </>
-          ) : (
-            <>
-              🔍 Rename
-            </>
+        <div className={styles.renameButtons}>
+          <button
+            className={styles.renameButton}
+            onClick={onSearchFiles}
+            disabled={loading || searchingFiles || !selectedFolder}
+          >
+            {searchingFiles ? (
+              <>
+                <span className={styles.spinner} />
+                Searching...
+              </>
+            ) : (
+              <>
+                🔍 Rename
+              </>
+            )}
+          </button>
+          
+          {searchingFiles && (
+            <button
+              className={styles.cancelButton}
+              onClick={onCancelSearch}
+            >
+              ❌ Cancel
+            </button>
           )}
-        </button>
+        </div>
         
-        {searchingFiles && (
-          <div className={styles.searchProgress}>
-            Searching for files in selected folder...
+        {searchingFiles && searchProgress.totalRows > 0 && (
+          <div className={styles.searchProgressInfo}>
+            <div className={styles.progressText}>
+              <strong>Row {searchProgress.currentRow} of {searchProgress.totalRows}</strong>
+              {searchProgress.currentFileName && (
+                <span className={styles.currentFile}>
+                  Searching: {searchProgress.currentFileName}
+                </span>
+              )}
+            </div>
+            <div className={styles.progressBar}>
+              <div 
+                className={styles.progressFill}
+                style={{ 
+                  width: `${(searchProgress.currentRow / searchProgress.totalRows) * 100}%` 
+                }}
+              />
+            </div>
+            <div className={styles.progressStats}>
+              {Math.round((searchProgress.currentRow / searchProgress.totalRows) * 100)}% complete
+            </div>
           </div>
         )}
         
-        {!selectedFolder && (
+        {!selectedFolder && !searchingFiles && (
           <div className={styles.searchNote}>
             <small>Please select a SharePoint folder first</small>
           </div>
