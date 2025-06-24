@@ -429,3 +429,53 @@ export class SearchProgressHelper {
     };
   }
 }
+
+// Добавьте эти типы в IRenameFilesState в types/RenameFilesTypes.ts
+
+export interface IRenameFilesState {
+  // File and data
+  data: IRenameFilesData;
+  
+  // UI state
+  loading: boolean;
+  error: string | undefined;
+  uploadProgress: {
+    stage: 'idle' | 'uploading' | 'parsing' | 'complete' | 'error';
+    progress: number;
+    message: string;
+  };
+  
+  // Table state
+  selectedCells: { [key: string]: boolean }; // key format: "columnId_rowIndex"
+  editingCell: { columnId: string; rowIndex: number } | undefined;
+  
+  // Column management
+  showColumnManager: boolean;
+  draggedColumn: string | undefined;
+  
+  // Export state
+  showExportDialog: boolean;
+  exportConfig: IRenameFilesExportConfig;
+  isExporting: boolean;
+  
+  // SharePoint folder selection
+  selectedFolder: ISharePointFolder | undefined;
+  showFolderDialog: boolean;
+  availableFolders: ISharePointFolder[];
+  loadingFolders: boolean;
+  
+  // File searching and renaming
+  searchingFiles: boolean;
+  fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' };
+  searchProgress: ISearchProgress;
+  
+  // NEW: Rename state
+  isRenaming: boolean;
+  renameProgress?: {
+    current: number;
+    total: number;
+    fileName: string;
+    success: number;
+    errors: number;
+  };
+}

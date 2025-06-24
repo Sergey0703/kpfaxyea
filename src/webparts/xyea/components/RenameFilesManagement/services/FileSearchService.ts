@@ -175,6 +175,215 @@ export class FileSearchService {
   }
 
   /**
+   * NEW: Rename found files with staffID prefix
+   */
+  public async renameFoundFiles(
+    rows: IRenameTableRow[],
+    fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' },
+    baseFolderPath: string,
+    progressCallback: (rowIndex: number, status: 'renaming' | 'renamed' | 'error') => void,
+    statusCallback?: (progress: { current: number; total: number; fileName: string; success: number; errors: number }) => void
+  ): Promise<{ success: number; errors: number; errorDetails: string[] }> {
+    
+    this.currentSearchId = Date.now().toString();
+    const searchId = this.currentSearchId;
+    this.isCancelled = false;
+    
+    console.log(`[FileSearchService] 🏷️ STARTING FILE RENAME (Search ID: ${searchId})`);
+    
+    // Find files to rename (only found files with staffID)
+    const filesToRename: Array<{
+      rowIndex: number;
+      originalFileName: string;
+      staffID: string;
+      directoryPath: string;
+      fullOriginalPath: string;
+      fullNewPath: string;
+    }> = [];
+
+    rows.forEach(row => {
+      const searchResult = fileSearchResults[row.rowIndex];
+      
+      if (searchResult === 'found') {
+        const originalFileName = String(row.cells['custom_0']?.value || '').trim();
+        const staffID = String(row.cells['staffID']?.value || '').trim();
+        const directoryPath = String(row.cells['custom_1']?.value || '').trim();
+        
+        if (originalFileName && staffID && directoryPath) {
+          const directorySharePointPath = this.buildDirectoryPath(directoryPath, baseFolderPath);
+          const fullOriginalPath = `${directorySharePointPath}/${originalFileName}`;
+          const newFileName = `${staffID} ${originalFileName}`;
+          const fullNewPath = `${directorySharePointPath}/${newFileName}`;
+          
+          filesToRename.push({
+            rowIndex: row.rowIndex,
+            originalFileName,
+            staffID,
+            directoryPath,
+            fullOriginalPath,
+            fullNewPath
+          });
+          
+          console.log(`[FileSearchService] 📝 Prepared rename: "${originalFileName}" -> "${newFileName}"`);
+        } else {
+          console.warn(`[FileSearchService] ⚠️ Missing data for row ${row.rowIndex}: fileName="${originalFileName}", staffID="${staffID}"`);
+        }
+      }
+    });
+
+    console.log(`[FileSearchService] 📊 Prepared ${filesToRename.length} files for renaming`);
+
+    if (filesToRename.length === 0) {
+      return { success: 0, errors: 0, errorDetails: [] };
+    }
+
+    let processedFiles = 0;
+    let successCount = 0;
+    let errorCount = 0;
+    const errorDetails: string[] = [];
+
+    try {
+      // Get SharePoint request digest once
+      const requestDigest = await this.getRequestDigest();
+      
+      // Process files in small batches to avoid overwhelming SharePoint
+      const BATCH_SIZE = 3;
+      
+      for (let i = 0; i < filesToRename.length; i += BATCH_SIZE) {
+        if (this.isCancelled || this.currentSearchId !== searchId) {
+          console.log('[FileSearchService] ❌ Rename operation cancelled');
+          break;
+        }
+
+        const batch = filesToRename.slice(i, i + BATCH_SIZE);
+        console.log(`[FileSearchService] 📦 Processing batch ${Math.floor(i / BATCH_SIZE) + 1}: ${batch.length} files`);
+
+        // Process batch sequentially (not parallel to avoid conflicts)
+        for (const fileInfo of batch) {
+          if (this.isCancelled) break;
+
+          try {
+            progressCallback(fileInfo.rowIndex, 'renaming');
+            
+            statusCallback?.({
+              current: processedFiles + 1,
+              total: filesToRename.length,
+              fileName: fileInfo.originalFileName,
+              success: successCount,
+              errors: errorCount
+            });
+
+            await this.renameSingleFile(fileInfo.fullOriginalPath, fileInfo.fullNewPath, requestDigest);
+            
+            successCount++;
+            progressCallback(fileInfo.rowIndex, 'renamed');
+            console.log(`[FileSearchService] ✅ SUCCESS: "${fileInfo.originalFileName}" -> "${fileInfo.staffID} ${fileInfo.originalFileName}"`);
+            
+          } catch (error) {
+            errorCount++;
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            errorDetails.push(`${fileInfo.originalFileName}: ${errorMessage}`);
+            progressCallback(fileInfo.rowIndex, 'error');
+            console.error(`[FileSearchService] ❌ ERROR: "${fileInfo.originalFileName}": ${errorMessage}`);
+          }
+          
+          processedFiles++;
+        }
+
+        // Small delay between batches
+        if (i + BATCH_SIZE < filesToRename.length) {
+          await this.delay(500);
+        }
+      }
+
+      console.log(`[FileSearchService] 🎯 Rename completed:`);
+      console.log(`  📊 Total files: ${filesToRename.length}`);
+      console.log(`  ✅ Successful: ${successCount}`);
+      console.log(`  ❌ Failed: ${errorCount}`);
+      console.log(`  📈 Success rate: ${filesToRename.length > 0 ? (successCount / filesToRename.length * 100).toFixed(1) + '%' : '0%'}`);
+
+      return { success: successCount, errors: errorCount, errorDetails };
+
+    } catch (error) {
+      console.error('[FileSearchService] ❌ Critical error in rename operation:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      errorDetails.push(`Critical error: ${errorMessage}`);
+      
+      return { 
+        success: successCount, 
+        errors: filesToRename.length - successCount, 
+        errorDetails 
+      };
+    }
+  }
+
+  /**
+   * Rename a single file using SharePoint REST API
+   */
+  private async renameSingleFile(originalPath: string, newPath: string, requestDigest: string): Promise<void> {
+    console.log(`[FileSearchService] 🔄 Renaming file:`);
+    console.log(`  From: "${originalPath}"`);
+    console.log(`  To: "${newPath}"`);
+    
+    const webUrl = this.context.pageContext.web.absoluteUrl;
+    const moveToUrl = `${webUrl}/_api/web/getFileByServerRelativeUrl('${encodeURIComponent(originalPath)}')/MoveTo('${encodeURIComponent(newPath)}', 1)`;
+    
+    const response = await fetch(moveToUrl, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json;odata=verbose',
+        'Content-Type': 'application/json;odata=verbose',
+        'X-RequestDigest': requestDigest
+      }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+    
+    console.log(`[FileSearchService] ✅ File renamed successfully`);
+  }
+
+  /**
+   * Get SharePoint request digest for authenticated requests
+   */
+  private async getRequestDigest(): Promise<string> {
+    try {
+      const webUrl = this.context.pageContext.web.absoluteUrl;
+      const response = await fetch(`${webUrl}/_api/contextinfo`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json;odata=verbose'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        return data.d.GetContextWebInformation.FormDigestValue;
+      } else {
+        throw new Error(`Failed to get request digest: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('[FileSearchService] Error getting request digest:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Build directory SharePoint path
+   */
+  private buildDirectoryPath(relativePath: string, basePath: string): string {
+    const normalizedRelative = relativePath.replace(/\\/g, '/');
+    const fullPath = `${basePath}/${normalizedRelative}`;
+    return fullPath.replace(/\/+/g, '/').replace(/\/$/, '');
+  }
+
+  // ... Rest of the existing methods (executeStage1_AnalyzeDirectories, executeStage2_CheckDirectoryExistence, etc.)
+  // [All the existing methods remain exactly the same - I'll include them for completeness]
+
+  /**
    * STAGE 1: Analyze directories with timeout protection
    */
   private async executeStage1_AnalyzeDirectories(
@@ -584,7 +793,6 @@ export class FileSearchService {
         console.log(`  📊 Success rate: ${filesFromExcel.length > 0 ? (directoryFoundCount / filesFromExcel.length * 100).toFixed(1) + '%' : '0%'}`);
 
       } catch (error) {
-        console.error(`[FileSearchService] ❌ ERROR in directory "${directoryPath}":`, error);
         console.error(`[FileSearchService] Error type: ${error?.constructor?.name || 'Unknown'}`);
         console.error(`[FileSearchService] Error message: ${error instanceof Error ? error.message : String(error)}`);
         

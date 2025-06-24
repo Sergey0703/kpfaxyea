@@ -14,11 +14,22 @@ export interface IRenameControlsPanelProps {
   searchingFiles: boolean;
   searchProgress: ISearchProgress;
   loading: boolean;
+  foundFilesCount: number; // NEW: Number of found files
+  isRenaming: boolean; // NEW: Rename status
+  renameProgress?: { // NEW: Rename progress
+    current: number;
+    total: number;
+    fileName: string;
+    success: number;
+    errors: number;
+  };
   onSelectFolder: () => void;
   onClearFolder: () => void;
-  onAnalyzeDirectories: () => void; // NEW: Stages 1-2
-  onSearchFiles: () => void; // NEW: Stage 3 only
+  onAnalyzeDirectories: () => void;
+  onSearchFiles: () => void;
   onCancelSearch: () => void;
+  onRenameFiles: () => void; // NEW: Rename callback
+  onCancelRename: () => void; // NEW: Cancel rename callback
 }
 
 export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
@@ -26,11 +37,16 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
   searchingFiles,
   searchProgress,
   loading,
+  foundFilesCount,
+  isRenaming,
+  renameProgress,
   onSelectFolder,
   onClearFolder,
   onAnalyzeDirectories,
   onSearchFiles,
-  onCancelSearch
+  onCancelSearch,
+  onRenameFiles,
+  onCancelRename
 }) => {
 
   /**
@@ -57,6 +73,10 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
    * Get stage-specific status text
    */
   const getStageStatusText = (): string => {
+    if (isRenaming && renameProgress) {
+      return `Renaming files: ${renameProgress.current}/${renameProgress.total} (${renameProgress.success} success, ${renameProgress.errors} errors)`;
+    }
+
     const stage = searchProgress.currentStage;
     
     switch (stage) {
@@ -106,6 +126,10 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
    * Render stage indicators
    */
   const renderStageIndicators = () => {
+    if (isRenaming) {
+      return null; // Hide stage indicators during rename
+    }
+
     const stages = [
       SearchStage.ANALYZING_DIRECTORIES,
       SearchStage.CHECKING_EXISTENCE,
@@ -147,13 +171,17 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
     const hasSearchPlan = searchProgress.searchPlan && searchProgress.searchPlan.totalDirectories > 0;
     const isAnalysisComplete = searchProgress.currentStage === SearchStage.CHECKING_EXISTENCE || 
                               (searchProgress.searchPlan && searchProgress.existingDirectories !== undefined);
+    const isSearchComplete = searchProgress.currentStage === SearchStage.COMPLETED && foundFilesCount > 0;
     
     return {
-      showAnalyzeButton: !hasSearchPlan && !searchingFiles,
-      showSearchButton: hasSearchPlan && isAnalysisComplete && !searchingFiles,
-      showCancelButton: searchingFiles,
+      showAnalyzeButton: !hasSearchPlan && !searchingFiles && !isRenaming,
+      showSearchButton: hasSearchPlan && isAnalysisComplete && !searchingFiles && !isRenaming,
+      showRenameButton: isSearchComplete && !searchingFiles && !isRenaming, // NEW
+      showCancelButton: searchingFiles || isRenaming,
       analyzeButtonText: searchingFiles ? 'Analyzing...' : '🔍 Analyze Directories',
-      searchButtonText: searchingFiles ? 'Searching...' : '🔍 Search Files'
+      searchButtonText: searchingFiles ? 'Searching...' : '🔍 Search Files',
+      renameButtonText: isRenaming ? 'Renaming...' : `🏷️ Rename ${foundFilesCount} Files`, // NEW
+      cancelButtonText: isRenaming ? '❌ Cancel Rename' : '❌ Cancel Search' // NEW
     };
   };
 
@@ -161,8 +189,13 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
    * Render detailed progress information
    */
   const renderDetailedProgress = () => {
-    if (!searchingFiles || searchProgress.currentStage === SearchStage.IDLE) {
+    if ((!searchingFiles && !isRenaming) || searchProgress.currentStage === SearchStage.IDLE) {
       return null;
+    }
+
+    // Rename progress has priority over search progress
+    if (isRenaming && renameProgress) {
+      return renderRenameProgress();
     }
 
     const stageInfo = getCurrentStageInfo();
@@ -299,6 +332,68 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
     );
   };
 
+  /**
+   * NEW: Render rename progress
+   */
+  const renderRenameProgress = () => {
+    if (!renameProgress) return null;
+
+    const progressPercentage = renameProgress.total > 0 ? (renameProgress.current / renameProgress.total) * 100 : 0;
+
+    return (
+      <div className={styles.searchProgressInfo}>
+        <div className={styles.stageHeader}>
+          <h4 className={styles.stageTitle}>
+            🏷️ Renaming Files
+            <span className={styles.stageProgress}>
+              ({progressPercentage.toFixed(0)}%)
+            </span>
+          </h4>
+          <p className={styles.stageDescription}>Adding staffID prefix to filenames in SharePoint...</p>
+        </div>
+
+        <div className={styles.progressContainer}>
+          <div className={styles.progressText}>
+            <strong className={styles.overallProgress}>
+              Progress: {renameProgress.current}/{renameProgress.total} files
+            </strong>
+          </div>
+          
+          <div className={styles.progressBar}>
+            <div 
+              className={styles.progressFill}
+              style={{ 
+                width: `${progressPercentage}%`,
+                backgroundColor: '#28a745'
+              }}
+            />
+          </div>
+        </div>
+
+        <div className={styles.operationDetails}>
+          <div className={styles.currentOperation}>
+            <strong>Current File:</strong> {renameProgress.fileName}
+          </div>
+        </div>
+
+        <div className={styles.searchStats}>
+          <div className={styles.stat}>
+            <span className={styles.statLabel}>Successfully Renamed:</span>
+            <span className={styles.statValue}>{renameProgress.success}</span>
+          </div>
+          <div className={styles.stat}>
+            <span className={styles.statLabel}>Errors:</span>
+            <span className={styles.statValue}>{renameProgress.errors}</span>
+          </div>
+          <div className={styles.stat}>
+            <span className={styles.statLabel}>Remaining:</span>
+            <span className={styles.statValue}>{renameProgress.total - renameProgress.current}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const buttonState = getButtonState();
 
   return (
@@ -309,7 +404,7 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
           <button
             className={styles.selectFolderButton}
             onClick={onSelectFolder}
-            disabled={loading || searchingFiles}
+            disabled={loading || searchingFiles || isRenaming}
           >
             📁 Select SharePoint Folder
           </button>
@@ -324,7 +419,7 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
                 className={styles.clearFolderButton}
                 onClick={onClearFolder}
                 title="Clear selection"
-                disabled={searchingFiles}
+                disabled={searchingFiles || isRenaming}
               >
                 ✕
               </button>
@@ -339,7 +434,7 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
         )}
       </div>
 
-      {/* Rename Files Controls with TWO BUTTONS */}
+      {/* Rename Files Controls with THREE BUTTONS */}
       <div className={styles.renameControls}>
         <div className={styles.renameButtons}>
           {/* BUTTON 1: Analyze Directories (Stages 1-2) */}
@@ -347,7 +442,7 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
             <button
               className={styles.renameButton}
               onClick={onAnalyzeDirectories}
-              disabled={loading || searchingFiles || !selectedFolder}
+              disabled={loading || searchingFiles || !selectedFolder || isRenaming}
             >
               {searchingFiles ? (
                 <>
@@ -367,7 +462,7 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
             <button
               className={styles.renameButton}
               onClick={onSearchFiles}
-              disabled={loading || searchingFiles}
+              disabled={loading || searchingFiles || isRenaming}
             >
               {searchingFiles ? (
                 <>
@@ -381,14 +476,34 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
               )}
             </button>
           )}
+
+          {/* BUTTON 3: Rename Files (NEW) */}
+          {buttonState.showRenameButton && (
+            <button
+              className={styles.renameFilesButton}
+              onClick={onRenameFiles}
+              disabled={loading || searchingFiles || isRenaming}
+            >
+              {isRenaming ? (
+                <>
+                  <span className={styles.spinner} />
+                  Renaming...
+                </>
+              ) : (
+                <>
+                  🏷️ Rename {foundFilesCount} Files
+                </>
+              )}
+            </button>
+          )}
           
           {/* Cancel button */}
           {buttonState.showCancelButton && (
             <button
               className={styles.cancelButton}
-              onClick={onCancelSearch}
+              onClick={isRenaming ? onCancelRename : onCancelSearch}
             >
-              ❌ Cancel
+              {buttonState.cancelButtonText}
             </button>
           )}
         </div>
@@ -404,19 +519,20 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
         {renderDetailedProgress()}
         
         {/* Helper text */}
-        {!selectedFolder && !searchingFiles && (
+        {!selectedFolder && !searchingFiles && !isRenaming && (
           <div className={styles.searchNote}>
             <small>Please select a SharePoint folder first</small>
           </div>
         )}
 
         {/* Show analysis results summary */}
-        {searchProgress.searchPlan && !searchingFiles && (
+        {searchProgress.searchPlan && !searchingFiles && !isRenaming && (
           <div className={styles.searchNote}>
             <small>
               Analysis complete: {searchProgress.searchPlan.totalDirectories} directories found, 
               {' '}{searchProgress.existingDirectories || 0} exist in SharePoint.
               {buttonState.showSearchButton && ' Ready to search files.'}
+              {buttonState.showRenameButton && ` Found ${foundFilesCount} files ready for renaming.`}
             </small>
           </div>
         )}

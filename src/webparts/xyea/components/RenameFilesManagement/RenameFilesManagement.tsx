@@ -67,7 +67,10 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       loadingFolders: false,
       searchingFiles: false,
       fileSearchResults: {},
-      searchProgress: SearchProgressHelper.createInitialProgress()
+      searchProgress: SearchProgressHelper.createInitialProgress(),
+      // NEW: Rename state
+      isRenaming: false,
+      renameProgress: undefined
     };
 
     this.fileInputRef = React.createRef<HTMLInputElement>();
@@ -87,7 +90,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
   public componentWillUnmount(): void {
     this.columnResizeHandler.removeEventListeners();
     
-    // Cancel any active search
+    // Cancel any active search or rename
     if (this.state.searchingFiles) {
       this.fileSearchService.cancelSearch();
     }
@@ -125,10 +128,12 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
           progress: 0,
           message: 'Reading file...'
         },
-        // Reset search state when loading new file
+        // Reset search and rename state when loading new file
         searchingFiles: false,
+        isRenaming: false,
         fileSearchResults: {},
-        searchProgress: SearchProgressHelper.createInitialProgress()
+        searchProgress: SearchProgressHelper.createInitialProgress(),
+        renameProgress: undefined
       });
 
       const processedData = await this.excelProcessor.processFile(
@@ -234,7 +239,9 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       selectedFolder: folder,
       showFolderDialog: false,
       fileSearchResults: {}, // Clear previous search results
-      searchProgress: SearchProgressHelper.createInitialProgress() // Reset progress
+      searchProgress: SearchProgressHelper.createInitialProgress(), // Reset progress
+      isRenaming: false,
+      renameProgress: undefined
     });
   }
 
@@ -246,11 +253,13 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     this.setState({ 
       selectedFolder: undefined,
       fileSearchResults: {},
-      searchProgress: SearchProgressHelper.createInitialProgress()
+      searchProgress: SearchProgressHelper.createInitialProgress(),
+      isRenaming: false,
+      renameProgress: undefined
     });
   }
 
-  // NEW: Handle directory analysis (Stages 1-2)
+  // Handle directory analysis (Stages 1-2)
   private handleAnalyzeDirectories = async (): Promise<void> => {
     const { selectedFolder, data } = this.state;
     
@@ -277,7 +286,9 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
           totalRows: data.rows.length,
           currentFileName: 'Starting directory analysis...'
         }
-      )
+      ),
+      isRenaming: false,
+      renameProgress: undefined
     });
     
     try {
@@ -314,7 +325,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     }
   }
 
-  // NEW: Handle file search (Stage 3 only)
+  // Handle file search (Stage 3 only)
   private handleSearchFiles = async (): Promise<void> => {
     const { data, searchProgress } = this.state;
     
@@ -333,7 +344,9 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     this.setState({ 
       searchingFiles: true, 
       error: undefined,
-      fileSearchResults: {}
+      fileSearchResults: {},
+      isRenaming: false,
+      renameProgress: undefined
     });
     
     try {
@@ -362,6 +375,79 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     } finally {
       this.setState({ searchingFiles: false });
     }
+  }
+
+  // NEW: Handle file renaming
+  private handleRenameFiles = async (): Promise<void> => {
+    const { data, fileSearchResults, selectedFolder } = this.state;
+    
+    if (!selectedFolder) {
+      this.setState({ error: 'Please select a SharePoint folder first' });
+      return;
+    }
+    
+    const foundFilesCount = Object.values(fileSearchResults).filter(r => r === 'found').length;
+    if (foundFilesCount === 0) {
+      this.setState({ error: 'No files found to rename' });
+      return;
+    }
+    
+    console.log(`[RenameFilesManagement] Starting rename of ${foundFilesCount} files...`);
+    
+    this.setState({ 
+      isRenaming: true, 
+      error: undefined,
+      renameProgress: {
+        current: 0,
+        total: foundFilesCount,
+        fileName: '',
+        success: 0,
+        errors: 0
+      }
+    });
+    
+    try {
+      const results = await this.fileSearchService.renameFoundFiles(
+        data.rows,
+        fileSearchResults,
+        selectedFolder.ServerRelativeUrl,
+        this.updateRenameFileResult,
+        this.updateRenameProgress
+      );
+      
+      console.log('[RenameFilesManagement] Rename completed:', results);
+      
+      if (results.errors > 0) {
+        this.setState({ 
+          error: `Rename completed with ${results.errors} errors. ${results.success} files renamed successfully.`
+        });
+      } else {
+        this.setState({ 
+          error: undefined
+        });
+        // You could show a success message here
+      }
+      
+    } catch (error) {
+      console.error('Error renaming files:', error);
+      this.setState({ 
+        error: error instanceof Error ? error.message : 'Failed to rename files'
+      });
+    } finally {
+      this.setState({ isRenaming: false });
+    }
+  }
+
+  // NEW: Cancel rename operation
+  private handleCancelRename = (): void => {
+    console.log('[RenameFilesManagement] Cancelling rename...');
+    
+    this.fileSearchService.cancelSearch(); // Reuse the same cancel mechanism
+    
+    this.setState({ 
+      isRenaming: false,
+      renameProgress: undefined
+    });
   }
 
   private handleCancelSearch = (): void => {
@@ -403,20 +489,46 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     }));
   }
 
+  // NEW: Update rename progress
+  private updateRenameProgress = (progress: { current: number; total: number; fileName: string; success: number; errors: number }): void => {
+    console.log('[RenameFilesManagement] Rename progress update:', progress);
+    
+    this.setState({
+      renameProgress: progress
+    });
+  }
+
+  // NEW: Update individual file rename result
+  private updateRenameFileResult = (rowIndex: number, status: 'renaming' | 'renamed' | 'error'): void => {
+    // You could update individual file status in the UI here if needed
+    console.log(`[RenameFilesManagement] File ${rowIndex + 1} status: ${status}`);
+  }
+
   private clearError = (): void => {
     this.setState({ error: undefined });
   }
 
   public render(): React.ReactElement<IRenameFilesManagementProps> {
-    const { data, loading, error, uploadProgress, searchProgress } = this.state;
+    const { 
+      data, 
+      loading, 
+      error, 
+      uploadProgress, 
+      searchProgress,
+      fileSearchResults,
+      selectedFolder,
+      isRenaming,
+      renameProgress
+    } = this.state;
+    
     const hasData = data.originalFile !== undefined;
 
     // Calculate search statistics for display
     const searchStats = {
-      totalFiles: Object.keys(this.state.fileSearchResults).length,
-      foundFiles: Object.values(this.state.fileSearchResults).filter(r => r === 'found').length,
-      notFoundFiles: Object.values(this.state.fileSearchResults).filter(r => r === 'not-found').length,
-      searchingFiles: Object.values(this.state.fileSearchResults).filter(r => r === 'searching').length
+      totalFiles: Object.keys(fileSearchResults).length,
+      foundFiles: Object.values(fileSearchResults).filter(r => r === 'found').length,
+      notFoundFiles: Object.values(fileSearchResults).filter(r => r === 'not-found').length,
+      searchingFiles: Object.values(fileSearchResults).filter(r => r === 'searching').length
     };
 
     return (
@@ -434,13 +546,13 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
               accept=".xlsx,.xls"
               onChange={(e) => { this.handleFileChange(e).catch(console.error); }}
               style={{ display: 'none' }}
-              disabled={loading}
+              disabled={loading || isRenaming}
             />
             
             <button
               className={styles.uploadButton}
               onClick={this.handleFileUpload}
-              disabled={loading}
+              disabled={loading || isRenaming}
             >
               {loading ? (
                 <>
@@ -458,7 +570,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
               <button
                 className={styles.addColumnButton}
                 onClick={this.handleAddCustomColumn}
-                disabled={loading}
+                disabled={loading || isRenaming}
               >
                 ➕ Add Column
               </button>
@@ -489,24 +601,35 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
                     )}
                   </>
                 )}
+                {isRenaming && renameProgress && (
+                  <>
+                    {' | '}
+                    <strong> Rename Progress:</strong> {renameProgress.success} renamed, {renameProgress.errors} errors
+                  </>
+                )}
               </div>
             </div>
 
             <RenameControlsPanel
-              selectedFolder={this.state.selectedFolder}
+              selectedFolder={selectedFolder}
               searchingFiles={this.state.searchingFiles}
               searchProgress={searchProgress}
               loading={loading}
+              foundFilesCount={searchStats.foundFiles}
+              isRenaming={isRenaming}
+              renameProgress={renameProgress}
               onSelectFolder={this.handleSelectFolder}
               onClearFolder={this.clearSelectedFolder}
-              onAnalyzeDirectories={this.handleAnalyzeDirectories} // NEW: Stage 1-2
-              onSearchFiles={this.handleSearchFiles} // NEW: Stage 3
+              onAnalyzeDirectories={this.handleAnalyzeDirectories}
+              onSearchFiles={this.handleSearchFiles}
               onCancelSearch={this.handleCancelSearch}
+              onRenameFiles={this.handleRenameFiles}
+              onCancelRename={this.handleCancelRename}
             />
 
             <DataTableView
               data={data}
-              fileSearchResults={this.state.fileSearchResults}
+              fileSearchResults={fileSearchResults}
               columnResizeHandler={this.columnResizeHandler}
               onCellEdit={this.updateCellData}
             />
@@ -538,6 +661,9 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
                 </p>
                 <p style={{ margin: '4px 0', lineHeight: 1.4 }}>
                   <strong style={{ color: '#323130' }}>Overall:</strong> {searchProgress.overallProgress.toFixed(1)}%
+                </p>
+                <p style={{ margin: '4px 0', lineHeight: 1.4 }}>
+                  <strong style={{ color: '#323130' }}>Found Files:</strong> {searchStats.foundFiles} ready for rename
                 </p>
               </div>
             )}
