@@ -367,7 +367,7 @@ export class ExcelExportService {
     return exportData;
   }
 
-  /**
+/**
    * NEW: Prepare rename files data for export
    */
   private static prepareRenameFilesExportData(
@@ -384,10 +384,20 @@ export class ExcelExportService {
     settings?: IRenameExportSettings
   ): any[][] {
     
+    // Use default settings if not provided
+    const exportSettings: IRenameExportSettings = settings || {
+      fileName: 'renamed_files_export',
+      includeHeaders: true,
+      includeStatusColumn: true,
+      includeTimestamps: true,
+      onlyCompletedRows: false,
+      fileFormat: 'xlsx'
+    };
+    
     const exportData: any[][] = [];
     
     // Prepare headers
-    if (settings?.includeHeaders) {
+    if (exportSettings.includeHeaders) {
       const headers: string[] = [];
       
       // Add data columns in order
@@ -399,12 +409,12 @@ export class ExcelExportService {
         });
       
       // Add status column
-      if (settings.includeStatusColumn) {
+      if (exportSettings.includeStatusColumn) {
         headers.push('Status');
       }
       
       // Add timestamp column
-      if (settings.includeTimestamps) {
+      if (exportSettings.includeTimestamps) {
         headers.push('Export Timestamp');
       }
       
@@ -416,7 +426,7 @@ export class ExcelExportService {
       const searchStatus = fileSearchResults[row.rowIndex];
       
       // Filter rows based on settings
-      if (settings.onlyCompletedRows) {
+      if (exportSettings.onlyCompletedRows) {
         if (searchStatus === 'searching') {
           return; // Skip rows that are still searching
         }
@@ -443,13 +453,13 @@ export class ExcelExportService {
         });
       
       // Add status information
-      if (settings.includeStatusColumn) {
+      if (exportSettings.includeStatusColumn) {
         const statusText = this.getRenameStatusText(searchStatus, renameProgress, row.rowIndex);
         rowData.push(statusText);
       }
       
       // Add timestamp
-      if (settings.includeTimestamps) {
+      if (exportSettings.includeTimestamps) {
         rowData.push(new Date().toLocaleString());
       }
       
