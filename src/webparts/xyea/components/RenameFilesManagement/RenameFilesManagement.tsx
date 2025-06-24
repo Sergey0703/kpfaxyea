@@ -79,6 +79,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       loadingFolders: false,
       searchingFiles: false,
       fileSearchResults: {},
+      fileRenameResults: {}, // NEW: Track individual file rename status
       searchProgress: SearchProgressHelper.createInitialProgress(),
       // NEW: Rename state with skipped support
       isRenaming: false,
@@ -144,6 +145,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
         searchingFiles: false,
         isRenaming: false,
         fileSearchResults: {},
+        fileRenameResults: {}, // NEW: Reset rename status
         searchProgress: SearchProgressHelper.createInitialProgress(),
         renameProgress: undefined,
         // NEW: Reset export settings with file name
@@ -262,6 +264,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       selectedFolder: folder,
       showFolderDialog: false,
       fileSearchResults: {}, // Clear previous search results
+      fileRenameResults: {}, // NEW: Clear previous rename results
       searchProgress: SearchProgressHelper.createInitialProgress(), // Reset progress
       isRenaming: false,
       renameProgress: undefined
@@ -276,6 +279,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     this.setState({ 
       selectedFolder: undefined,
       fileSearchResults: {},
+      fileRenameResults: {}, // NEW: Clear rename results
       searchProgress: SearchProgressHelper.createInitialProgress(),
       isRenaming: false,
       renameProgress: undefined
@@ -302,6 +306,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       searchingFiles: true, 
       error: undefined,
       fileSearchResults: {},
+      fileRenameResults: {}, // NEW: Clear rename results
       searchProgress: SearchProgressHelper.transitionToStage(
         this.state.searchProgress,
         SearchStage.ANALYZING_DIRECTORIES,
@@ -368,6 +373,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       searchingFiles: true, 
       error: undefined,
       fileSearchResults: {},
+      fileRenameResults: {}, // NEW: Clear rename results
       isRenaming: false,
       renameProgress: undefined
     });
@@ -420,6 +426,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     this.setState({ 
       isRenaming: true, 
       error: undefined,
+      fileRenameResults: {}, // NEW: Reset rename results
       renameProgress: {
         current: 0,
         total: foundFilesCount,
@@ -544,7 +551,14 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
 
   // NEW: Update individual file rename result with skipped support
   private updateRenameFileResult = (rowIndex: number, status: 'renaming' | 'renamed' | 'error' | 'skipped'): void => {
-    // You could update individual file status in the UI here if needed
+    // NEW: Save the rename status for each individual file
+    this.setState(prevState => ({
+      fileRenameResults: {
+        ...prevState.fileRenameResults,
+        [rowIndex]: status
+      }
+    }));
+    
     console.log(`[RenameFilesManagement] File ${rowIndex + 1} status: ${status}`);
     
     // Update progress callback to show correct icon
@@ -564,7 +578,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
   }
 
   private handleExport = async (): Promise<void> => {
-    const { data, fileSearchResults, renameProgress, exportSettings } = this.state;
+    const { data, fileSearchResults, fileRenameResults, renameProgress, exportSettings } = this.state;
     
     if (!data.originalFile) {
       this.setState({ error: 'No data to export' });
@@ -586,6 +600,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       const result = await ExcelExportService.exportRenameFilesData(
         data,
         fileSearchResults,
+        fileRenameResults, // NEW: Pass individual file rename results
         renameProgress,
         exportSettings
       );
@@ -611,7 +626,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
 
   // NEW: Render export controls section
   private renderExportControls = (): React.ReactNode => {
-    const { data, fileSearchResults, renameProgress, exportSettings, isExporting } = this.state;
+    const { data, fileSearchResults, fileRenameResults, renameProgress, exportSettings, isExporting } = this.state;
 
     if (!data.originalFile) {
       return null;
@@ -621,6 +636,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     const statistics = ExcelExportService.getRenameFilesExportStatistics(
       data,
       fileSearchResults,
+      fileRenameResults, // NEW: Pass individual file rename results
       renameProgress,
       exportSettings
     );

@@ -235,7 +235,7 @@ export interface ISearchPlan {
 }
 
 /**
- * Interface for component state - UPDATED with export support
+ * Interface for component state - NEW: Added individual file rename tracking
  */
 export interface IRenameFilesState {
   // File and data
@@ -272,9 +272,10 @@ export interface IRenameFilesState {
   availableFolders: ISharePointFolder[];
   loadingFolders: boolean;
   
-  // File searching and renaming - UPDATED with skipped support
+  // File searching and renaming - NEW: Added individual file rename tracking
   searchingFiles: boolean;
-  fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' | 'skipped' }; // UPDATED: Added 'skipped'
+  fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' | 'skipped' };
+  fileRenameResults: { [rowIndex: number]: 'renaming' | 'renamed' | 'error' | 'skipped' | undefined }; // NEW: Track individual file rename status
   searchProgress: ISearchProgress; // Enhanced progress tracking
   
   // Rename state with skipped support

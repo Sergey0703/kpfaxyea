@@ -113,11 +113,12 @@ export class ExcelExportService {
   }
 
   /**
-   * NEW: Export rename files data with status information
+   * NEW: Export rename files data with status information - UPDATED with individual file rename status
    */
   public static async exportRenameFilesData(
     data: IRenameFilesData,
     fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' | 'skipped' },
+    fileRenameResults: { [rowIndex: number]: 'renaming' | 'renamed' | 'error' | 'skipped' | undefined }, // NEW: Individual file rename status
     renameProgress?: {
       current: number;
       total: number;
@@ -149,6 +150,7 @@ export class ExcelExportService {
       const exportData = this.prepareRenameFilesExportData(
         data,
         fileSearchResults,
+        fileRenameResults, // NEW: Pass individual file rename results
         renameProgress,
         settings
       );
@@ -190,11 +192,12 @@ export class ExcelExportService {
   }
 
   /**
-   * NEW: Get export statistics for rename files
+   * NEW: Get export statistics for rename files - UPDATED with individual file rename status
    */
   public static getRenameFilesExportStatistics(
     data: IRenameFilesData,
     fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' | 'skipped' },
+    fileRenameResults: { [rowIndex: number]: 'renaming' | 'renamed' | 'error' | 'skipped' | undefined }, // NEW: Individual file rename status
     renameProgress?: {
       current: number;
       total: number;
@@ -225,29 +228,39 @@ export class ExcelExportService {
 
     data.rows.forEach(row => {
       const searchStatus = fileSearchResults[row.rowIndex];
+      const renameStatus = fileRenameResults[row.rowIndex];
       
-      switch (searchStatus) {
-        case 'found':
-          foundFiles++;
-          break;
-        case 'not-found':
-          notFoundFiles++;
-          break;
-        case 'searching':
-          searchingFiles++;
-          break;
-        case 'skipped':
-          skippedFiles++;
-          break;
+      // Count rename status first if available
+      if (renameStatus) {
+        switch (renameStatus) {
+          case 'renamed':
+            renamedFiles++;
+            break;
+          case 'error':
+            errorFiles++;
+            break;
+          case 'skipped':
+            skippedFiles++;
+            break;
+        }
+      } else {
+        // Count search status
+        switch (searchStatus) {
+          case 'found':
+            foundFiles++;
+            break;
+          case 'not-found':
+            notFoundFiles++;
+            break;
+          case 'searching':
+            searchingFiles++;
+            break;
+          case 'skipped':
+            skippedFiles++;
+            break;
+        }
       }
     });
-
-    // Add rename statistics if available
-    if (renameProgress) {
-      renamedFiles = renameProgress.success;
-      errorFiles = renameProgress.errors;
-      skippedFiles += renameProgress.skipped;
-    }
 
     // Calculate exportable rows
     let exportableRows = data.totalRows;
@@ -367,12 +380,13 @@ export class ExcelExportService {
     return exportData;
   }
 
-/**
-   * NEW: Prepare rename files data for export
+  /**
+   * NEW: Prepare rename files data for export - UPDATED with individual file rename status
    */
   private static prepareRenameFilesExportData(
     data: IRenameFilesData,
     fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' | 'skipped' },
+    fileRenameResults: { [rowIndex: number]: 'renaming' | 'renamed' | 'error' | 'skipped' | undefined }, // NEW: Individual file rename status
     renameProgress?: {
       current: number;
       total: number;
@@ -424,6 +438,7 @@ export class ExcelExportService {
     // Process each row
     data.rows.forEach(row => {
       const searchStatus = fileSearchResults[row.rowIndex];
+      const renameStatus = fileRenameResults[row.rowIndex]; // NEW: Get individual file rename status
       
       // Filter rows based on settings
       if (exportSettings.onlyCompletedRows) {
@@ -454,7 +469,7 @@ export class ExcelExportService {
       
       // Add status information
       if (exportSettings.includeStatusColumn) {
-        const statusText = this.getRenameStatusText(searchStatus, renameProgress, row.rowIndex);
+        const statusText = this.getRenameStatusText(searchStatus, renameStatus); // NEW: Use individual rename status
         rowData.push(statusText);
       }
       
@@ -470,33 +485,30 @@ export class ExcelExportService {
   }
 
   /**
-   * NEW: Get human-readable status text - UPDATED with new status texts
+   * NEW: Get human-readable status text - UPDATED to use individual file rename status
    */
   private static getRenameStatusText(
     searchStatus: 'found' | 'not-found' | 'searching' | 'skipped',
-    renameProgress?: {
-      current: number;
-      total: number;
-      fileName: string;
-      success: number;
-      errors: number;
-      skipped: number;
-    },
-    rowIndex?: number
+    renameStatus?: 'renaming' | 'renamed' | 'error' | 'skipped' | undefined // NEW: Individual file rename status
   ): string {
     
-    // If rename is in progress or completed, show rename status
-    if (renameProgress && renameProgress.current > 0) {
-      if (renameProgress.success > 0) {
-        return 'File renamed';
-      } else if (renameProgress.errors > 0) {
-        return 'File rename error';
-      } else if (renameProgress.skipped > 0) {
-        return 'File skipped';
+    // NEW: If we have a rename status for this specific file, use it
+    if (renameStatus) {
+      switch (renameStatus) {
+        case 'renaming':
+          return 'Renaming...';
+        case 'renamed':
+          return 'File renamed';
+        case 'error':
+          return 'File rename error';
+        case 'skipped':
+          return 'File skipped';
+        default:
+          break;
       }
     }
     
-    // Otherwise show search status with updated texts
+    // Otherwise use search status with updated texts
     switch (searchStatus) {
       case 'found':
         return 'File found';

@@ -29,7 +29,7 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
 
     switch (searchResult) {
       case 'searching':
-        return <span className={styles.searchingIndicator} title="Folder not found">🔍</span>;
+        return <span className={styles.searchingIndicator} title="Folder not found">📂❌</span>;
       case 'found':
         return <span className={styles.foundIndicator} title="File found">✅</span>;
       case 'not-found':
