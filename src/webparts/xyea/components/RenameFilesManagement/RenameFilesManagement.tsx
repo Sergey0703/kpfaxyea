@@ -68,7 +68,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       searchingFiles: false,
       fileSearchResults: {},
       searchProgress: SearchProgressHelper.createInitialProgress(),
-      // NEW: Rename state
+      // NEW: Rename state with skipped support
       isRenaming: false,
       renameProgress: undefined
     };
@@ -377,7 +377,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     }
   }
 
-  // NEW: Handle file renaming
+  // NEW: Handle file renaming with skipped support
   private handleRenameFiles = async (): Promise<void> => {
     const { data, fileSearchResults, selectedFolder } = this.state;
     
@@ -402,7 +402,8 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
         total: foundFilesCount,
         fileName: '',
         success: 0,
-        errors: 0
+        errors: 0,
+        skipped: 0  // NEW: Initialize skipped counter
       }
     });
     
@@ -417,15 +418,28 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       
       console.log('[RenameFilesManagement] Rename completed:', results);
       
-      if (results.errors > 0) {
+      // NEW: Updated error handling for skipped files
+      if (results.errors > 0 || results.skipped > 0) {
+        let errorMessage = `Rename completed: ${results.success} files renamed successfully`;
+        
+        if (results.skipped > 0) {
+          errorMessage += `, ${results.skipped} files skipped (target already exists)`;
+        }
+        
+        if (results.errors > 0) {
+          errorMessage += `, ${results.errors} files failed`;
+        }
+        
+        errorMessage += '.';
+        
         this.setState({ 
-          error: `Rename completed with ${results.errors} errors. ${results.success} files renamed successfully.`
+          error: errorMessage
         });
       } else {
         this.setState({ 
           error: undefined
         });
-        // You could show a success message here
+        // Success message could be shown here if needed
       }
       
     } catch (error) {
@@ -489,8 +503,15 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     }));
   }
 
-  // NEW: Update rename progress
-  private updateRenameProgress = (progress: { current: number; total: number; fileName: string; success: number; errors: number }): void => {
+  // NEW: Update rename progress with skipped support
+  private updateRenameProgress = (progress: { 
+    current: number; 
+    total: number; 
+    fileName: string; 
+    success: number; 
+    errors: number; 
+    skipped: number;  // NEW: Include skipped
+  }): void => {
     console.log('[RenameFilesManagement] Rename progress update:', progress);
     
     this.setState({
@@ -498,10 +519,15 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     });
   }
 
-  // NEW: Update individual file rename result
-  private updateRenameFileResult = (rowIndex: number, status: 'renaming' | 'renamed' | 'error'): void => {
+  // NEW: Update individual file rename result with skipped support
+  private updateRenameFileResult = (rowIndex: number, status: 'renaming' | 'renamed' | 'error' | 'skipped'): void => {
     // You could update individual file status in the UI here if needed
     console.log(`[RenameFilesManagement] File ${rowIndex + 1} status: ${status}`);
+    
+    // Update progress callback to show correct icon
+    if (status === 'skipped') {
+      console.log(`[RenameFilesManagement] File ${rowIndex + 1} was skipped (target already exists)`);
+    }
   }
 
   private clearError = (): void => {
@@ -528,7 +554,8 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       totalFiles: Object.keys(fileSearchResults).length,
       foundFiles: Object.values(fileSearchResults).filter(r => r === 'found').length,
       notFoundFiles: Object.values(fileSearchResults).filter(r => r === 'not-found').length,
-      searchingFiles: Object.values(fileSearchResults).filter(r => r === 'searching').length
+      searchingFiles: Object.values(fileSearchResults).filter(r => r === 'searching').length,
+      skippedFiles: Object.values(fileSearchResults).filter(r => r === 'skipped').length  // NEW: Add skipped files
     };
 
     return (
@@ -599,12 +626,18 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
                     {searchStats.searchingFiles > 0 && (
                       <>, {searchStats.searchingFiles} searching</>
                     )}
+                    {searchStats.skippedFiles > 0 && (
+                      <>, {searchStats.skippedFiles} skipped</>
+                    )}
                   </>
                 )}
                 {isRenaming && renameProgress && (
                   <>
                     {' | '}
                     <strong> Rename Progress:</strong> {renameProgress.success} renamed, {renameProgress.errors} errors
+                    {renameProgress.skipped > 0 && (
+                      <>, {renameProgress.skipped} skipped</>
+                    )}
                   </>
                 )}
               </div>
@@ -665,6 +698,11 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
                 <p style={{ margin: '4px 0', lineHeight: 1.4 }}>
                   <strong style={{ color: '#323130' }}>Found Files:</strong> {searchStats.foundFiles} ready for rename
                 </p>
+                {searchStats.skippedFiles > 0 && (
+                  <p style={{ margin: '4px 0', lineHeight: 1.4 }}>
+                    <strong style={{ color: '#323130' }}>Skipped Files:</strong> {searchStats.skippedFiles} (target already exists)
+                  </p>
+                )}
               </div>
             )}
           </div>

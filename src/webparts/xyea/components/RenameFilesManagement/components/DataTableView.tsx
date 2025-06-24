@@ -7,7 +7,7 @@ import { ColumnResizeHandler } from '../handlers/ColumnResizeHandler';
 
 export interface IDataTableViewProps {
   data: IRenameFilesData;
-  fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' };
+  fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' | 'skipped' }; // UPDATED: Added 'skipped'
   columnResizeHandler: ColumnResizeHandler;
   onCellEdit: (columnId: string, rowIndex: number, newValue: string) => void;
 }
@@ -34,6 +34,8 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
         return <span className={styles.foundIndicator} title="File found in SharePoint">✅</span>;
       case 'not-found':
         return <span className={styles.notFoundIndicator} title="File not found in SharePoint">❌</span>;
+      case 'skipped':
+        return <span className={styles.skippedIndicator} title="Skipped - target file already exists">⏭️</span>;
       default:
         return null;
     }

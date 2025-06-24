@@ -14,22 +14,23 @@ export interface IRenameControlsPanelProps {
   searchingFiles: boolean;
   searchProgress: ISearchProgress;
   loading: boolean;
-  foundFilesCount: number; // NEW: Number of found files
-  isRenaming: boolean; // NEW: Rename status
-  renameProgress?: { // NEW: Rename progress
+  foundFilesCount: number;
+  isRenaming: boolean;
+  renameProgress?: { // UPDATED: Include skipped support
     current: number;
     total: number;
     fileName: string;
     success: number;
     errors: number;
+    skipped: number; // NEW: Include skipped
   };
   onSelectFolder: () => void;
   onClearFolder: () => void;
   onAnalyzeDirectories: () => void;
   onSearchFiles: () => void;
   onCancelSearch: () => void;
-  onRenameFiles: () => void; // NEW: Rename callback
-  onCancelRename: () => void; // NEW: Cancel rename callback
+  onRenameFiles: () => void;
+  onCancelRename: () => void;
 }
 
 export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
@@ -74,7 +75,7 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
    */
   const getStageStatusText = (): string => {
     if (isRenaming && renameProgress) {
-      return `Renaming files: ${renameProgress.current}/${renameProgress.total} (${renameProgress.success} success, ${renameProgress.errors} errors)`;
+      return `Renaming files: ${renameProgress.current}/${renameProgress.total} (${renameProgress.success} success, ${renameProgress.errors} errors, ${renameProgress.skipped} skipped)`;
     }
 
     const stage = searchProgress.currentStage;
@@ -176,12 +177,12 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
     return {
       showAnalyzeButton: !hasSearchPlan && !searchingFiles && !isRenaming,
       showSearchButton: hasSearchPlan && isAnalysisComplete && !searchingFiles && !isRenaming,
-      showRenameButton: isSearchComplete && !searchingFiles && !isRenaming, // NEW
+      showRenameButton: isSearchComplete && !searchingFiles && !isRenaming,
       showCancelButton: searchingFiles || isRenaming,
       analyzeButtonText: searchingFiles ? 'Analyzing...' : '🔍 Analyze Directories',
       searchButtonText: searchingFiles ? 'Searching...' : '🔍 Search Files',
-      renameButtonText: isRenaming ? 'Renaming...' : `🏷️ Rename ${foundFilesCount} Files`, // NEW
-      cancelButtonText: isRenaming ? '❌ Cancel Rename' : '❌ Cancel Search' // NEW
+      renameButtonText: isRenaming ? 'Renaming...' : `🏷️ Rename ${foundFilesCount} Files`,
+      cancelButtonText: isRenaming ? '❌ Cancel Rename' : '❌ Cancel Search'
     };
   };
 
@@ -333,7 +334,7 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
   };
 
   /**
-   * NEW: Render rename progress
+   * Render rename progress with skipped files support
    */
   const renderRenameProgress = () => {
     if (!renameProgress) return null;
@@ -384,6 +385,10 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
           <div className={styles.stat}>
             <span className={styles.statLabel}>Errors:</span>
             <span className={styles.statValue}>{renameProgress.errors}</span>
+          </div>
+          <div className={styles.stat}>
+            <span className={styles.statLabel}>Skipped (Target Exists):</span>
+            <span className={styles.statValue}>{renameProgress.skipped}</span>
           </div>
           <div className={styles.stat}>
             <span className={styles.statLabel}>Remaining:</span>
@@ -477,7 +482,7 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
             </button>
           )}
 
-          {/* BUTTON 3: Rename Files (NEW) */}
+          {/* BUTTON 3: Rename Files */}
           {buttonState.showRenameButton && (
             <button
               className={styles.renameFilesButton}

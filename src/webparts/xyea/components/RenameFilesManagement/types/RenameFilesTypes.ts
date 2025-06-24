@@ -106,7 +106,7 @@ export interface ISharePointFolder {
 }
 
 /**
- * NEW: Search stages enum
+ * Search stages enum
  */
 export enum SearchStage {
   IDLE = 'idle',
@@ -119,7 +119,7 @@ export enum SearchStage {
 }
 
 /**
- * NEW: Interface for search stage information
+ * Interface for search stage information
  */
 export interface ISearchStageInfo {
   stage: SearchStage;
@@ -130,7 +130,7 @@ export interface ISearchStageInfo {
 }
 
 /**
- * NEW: Enhanced search progress interface with stages
+ * Enhanced search progress interface with stages
  */
 export interface ISearchProgress {
   // Stage information
@@ -142,7 +142,7 @@ export interface ISearchProgress {
   currentRow: number;
   totalRows: number;
   currentFileName: string;
-  currentDirectory?: string; // NEW: Current directory being processed
+  currentDirectory?: string; // Current directory being processed
   
   // Stage-specific stats
   directoriesAnalyzed?: number;
@@ -160,12 +160,12 @@ export interface ISearchProgress {
   errors?: string[];
   warnings?: string[];
   
-  // NEW: Search plan reference
+  // Search plan reference
   searchPlan?: ISearchPlan;
 }
 
 /**
- * NEW: Directory analysis result
+ * Directory analysis result
  */
 export interface IDirectoryAnalysis {
   directoryPath: string;
@@ -178,7 +178,7 @@ export interface IDirectoryAnalysis {
 }
 
 /**
- * NEW: Search plan interface
+ * Search plan interface
  */
 export interface ISearchPlan {
   totalRows: number;
@@ -226,12 +226,12 @@ export interface IRenameFilesState {
   availableFolders: ISharePointFolder[];
   loadingFolders: boolean;
   
-  // File searching and renaming - UPDATED with new progress interface
+  // File searching and renaming - UPDATED with skipped support
   searchingFiles: boolean;
   fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' | 'skipped' }; // UPDATED: Added 'skipped'
-  searchProgress: ISearchProgress; // UPDATED: Enhanced progress tracking
+  searchProgress: ISearchProgress; // Enhanced progress tracking
   
-  // NEW: Rename state with skipped support
+  // Rename state with skipped support
   isRenaming: boolean;
   renameProgress?: {
     current: number;
@@ -313,7 +313,7 @@ export interface IFileSearchResult {
 }
 
 /**
- * NEW: Interface for rename operation result
+ * Interface for rename operation result - UPDATED with skipped support
  */
 export interface IRenameOperationResult {
   success: number;
@@ -324,12 +324,12 @@ export interface IRenameOperationResult {
 }
 
 /**
- * NEW: Interface for file rename status
+ * Interface for file rename status - UPDATED with 'skipped'
  */
 export type FileRenameStatus = 'renaming' | 'renamed' | 'error' | 'skipped';
 
 /**
- * NEW: Constants for search stages
+ * Constants for search stages
  */
 export const SEARCH_STAGES: { [key in SearchStage]: ISearchStageInfo } = {
   [SearchStage.IDLE]: {
@@ -344,21 +344,21 @@ export const SEARCH_STAGES: { [key in SearchStage]: ISearchStageInfo } = {
     title: 'Analyzing Directories',
     description: 'Extracting and analyzing directory structure from your data...',
     progressMin: 0,
-    progressMax: 50 // NEW: Changed to 50% for two-button approach
+    progressMax: 50 // Changed to 50% for two-button approach
   },
   [SearchStage.CHECKING_EXISTENCE]: {
     stage: SearchStage.CHECKING_EXISTENCE,
     title: 'Checking Directory Existence', 
     description: 'Verifying which directories exist in SharePoint...',
-    progressMin: 50, // NEW: Changed to start at 50%
-    progressMax: 100 // NEW: Changed to end at 100% for analysis phase
+    progressMin: 50, // Changed to start at 50%
+    progressMax: 100 // Changed to end at 100% for analysis phase
   },
   [SearchStage.SEARCHING_FILES]: {
     stage: SearchStage.SEARCHING_FILES,
     title: 'Searching Files',
     description: 'Looking for files in existing directories...',
-    progressMin: 0, // NEW: Reset to 0% for separate search phase
-    progressMax: 100 // NEW: Full 100% for file search
+    progressMin: 0, // Reset to 0% for separate search phase
+    progressMax: 100 // Full 100% for file search
   },
   [SearchStage.COMPLETED]: {
     stage: SearchStage.COMPLETED,
@@ -384,7 +384,7 @@ export const SEARCH_STAGES: { [key in SearchStage]: ISearchStageInfo } = {
 };
 
 /**
- * NEW: Helper functions for search progress
+ * Helper functions for search progress
  */
 export class SearchProgressHelper {
   
@@ -458,7 +458,7 @@ export class SearchProgressHelper {
 }
 
 /**
- * NEW: Helper functions for rename progress
+ * Helper functions for rename progress with skipped support
  */
 export class RenameProgressHelper {
   
@@ -484,7 +484,7 @@ export class RenameProgressHelper {
   }
   
   /**
-   * Update progress with new file
+   * Update progress with new file - UPDATED with skipped support
    */
   public static updateProgress(
     currentProgress: {
@@ -541,7 +541,7 @@ export class RenameProgressHelper {
   }
   
   /**
-   * Get summary message
+   * Get summary message - UPDATED with skipped support
    */
   public static getSummaryMessage(progress: {
     current: number;
@@ -569,7 +569,7 @@ export class RenameProgressHelper {
 }
 
 /**
- * NEW: Enum for different types of file status icons
+ * Enum for different types of file status icons
  */
 export enum FileStatusIcon {
   SEARCHING = '🔍',
@@ -582,12 +582,12 @@ export enum FileStatusIcon {
 }
 
 /**
- * NEW: Helper functions for file status
+ * Helper functions for file status
  */
 export class FileStatusHelper {
   
   /**
-   * Get icon for file search status
+   * Get icon for file search status - UPDATED with skipped support
    */
   public static getSearchIcon(status: 'found' | 'not-found' | 'searching' | 'skipped'): string {
     switch (status) {
@@ -623,7 +623,7 @@ export class FileStatusHelper {
   }
   
   /**
-   * Get tooltip text for status
+   * Get tooltip text for status - UPDATED with skipped support
    */
   public static getTooltipText(status: 'found' | 'not-found' | 'searching' | 'skipped' | FileRenameStatus): string {
     switch (status) {
@@ -648,7 +648,7 @@ export class FileStatusHelper {
 }
 
 /**
- * NEW: Interface for batch rename operations
+ * Interface for batch rename operations - UPDATED with skipped support
  */
 export interface IBatchRenameOperation {
   id: string;
@@ -670,7 +670,7 @@ export interface IBatchRenameOperation {
 }
 
 /**
- * NEW: Interface for rename operation statistics
+ * Interface for rename operation statistics - UPDATED with skipped support
  */
 export interface IRenameStatistics {
   totalOperations: number;
@@ -683,7 +683,7 @@ export interface IRenameStatistics {
 }
 
 /**
- * NEW: Type definitions for callback functions
+ * Type definitions for callback functions - UPDATED with skipped support
  */
 export type SearchProgressCallback = (progress: ISearchProgress) => void;
 export type RenameProgressCallback = (progress: {
@@ -696,3 +696,109 @@ export type RenameProgressCallback = (progress: {
 }) => void;
 export type FileStatusCallback = (rowIndex: number, status: FileRenameStatus) => void;
 export type SearchResultCallback = (rowIndex: number, result: 'found' | 'not-found' | 'searching') => void;
+
+/**
+ * Constants for file operation timeouts
+ */
+export const FILE_OPERATION_TIMEOUTS = {
+  DIRECTORY_CHECK: 3000, // 3 seconds per directory
+  FOLDER_LOAD: 8000, // 8 seconds for folder loading
+  FILE_SEARCH: 5000, // 5 seconds per file search
+  FILE_RENAME: 10000, // 10 seconds per file rename
+  BATCH_DELAY: 1000 // 1 second delay between batch operations
+};
+
+/**
+ * Constants for progress thresholds
+ */
+export const PROGRESS_THRESHOLDS = {
+  ANALYSIS_COMPLETE: 100,
+  SEARCH_COMPLETE: 100,
+  RENAME_COMPLETE: 100,
+  ERROR_THRESHOLD: 50, // Max percentage of errors before stopping
+  WARNING_THRESHOLD: 25 // Percentage of warnings before showing alert
+};
+
+/**
+ * File naming constants
+ */
+export const FILE_NAMING = {
+  MAX_FILENAME_LENGTH: 255,
+  MAX_PATH_LENGTH: 400,
+  INVALID_CHARS: /[<>:"/\\|?*]/g,
+  RESERVED_NAMES: ['CON', 'PRN', 'AUX', 'NUL'],
+  STAFF_ID_PATTERN: /^[0-9A-Za-z]{1,10}$/,
+  EXTENSION_PATTERN: /\.[a-zA-Z0-9]{2,5}$/
+};
+
+/**
+ * SharePoint API endpoints
+ */
+export const SHAREPOINT_ENDPOINTS = {
+  CONTEXT_INFO: '/_api/contextinfo',
+  GET_FILE: '/_api/web/getFileByServerRelativeUrl',
+  GET_FOLDER: '/_api/web/getFolderByServerRelativeUrl',
+  MOVE_FILE_SIMPLE: '/MoveTo',
+  MOVE_FILE_MODERN: '/_api/SP.MoveCopyUtil.MoveFileByPath',
+  LIST_FOLDERS: '/folders',
+  LIST_FILES: '/files'
+};
+
+/**
+ * Error types for better error handling
+ */
+export enum RenameErrorType {
+  FILE_NOT_FOUND = 'FILE_NOT_FOUND',
+  FILE_ALREADY_EXISTS = 'FILE_ALREADY_EXISTS',
+  PERMISSION_DENIED = 'PERMISSION_DENIED',
+  NETWORK_ERROR = 'NETWORK_ERROR',
+  INVALID_PATH = 'INVALID_PATH',
+  TIMEOUT_ERROR = 'TIMEOUT_ERROR',
+  UNKNOWN_ERROR = 'UNKNOWN_ERROR'
+}
+
+/**
+ * Interface for structured error information
+ */
+export interface IRenameError {
+  type: RenameErrorType;
+  message: string;
+  filePath?: string;
+  rowIndex?: number;
+  details?: any;
+}
+
+/**
+ * Performance metrics interface
+ */
+export interface IPerformanceMetrics {
+  totalOperationTime: number;
+  averageFileProcessTime: number;
+  apiCallCount: number;
+  successRate: number;
+  errorRate: number;
+  skipRate: number;
+  throughput: number; // files per second
+}
+
+/**
+ * Logging levels for console output
+ */
+export enum LogLevel {
+  DEBUG = 'debug',
+  INFO = 'info',
+  WARN = 'warn',
+  ERROR = 'error'
+}
+
+/**
+ * Interface for logging configuration
+ */
+export interface ILoggingConfig {
+  level: LogLevel;
+  enableConsoleLogging: boolean;
+  enableFileLogging: boolean;
+  maxLogEntries: number;
+  includeTimestamps: boolean;
+  includeStackTrace: boolean;
+}
