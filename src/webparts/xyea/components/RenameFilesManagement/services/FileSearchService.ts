@@ -283,7 +283,7 @@ export class FileSearchService {
       const requestDigest = await this.getRequestDigest();
       
       // ИСПРАВЛЕНИЕ 4: Еще меньший batch size и больше задержек для стабильности
-      const BATCH_SIZE = 2; // Очень маленький batch size
+      const BATCH_SIZE = 1; // По одному файлу для максимальной стабильности
       
       for (let i = 0; i < filesToRename.length; i += BATCH_SIZE) {
         if (this.isCancelled || this.currentSearchId !== searchId) {
@@ -292,9 +292,9 @@ export class FileSearchService {
         }
 
         const batch = filesToRename.slice(i, i + BATCH_SIZE);
-        console.log(`[FileSearchService] 📦 Processing batch ${Math.floor(i / BATCH_SIZE) + 1}: ${batch.length} files`);
+        console.log(`[FileSearchService] 📦 Processing file ${i + 1}/${filesToRename.length}`);
 
-        // Process batch sequentially (not parallel to avoid conflicts)
+        // Process each file individually
         for (const fileInfo of batch) {
           if (this.isCancelled) break;
 
@@ -314,6 +314,8 @@ export class FileSearchService {
             console.log(`  Original: "${fileInfo.originalFileName}"`);
             console.log(`  New: "${fileInfo.newFileName}"`);
             console.log(`  StaffID: "${fileInfo.staffID}"`);
+            console.log(`  Full original path: "${fileInfo.fullOriginalPath}"`);
+            console.log(`  Full new path: "${fileInfo.fullNewPath}"`);
 
             await this.renameSingleFile(fileInfo.fullOriginalPath, fileInfo.fullNewPath, requestDigest);
             
@@ -340,13 +342,7 @@ export class FileSearchService {
           processedFiles++;
           
           // ИСПРАВЛЕНИЕ 7: Увеличенная задержка между файлами
-          await this.delay(1000); // 1 секунда между файлами
-        }
-
-        // ИСПРАВЛЕНИЕ 8: Увеличенная задержка между batch'ами
-        if (i + BATCH_SIZE < filesToRename.length) {
-          console.log(`[FileSearchService] ⏳ Waiting 2 seconds before next batch...`);
-          await this.delay(2000); // 2 секунды между batch'ами
+          await this.delay(2000); // 2 секунды между файлами для стабильности
         }
       }
 
@@ -414,137 +410,206 @@ export class FileSearchService {
   }
 
   /**
-   * Rename a single file using SharePoint REST API with better error handling
+   * НОВЫЙ: Очистка и нормализация SharePoint путей
    */
-  private async renameSingleFile(originalPath: string, newPath: string, requestDigest: string): Promise<void> {
-    console.log(`[FileSearchService] 🔄 Renaming file:`);
-    console.log(`  From: "${originalPath}"`);
-    console.log(`  To: "${newPath}"`);
+  private cleanSharePointPath(path: string): string {
+    // Убираем лишние пробелы и нормализуем разделители
+    let cleanPath = path.trim().replace(/\\/g, '/');
     
-    const webUrl = this.context.pageContext.web.absoluteUrl;
+    // Убираем двойные слэши
+    cleanPath = cleanPath.replace(/\/+/g, '/');
     
+    // Убираем слэш в конце (если есть)
+    cleanPath = cleanPath.replace(/\/$/, '');
+    
+    // Проверяем, что путь начинается правильно
+    if (!cleanPath.startsWith('/')) {
+      cleanPath = '/' + cleanPath;
+    }
+    
+    console.log(`[FileSearchService] Path cleaning: "${path}" -> "${cleanPath}"`);
+    return cleanPath;
+  }
+
+  /**
+   * НОВЫЙ: Проверка существования файла
+   */
+  private async checkFileExists(filePath: string): Promise<{ exists: boolean; error?: string }> {
     try {
-      // ИСПРАВЛЕНИЕ 1: Проверим, существует ли файл с новым именем
-      const checkNewFileUrl = `${webUrl}/_api/web/getFileByServerRelativeUrl('${encodeURIComponent(newPath)}')`;
-      const checkResponse = await fetch(checkNewFileUrl, {
+      const webUrl = this.context.pageContext.web.absoluteUrl;
+      const checkUrl = `${webUrl}/_api/web/getFileByServerRelativeUrl('${encodeURIComponent(filePath)}')`;
+      
+      console.log(`[FileSearchService] 🔍 Checking file existence: ${checkUrl}`);
+      
+      const response = await fetch(checkUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json;odata=verbose'
         }
       });
       
-      if (checkResponse.ok) {
-        // Файл с таким именем уже существует - добавим суффикс
-        const pathParts = newPath.split('/');
-        const fileName = pathParts[pathParts.length - 1];
-        const directory = pathParts.slice(0, -1).join('/');
-        const fileNameParts = fileName.split('.');
-        const extension = fileNameParts.pop();
-        const baseName = fileNameParts.join('.');
-        
-        // Создаем уникальное имя с timestamp
-        const timestamp = new Date().getTime();
-        const uniqueFileName = `${baseName}_${timestamp}.${extension}`;
-        newPath = `${directory}/${uniqueFileName}`;
-        
-        console.log(`[FileSearchService] ⚠️ File exists, using unique name: "${newPath}"`);
+      if (response.ok) {
+        console.log(`[FileSearchService] ✅ File exists: "${filePath}"`);
+        return { exists: true };
+      } else if (response.status === 404) {
+        console.log(`[FileSearchService] ❌ File does not exist: "${filePath}"`);
+        return { exists: false };
+      } else {
+        console.log(`[FileSearchService] ⚠️ Unknown status ${response.status} for file: "${filePath}"`);
+        return { exists: false, error: `HTTP ${response.status}` };
       }
+    } catch (error) {
+      console.log(`[FileSearchService] ⚠️ Error checking file existence: ${error}`);
+      return { exists: false, error: String(error) };
+    }
+  }
+
+  /**
+   * НОВЫЙ: Генерация уникального имени файла
+   */
+  private generateUniqueFileName(originalPath: string): string {
+    const pathParts = originalPath.split('/');
+    const fileName = pathParts[pathParts.length - 1];
+    const directory = pathParts.slice(0, -1).join('/');
+    
+    // Разбираем имя файла на части
+    const lastDotIndex = fileName.lastIndexOf('.');
+    const baseName = lastDotIndex > 0 ? fileName.substring(0, lastDotIndex) : fileName;
+    const extension = lastDotIndex > 0 ? fileName.substring(lastDotIndex) : '';
+    
+    // Добавляем timestamp для уникальности
+    const timestamp = new Date().getTime();
+    const uniqueFileName = `${baseName}_${timestamp}${extension}`;
+    
+    return `${directory}/${uniqueFileName}`;
+  }
+
+  /**
+   * ИСПРАВЛЕННЫЙ: Простой MoveTo API с правильным кодированием
+   */
+  private async trySimpleMoveTo(originalPath: string, newPath: string, requestDigest: string): Promise<boolean> {
+    try {
+      console.log(`[FileSearchService] 🔄 Trying simple MoveTo API`);
       
-      // ИСПРАВЛЕНИЕ 2: Используем более современный SP.MoveCopyUtil API
-      const moveApiUrl = `${webUrl}/_api/SP.MoveCopyUtil.MoveFileByPath()`;
+      const webUrl = this.context.pageContext.web.absoluteUrl;
       
-      const movePayload = {
-        srcPath: {
-          __metadata: { type: "SP.ResourcePath" },
-          DecodedUrl: originalPath
-        },
-        destPath: {
-          __metadata: { type: "SP.ResourcePath" },
-          DecodedUrl: newPath
-        },
-        options: {
-          __metadata: { type: "SP.MoveCopyOptions" },
-          KeepBoth: false, // Не сохранять оба файла
-          ResetAuthorAndCreatedOnCopy: false,
-          ShouldBypassSharedLocks: true
-        }
-      };
+      // ИСПРАВЛЕНИЕ: НЕ используем двойное кодирование!
+      // SharePoint API ожидает уже правильно сформированный URL
+      const moveToUrl = `${webUrl}/_api/web/getFileByServerRelativeUrl('${originalPath}')/MoveTo(newurl='${newPath}',flags=1)`;
       
-      console.log(`[FileSearchService] 📞 Using SP.MoveCopyUtil.MoveFileByPath API`);
+      console.log(`[FileSearchService] 📞 Simple MoveTo URL:`, moveToUrl);
       
-      const response = await fetch(moveApiUrl, {
+      const response = await fetch(moveToUrl, {
         method: 'POST',
         headers: {
           'Accept': 'application/json;odata=verbose',
           'Content-Type': 'application/json;odata=verbose',
           'X-RequestDigest': requestDigest
-        },
-        body: JSON.stringify(movePayload)
+        }
       });
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[FileSearchService] Modern API failed, trying fallback. Error:`, errorText);
-        
-        // FALLBACK: Используем старый MoveTo API с флагом overwrite
-        await this.renameSingleFileWithMoveTo(originalPath, newPath, requestDigest);
+      if (response.ok) {
+        console.log(`[FileSearchService] ✅ Simple MoveTo succeeded`);
+        return true;
       } else {
-        console.log(`[FileSearchService] ✅ File renamed successfully using modern API`);
+        const errorText = await response.text();
+        console.log(`[FileSearchService] ❌ Simple MoveTo failed (${response.status}): ${errorText}`);
+        return false;
       }
-      
     } catch (error) {
-      console.error(`[FileSearchService] Error in modern API, trying fallback:`, error);
-      
-      // FALLBACK: Используем старый MoveTo API
-      await this.renameSingleFileWithMoveTo(originalPath, newPath, requestDigest);
+      console.log(`[FileSearchService] ❌ Simple MoveTo exception:`, error);
+      return false;
     }
   }
 
   /**
-   * Fallback method using old MoveTo API
+   * ИСПРАВЛЕННЫЙ: Современный Move API с корректными параметрами
    */
-  private async renameSingleFileWithMoveTo(originalPath: string, newPath: string, requestDigest: string): Promise<void> {
-    console.log(`[FileSearchService] 🔄 Using fallback MoveTo API`);
+  private async tryModernMoveAPI(originalPath: string, newPath: string, requestDigest: string): Promise<void> {
+    console.log(`[FileSearchService] 🔄 Trying modern SP.MoveCopyUtil.MoveFileByPath API`);
     
     const webUrl = this.context.pageContext.web.absoluteUrl;
+    const moveApiUrl = `${webUrl}/_api/SP.MoveCopyUtil.MoveFileByPath`;
     
-    // ИСПРАВЛЕНИЕ 3: Используем правильное кодирование URL и флаг overwrite
-    const encodedOriginalPath = encodeURIComponent(originalPath);
-    const encodedNewPath = encodeURIComponent(newPath);
+    // ИСПРАВЛЕНИЕ: Правильная структура payload для современного API
+    const movePayload = {
+      srcPath: {
+        __metadata: { type: "SP.ResourcePath" },
+        DecodedUrl: originalPath  // НЕ кодируем здесь, API сам закодирует
+      },
+      destPath: {
+        __metadata: { type: "SP.ResourcePath" },
+        DecodedUrl: newPath      // НЕ кодируем здесь, API сам закодирует
+      },
+      options: {
+        __metadata: { type: "SP.MoveCopyOptions" },
+        KeepBoth: false,
+        ResetAuthorAndCreatedOnCopy: false,
+        ShouldBypassSharedLocks: true
+      }
+    };
     
-    // flags=1 означает overwrite existing file
-    const moveToUrl = `${webUrl}/_api/web/getFileByServerRelativeUrl('${encodedOriginalPath}')/MoveTo(newurl='${encodedNewPath}',flags=1)`;
+    console.log(`[FileSearchService] 📞 Modern API payload:`, JSON.stringify(movePayload, null, 2));
     
-    console.log(`[FileSearchService] 📞 MoveTo URL:`, moveToUrl);
-    
-    const response = await fetch(moveToUrl, {
+    const response = await fetch(moveApiUrl, {
       method: 'POST',
       headers: {
         'Accept': 'application/json;odata=verbose',
         'Content-Type': 'application/json;odata=verbose',
         'X-RequestDigest': requestDigest
-      }
+      },
+      body: JSON.stringify(movePayload)
     });
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[FileSearchService] ❌ MoveTo API also failed:`, errorText);
-      
-      // Попробуем распарсить ошибку
-      let errorMessage = errorText;
-      try {
-        const errorData = JSON.parse(errorText);
-        if (errorData.error && errorData.error.message) {
-          errorMessage = errorData.error.message.value || errorData.error.message;
-        }
-      } catch (e) {
-        // Игнорируем ошибки парсинга
-      }
-      
-      throw new Error(`HTTP ${response.status}: ${errorMessage}`);
+      console.error(`[FileSearchService] ❌ Modern API failed (${response.status}):`, errorText);
+      throw new Error(`Modern API failed: HTTP ${response.status}: ${errorText}`);
     }
     
-    console.log(`[FileSearchService] ✅ File renamed successfully using MoveTo API`);
+    console.log(`[FileSearchService] ✅ Modern API succeeded`);
+  }
+
+  /**
+   * Rename a single file using SharePoint REST API with FIXED URL encoding
+   */
+  private async renameSingleFile(originalPath: string, newPath: string, requestDigest: string): Promise<void> {
+    console.log(`[FileSearchService] 🔄 FIXED Renaming file:`);
+    console.log(`  From: "${originalPath}"`);
+    console.log(`  To: "${newPath}"`);
+    
+    // ИСПРАВЛЕНИЕ: Проверяем и корректируем пути
+    const cleanOriginalPath = this.cleanSharePointPath(originalPath);
+    let cleanNewPath = this.cleanSharePointPath(newPath);
+    
+    console.log(`[FileSearchService] 🧹 Cleaned paths:`);
+    console.log(`  Clean from: "${cleanOriginalPath}"`);
+    console.log(`  Clean to: "${cleanNewPath}"`);
+    
+    try {
+      // ИСПРАВЛЕНИЕ 1: Проверим, существует ли файл с новым именем
+      const checkResult = await this.checkFileExists(cleanNewPath);
+      if (checkResult.exists) {
+        // Файл с таким именем уже существует - создаем уникальное имя
+        cleanNewPath = this.generateUniqueFileName(cleanNewPath);
+        console.log(`[FileSearchService] ⚠️ File exists, using unique name: "${cleanNewPath}"`);
+      }
+      
+      // ИСПРАВЛЕНИЕ 2: Сначала пробуем простой MoveTo API с правильным кодированием
+      const success = await this.trySimpleMoveTo(cleanOriginalPath, cleanNewPath, requestDigest);
+      if (success) {
+        console.log(`[FileSearchService] ✅ File renamed successfully using simple MoveTo`);
+        return;
+      }
+      
+      // ИСПРАВЛЕНИЕ 3: Если простой не работает, пробуем современный API с корректными параметрами
+      await this.tryModernMoveAPI(cleanOriginalPath, cleanNewPath, requestDigest);
+      console.log(`[FileSearchService] ✅ File renamed successfully using modern API`);
+      
+    } catch (error) {
+      console.error(`[FileSearchService] ❌ All rename methods failed:`, error);
+      throw error;
+    }
   }
 
   /**

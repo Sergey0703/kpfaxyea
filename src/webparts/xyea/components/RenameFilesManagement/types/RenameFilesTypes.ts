@@ -192,7 +192,7 @@ export interface ISearchPlan {
 }
 
 /**
- * Interface for component state
+ * Interface for component state - UPDATED with skipped support
  */
 export interface IRenameFilesState {
   // File and data
@@ -228,9 +228,19 @@ export interface IRenameFilesState {
   
   // File searching and renaming - UPDATED with new progress interface
   searchingFiles: boolean;
-  fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' };
+  fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' | 'skipped' }; // UPDATED: Added 'skipped'
   searchProgress: ISearchProgress; // UPDATED: Enhanced progress tracking
-  searchPlan?: ISearchPlan; // NEW: Search plan for optimization
+  
+  // NEW: Rename state with skipped support
+  isRenaming: boolean;
+  renameProgress?: {
+    current: number;
+    total: number;
+    fileName: string;
+    success: number;
+    errors: number;
+    skipped: number; // NEW: Track skipped files
+  };
 }
 
 /**
@@ -291,15 +301,32 @@ export interface IUploadProgress {
 }
 
 /**
- * Interface for file search result
+ * Interface for file search result - UPDATED with skipped support
  */
 export interface IFileSearchResult {
   rowIndex: number;
   fileName: string;
-  searchStatus: 'found' | 'not-found' | 'searching';
+  searchStatus: 'found' | 'not-found' | 'searching' | 'skipped'; // UPDATED: Added 'skipped'
   foundPath?: string;
   searchTime?: number;
+  skipReason?: string; // NEW: Reason why file was skipped
 }
+
+/**
+ * NEW: Interface for rename operation result
+ */
+export interface IRenameOperationResult {
+  success: number;
+  errors: number;
+  skipped: number; // NEW: Number of skipped files
+  errorDetails: string[];
+  skippedDetails: string[]; // NEW: Details of skipped files
+}
+
+/**
+ * NEW: Interface for file rename status
+ */
+export type FileRenameStatus = 'renaming' | 'renamed' | 'error' | 'skipped';
 
 /**
  * NEW: Constants for search stages
@@ -430,52 +457,242 @@ export class SearchProgressHelper {
   }
 }
 
-// Добавьте эти типы в IRenameFilesState в types/RenameFilesTypes.ts
-
-export interface IRenameFilesState {
-  // File and data
-  data: IRenameFilesData;
+/**
+ * NEW: Helper functions for rename progress
+ */
+export class RenameProgressHelper {
   
-  // UI state
-  loading: boolean;
-  error: string | undefined;
-  uploadProgress: {
-    stage: 'idle' | 'uploading' | 'parsing' | 'complete' | 'error';
-    progress: number;
-    message: string;
-  };
-  
-  // Table state
-  selectedCells: { [key: string]: boolean }; // key format: "columnId_rowIndex"
-  editingCell: { columnId: string; rowIndex: number } | undefined;
-  
-  // Column management
-  showColumnManager: boolean;
-  draggedColumn: string | undefined;
-  
-  // Export state
-  showExportDialog: boolean;
-  exportConfig: IRenameFilesExportConfig;
-  isExporting: boolean;
-  
-  // SharePoint folder selection
-  selectedFolder: ISharePointFolder | undefined;
-  showFolderDialog: boolean;
-  availableFolders: ISharePointFolder[];
-  loadingFolders: boolean;
-  
-  // File searching and renaming
-  searchingFiles: boolean;
-  fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' };
-  searchProgress: ISearchProgress;
-  
-  // NEW: Rename state
-  isRenaming: boolean;
-  renameProgress?: {
+  /**
+   * Create initial rename progress
+   */
+  public static createInitialProgress(totalFiles: number): {
     current: number;
     total: number;
     fileName: string;
     success: number;
     errors: number;
+    skipped: number;
+  } {
+    return {
+      current: 0,
+      total: totalFiles,
+      fileName: '',
+      success: 0,
+      errors: 0,
+      skipped: 0
+    };
+  }
+  
+  /**
+   * Update progress with new file
+   */
+  public static updateProgress(
+    currentProgress: {
+      current: number;
+      total: number;
+      fileName: string;
+      success: number;
+      errors: number;
+      skipped: number;
+    },
+    fileName: string,
+    status: 'success' | 'error' | 'skipped'
+  ): {
+    current: number;
+    total: number;
+    fileName: string;
+    success: number;
+    errors: number;
+    skipped: number;
+  } {
+    const newProgress = {
+      ...currentProgress,
+      current: currentProgress.current + 1,
+      fileName
+    };
+    
+    switch (status) {
+      case 'success':
+        newProgress.success++;
+        break;
+      case 'error':
+        newProgress.errors++;
+        break;
+      case 'skipped':
+        newProgress.skipped++;
+        break;
+    }
+    
+    return newProgress;
+  }
+  
+  /**
+   * Calculate completion percentage
+   */
+  public static getCompletionPercentage(progress: {
+    current: number;
+    total: number;
+    success: number;
+    errors: number;
+    skipped: number;
+  }): number {
+    if (progress.total === 0) return 0;
+    return Math.round((progress.current / progress.total) * 100);
+  }
+  
+  /**
+   * Get summary message
+   */
+  public static getSummaryMessage(progress: {
+    current: number;
+    total: number;
+    success: number;
+    errors: number;
+    skipped: number;
+  }): string {
+    const messages: string[] = [];
+    
+    if (progress.success > 0) {
+      messages.push(`✅ ${progress.success} renamed`);
+    }
+    
+    if (progress.skipped > 0) {
+      messages.push(`⏭️ ${progress.skipped} skipped`);
+    }
+    
+    if (progress.errors > 0) {
+      messages.push(`❌ ${progress.errors} failed`);
+    }
+    
+    return messages.join(', ') || 'No operations completed';
+  }
+}
+
+/**
+ * NEW: Enum for different types of file status icons
+ */
+export enum FileStatusIcon {
+  SEARCHING = '🔍',
+  FOUND = '✅',
+  NOT_FOUND = '❌',
+  SKIPPED = '⏭️',
+  RENAMING = '🔄',
+  RENAMED = '✅',
+  ERROR = '❌'
+}
+
+/**
+ * NEW: Helper functions for file status
+ */
+export class FileStatusHelper {
+  
+  /**
+   * Get icon for file search status
+   */
+  public static getSearchIcon(status: 'found' | 'not-found' | 'searching' | 'skipped'): string {
+    switch (status) {
+      case 'searching':
+        return FileStatusIcon.SEARCHING;
+      case 'found':
+        return FileStatusIcon.FOUND;
+      case 'not-found':
+        return FileStatusIcon.NOT_FOUND;
+      case 'skipped':
+        return FileStatusIcon.SKIPPED;
+      default:
+        return '';
+    }
+  }
+  
+  /**
+   * Get icon for file rename status
+   */
+  public static getRenameIcon(status: FileRenameStatus): string {
+    switch (status) {
+      case 'renaming':
+        return FileStatusIcon.RENAMING;
+      case 'renamed':
+        return FileStatusIcon.RENAMED;
+      case 'skipped':
+        return FileStatusIcon.SKIPPED;
+      case 'error':
+        return FileStatusIcon.ERROR;
+      default:
+        return '';
+    }
+  }
+  
+  /**
+   * Get tooltip text for status
+   */
+  public static getTooltipText(status: 'found' | 'not-found' | 'searching' | 'skipped' | FileRenameStatus): string {
+    switch (status) {
+      case 'searching':
+        return 'Searching for file...';
+      case 'found':
+        return 'File found in SharePoint';
+      case 'not-found':
+        return 'File not found in SharePoint';
+      case 'skipped':
+        return 'Skipped - target file already exists';
+      case 'renaming':
+        return 'Renaming file...';
+      case 'renamed':
+        return 'File renamed successfully';
+      case 'error':
+        return 'Error occurred during rename';
+      default:
+        return '';
+    }
+  }
+}
+
+/**
+ * NEW: Interface for batch rename operations
+ */
+export interface IBatchRenameOperation {
+  id: string;
+  files: Array<{
+    rowIndex: number;
+    originalName: string;
+    newName: string;
+    staffID: string;
+    status: FileRenameStatus;
+  }>;
+  startTime: Date;
+  endTime?: Date;
+  summary: {
+    total: number;
+    success: number;
+    errors: number;
+    skipped: number;
   };
 }
+
+/**
+ * NEW: Interface for rename operation statistics
+ */
+export interface IRenameStatistics {
+  totalOperations: number;
+  successfulRenames: number;
+  failedRenames: number;
+  skippedRenames: number;
+  averageTimePerFile: number;
+  totalTimeElapsed: number;
+  successRate: number;
+}
+
+/**
+ * NEW: Type definitions for callback functions
+ */
+export type SearchProgressCallback = (progress: ISearchProgress) => void;
+export type RenameProgressCallback = (progress: {
+  current: number;
+  total: number;
+  fileName: string;
+  success: number;
+  errors: number;
+  skipped: number;
+}) => void;
+export type FileStatusCallback = (rowIndex: number, status: FileRenameStatus) => void;
+export type SearchResultCallback = (rowIndex: number, result: 'found' | 'not-found' | 'searching') => void;
