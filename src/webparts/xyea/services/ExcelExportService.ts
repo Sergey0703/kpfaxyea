@@ -8,6 +8,11 @@ import {
   ExportFormat,
   IExcelRow
 } from '../interfaces/ExcelInterfaces';
+import { 
+  IRenameFilesData,
+  IRenameExportSettings,
+  IRenameExportStatistics
+} from '../components/RenameFilesManagement/types/RenameFilesTypes';
 
 // Type definitions for better type safety
 type CellValue = string | number | boolean | Date | undefined; // Changed from null to undefined
@@ -43,7 +48,7 @@ interface IColumnWidth {
 export class ExcelExportService {
 
   /**
-   * Экспорт отфильтрованных данных
+   * Экспорт отфильтрованных данных для Separate Files Management
    */
   public static async exportFilteredData(
     originalFileName: string,
@@ -108,7 +113,167 @@ export class ExcelExportService {
   }
 
   /**
-   * Генерация имени файла на основе фильтров
+   * NEW: Export rename files data with status information
+   */
+  public static async exportRenameFilesData(
+    data: IRenameFilesData,
+    fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' | 'skipped' },
+    renameProgress?: {
+      current: number;
+      total: number;
+      fileName: string;
+      success: number;
+      errors: number;
+      skipped: number;
+    },
+    exportSettings?: IRenameExportSettings
+  ): Promise<{ success: boolean; fileName?: string; error?: string }> {
+    try {
+      console.log('[ExcelExportService] Starting rename files export:', {
+        totalRows: data.totalRows,
+        columns: data.columns.length,
+        exportSettings
+      });
+
+      // Use default settings if not provided
+      const settings: IRenameExportSettings = exportSettings || {
+        fileName: 'renamed_files_export',
+        includeHeaders: true,
+        includeStatusColumn: true,
+        includeTimestamps: true,
+        onlyCompletedRows: false,
+        fileFormat: 'xlsx'
+      };
+
+      // Prepare export data with status information
+      const exportData = this.prepareRenameFilesExportData(
+        data,
+        fileSearchResults,
+        renameProgress,
+        settings
+      );
+      
+      if (exportData.length === 0) {
+        return {
+          success: false,
+          error: 'No data to export. Please check your export settings.'
+        };
+      }
+
+      // Generate filename
+      const fileName = this.generateRenameExportFileName(
+        settings.fileName,
+        settings.fileFormat
+      );
+
+      // Create and download file
+      const blob = await this.createRenameFilesExportFile(exportData, settings);
+      this.downloadFile(blob, fileName);
+
+      console.log('[ExcelExportService] Rename files export completed:', {
+        fileName,
+        rowsExported: exportData.length - (settings.includeHeaders ? 1 : 0)
+      });
+
+      return {
+        success: true,
+        fileName
+      };
+
+    } catch (error) {
+      console.error('[ExcelExportService] Rename files export failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Export failed'
+      };
+    }
+  }
+
+  /**
+   * NEW: Get export statistics for rename files
+   */
+  public static getRenameFilesExportStatistics(
+    data: IRenameFilesData,
+    fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' | 'skipped' },
+    renameProgress?: {
+      current: number;
+      total: number;
+      fileName: string;
+      success: number;
+      errors: number;
+      skipped: number;
+    },
+    exportSettings?: IRenameExportSettings
+  ): IRenameExportStatistics {
+    
+    const settings = exportSettings || {
+      fileName: 'renamed_files_export',
+      includeHeaders: true,
+      includeStatusColumn: true,
+      includeTimestamps: true,
+      onlyCompletedRows: false,
+      fileFormat: 'xlsx'
+    };
+
+    // Count different statuses
+    let foundFiles = 0;
+    let notFoundFiles = 0;
+    let searchingFiles = 0;
+    let skippedFiles = 0;
+    let renamedFiles = 0;
+    let errorFiles = 0;
+
+    data.rows.forEach(row => {
+      const searchStatus = fileSearchResults[row.rowIndex];
+      
+      switch (searchStatus) {
+        case 'found':
+          foundFiles++;
+          break;
+        case 'not-found':
+          notFoundFiles++;
+          break;
+        case 'searching':
+          searchingFiles++;
+          break;
+        case 'skipped':
+          skippedFiles++;
+          break;
+      }
+    });
+
+    // Add rename statistics if available
+    if (renameProgress) {
+      renamedFiles = renameProgress.success;
+      errorFiles = renameProgress.errors;
+      skippedFiles += renameProgress.skipped;
+    }
+
+    // Calculate exportable rows
+    let exportableRows = data.totalRows;
+    if (settings.onlyCompletedRows) {
+      exportableRows = foundFiles + notFoundFiles + renamedFiles + errorFiles + skippedFiles;
+    }
+
+    // Estimate file size
+    const estimatedFileSize = this.formatFileSize(exportableRows * (data.columns.length + 1) * 20);
+
+    return {
+      totalRows: data.totalRows,
+      exportableRows,
+      foundFiles,
+      notFoundFiles,
+      renamedFiles,
+      errorFiles,
+      skippedFiles,
+      searchingFiles,
+      estimatedFileSize,
+      canExport: exportableRows > 0
+    };
+  }
+
+  /**
+   * Генерация имени файла на основе фильтров для Separate Files
    */
   private static generateExportFileName(
     originalFileName: string,
@@ -157,7 +322,24 @@ export class ExcelExportService {
   }
 
   /**
-   * Подготовка данных для экспорта
+   * NEW: Generate export filename for rename files
+   */
+  private static generateRenameExportFileName(baseName: string, format: 'xlsx' | 'csv'): string {
+    // Remove existing extension
+    const nameWithoutExt = baseName.replace(/\.(xlsx|xls|csv)$/i, '');
+    
+    // Add timestamp
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '_');
+    const cleanName = nameWithoutExt.replace(/[^a-zA-Z0-9_-]/g, '_');
+    
+    // Determine extension
+    const extension = format === 'csv' ? 'csv' : 'xlsx';
+    
+    return `${cleanName}_${timestamp}.${extension}`;
+  }
+
+  /**
+   * Подготовка данных для экспорта (Separate Files)
    */
   private static prepareExportData(
     headers: string[],
@@ -186,6 +368,140 @@ export class ExcelExportService {
   }
 
   /**
+   * NEW: Prepare rename files data for export
+   */
+  private static prepareRenameFilesExportData(
+    data: IRenameFilesData,
+    fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' | 'skipped' },
+    renameProgress?: {
+      current: number;
+      total: number;
+      fileName: string;
+      success: number;
+      errors: number;
+      skipped: number;
+    },
+    settings?: IRenameExportSettings
+  ): any[][] {
+    
+    const exportData: any[][] = [];
+    
+    // Prepare headers
+    if (settings?.includeHeaders) {
+      const headers: string[] = [];
+      
+      // Add data columns in order
+      data.columns
+        .sort((a, b) => a.currentIndex - b.currentIndex)
+        .filter(col => col.isVisible)
+        .forEach(column => {
+          headers.push(column.name);
+        });
+      
+      // Add status column
+      if (settings.includeStatusColumn) {
+        headers.push('Status');
+      }
+      
+      // Add timestamp column
+      if (settings.includeTimestamps) {
+        headers.push('Export Timestamp');
+      }
+      
+      exportData.push(headers);
+    }
+    
+    // Process each row
+    data.rows.forEach(row => {
+      const searchStatus = fileSearchResults[row.rowIndex];
+      
+      // Filter rows based on settings
+      if (settings.onlyCompletedRows) {
+        if (searchStatus === 'searching') {
+          return; // Skip rows that are still searching
+        }
+      }
+      
+      const rowData: any[] = [];
+      
+      // Add cell values in column order
+      data.columns
+        .sort((a, b) => a.currentIndex - b.currentIndex)
+        .filter(col => col.isVisible)
+        .forEach(column => {
+          const cell = row.cells[column.id];
+          const value = cell ? cell.value : '';
+          
+          // Format the value appropriately
+          if (value instanceof Date) {
+            rowData.push(value.toLocaleDateString());
+          } else if (typeof value === 'number') {
+            rowData.push(value);
+          } else {
+            rowData.push(String(value || ''));
+          }
+        });
+      
+      // Add status information
+      if (settings.includeStatusColumn) {
+        const statusText = this.getRenameStatusText(searchStatus, renameProgress, row.rowIndex);
+        rowData.push(statusText);
+      }
+      
+      // Add timestamp
+      if (settings.includeTimestamps) {
+        rowData.push(new Date().toLocaleString());
+      }
+      
+      exportData.push(rowData);
+    });
+    
+    return exportData;
+  }
+
+  /**
+   * NEW: Get human-readable status text
+   */
+  private static getRenameStatusText(
+    searchStatus: 'found' | 'not-found' | 'searching' | 'skipped',
+    renameProgress?: {
+      current: number;
+      total: number;
+      fileName: string;
+      success: number;
+      errors: number;
+      skipped: number;
+    },
+    rowIndex?: number
+  ): string {
+    
+    // If rename is in progress or completed, show rename status
+    if (renameProgress && renameProgress.current > 0) {
+      if (renameProgress.success > 0) {
+        return 'Renamed Successfully';
+      } else if (renameProgress.errors > 0) {
+        return 'Rename Failed';
+      } else if (renameProgress.skipped > 0) {
+        return 'Skipped (Target Exists)';
+      }
+    }
+    
+    // Otherwise show search status
+    switch (searchStatus) {
+      case 'found':
+        return 'Found in SharePoint';
+      case 'not-found':
+        return 'Not Found';
+      case 'searching':
+        return 'Searching...';
+      case 'skipped':
+        return 'Skipped';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  /**
    * Форматирование значения ячейки для экспорта
    */
   private static formatCellForExport(value: CellValue): CellValue {
@@ -207,7 +523,7 @@ export class ExcelExportService {
   }
 
   /**
-   * Экспорт в Excel формат
+   * Экспорт в Excel формат (Separate Files)
    */
   private static async exportAsExcel(
     data: ExcelData,
@@ -232,7 +548,7 @@ export class ExcelExportService {
   }
 
   /**
-   * Экспорт в CSV формат
+   * Экспорт в CSV формат (Separate Files)
    */
   private static async exportAsCSV(
     data: ExcelData,
@@ -269,7 +585,66 @@ export class ExcelExportService {
   }
 
   /**
-   * Вычисление оптимальной ширины колонок
+   * NEW: Create export file for rename files data
+   */
+  private static async createRenameFilesExportFile(
+    data: any[][],
+    settings: IRenameExportSettings
+  ): Promise<Blob> {
+    
+    if (settings.fileFormat === 'csv') {
+      return this.createCSVBlobFromData(data);
+    } else {
+      return this.createExcelBlobFromData(data, 'Rename Files Export');
+    }
+  }
+
+  /**
+   * NEW: Create CSV blob from data array
+   */
+  private static createCSVBlobFromData(data: any[][]): Blob {
+    const csvContent = data
+      .map(row => 
+        row.map(cell => {
+          const cellValue = String(cell || '');
+          // Escape quotes and wrap in quotes if contains comma, quote, or newline
+          if (cellValue.includes(',') || cellValue.includes('"') || cellValue.includes('\n')) {
+            return `"${cellValue.replace(/"/g, '""')}"`;
+          }
+          return cellValue;
+        }).join(',')
+      )
+      .join('\n');
+    
+    return new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  }
+
+  /**
+   * NEW: Create Excel blob from data array
+   */
+  private static createExcelBlobFromData(data: any[][], sheetName: string = 'Sheet1'): Blob {
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+    
+    // Auto-adjust column widths
+    const columnWidths = this.calculateRenameColumnWidths(data);
+    worksheet['!cols'] = columnWidths;
+    
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    
+    const excelBuffer = XLSX.write(workbook, { 
+      bookType: 'xlsx', 
+      type: 'array',
+      compression: true
+    });
+    
+    return new Blob([excelBuffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+  }
+
+  /**
+   * Вычисление оптимальной ширины колонок (Separate Files)
    */
   private static calculateColumnWidths(data: ExcelData): IColumnWidth[] {
     if (data.length === 0) return [];
@@ -295,7 +670,52 @@ export class ExcelExportService {
   }
 
   /**
-   * Получение статистики экспорта
+   * NEW: Calculate column widths for rename files export
+   */
+  private static calculateRenameColumnWidths(data: any[][]): Array<{ wch: number }> {
+    if (data.length === 0) return [];
+    
+    const columnCount = data[0].length;
+    const widths: Array<{ wch: number }> = [];
+    
+    for (let col = 0; col < columnCount; col++) {
+      let maxWidth = 10; // Minimum width
+      
+      data.forEach(row => {
+        if (row[col] !== undefined && row[col] !== null) {
+          const cellLength = String(row[col]).length;
+          maxWidth = Math.max(maxWidth, Math.min(cellLength, 50)); // Max width of 50
+        }
+      });
+      
+      widths.push({ wch: maxWidth });
+    }
+    
+    return widths;
+  }
+
+  /**
+   * NEW: Download file helper method
+   */
+  private static downloadFile(blob: Blob, fileName: string): void {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.style.display = 'none';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up the URL object
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+    }, 100);
+  }
+
+  /**
+   * Получение статистики экспорта (Separate Files)
    */
   public static getExportStatistics(
     sheet: IExcelSheet,
@@ -334,7 +754,7 @@ export class ExcelExportService {
   }
 
   /**
-   * Предварительный просмотр экспорта
+   * Предварительный просмотр экспорта (Separate Files)
    */
   public static getExportPreview(
     sheet: IExcelSheet,
@@ -358,8 +778,8 @@ export class ExcelExportService {
    * Валидация настроек экспорта
    */
   public static validateExportSettings(
-    settings: IExportSettings,
-    visibleRowsCount: number
+    settings: IExportSettings | IRenameExportSettings,
+    visibleRowsCount?: number
   ): IExportValidation {
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -374,15 +794,17 @@ export class ExcelExportService {
     }
 
     // Проверка количества строк
-    if (visibleRowsCount === 0) {
-      errors.push('No data to export');
-    } else if (visibleRowsCount > 100000) {
-      warnings.push('Large dataset detected. Export may take some time.');
-    }
+    if (visibleRowsCount !== undefined) {
+      if (visibleRowsCount === 0) {
+        errors.push('No data to export');
+      } else if (visibleRowsCount > 100000) {
+        warnings.push('Large dataset detected. Export may take some time.');
+      }
 
-    // Проверка ограничения строк
-    if (settings.maxRows && settings.maxRows > 0 && settings.maxRows > visibleRowsCount) {
-      warnings.push(`Max rows setting (${settings.maxRows}) is higher than available data (${visibleRowsCount})`);
+      // Проверка ограничения строк (only for IExportSettings)
+      if ('maxRows' in settings && settings.maxRows && settings.maxRows > 0 && settings.maxRows > visibleRowsCount) {
+        warnings.push(`Max rows setting (${settings.maxRows}) is higher than available data (${visibleRowsCount})`);
+      }
     }
 
     return {
@@ -393,7 +815,7 @@ export class ExcelExportService {
   }
 
   /**
-   * Создание настроек экспорта по умолчанию
+   * Создание настроек экспорта по умолчанию (Separate Files)
    */
   public static createDefaultExportSettings(originalFileName: string): IExportSettings {
     const baseName = originalFileName.replace(/\.[^/.]+$/, '');
@@ -403,6 +825,20 @@ export class ExcelExportService {
       includeHeaders: true,
       onlyVisibleColumns: true,
       fileFormat: ExportFormat.XLSX
+    };
+  }
+
+  /**
+   * NEW: Create default export settings for Rename Files Management
+   */
+  public static createDefaultRenameExportSettings(baseName?: string): IRenameExportSettings {
+    return {
+      fileName: baseName ? `${baseName}_renamed` : 'renamed_files_export',
+      includeHeaders: true,
+      includeStatusColumn: true,
+      includeTimestamps: true,
+      onlyCompletedRows: false,
+      fileFormat: 'xlsx'
     };
   }
 }

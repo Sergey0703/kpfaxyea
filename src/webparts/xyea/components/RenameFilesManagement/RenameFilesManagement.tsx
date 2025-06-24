@@ -7,7 +7,8 @@ import {
   IRenameFilesState,
   SearchStage,
   ISearchProgress,
-  SearchProgressHelper
+  SearchProgressHelper,
+  IRenameExportSettings
 } from './types/RenameFilesTypes';
 import { ExcelFileProcessor } from './services/ExcelFileProcessor';
 import { SharePointFolderService } from './services/SharePointFolderService';
@@ -18,6 +19,8 @@ import { FolderSelectionDialog } from './components/FolderSelectionDialog';
 import { RenameControlsPanel } from './components/RenameControlsPanel';
 import { DataTableView } from './components/DataTableView';
 import { ProgressIndicator } from './components/ProgressIndicator';
+import { ExportControlsPanel } from './components/ExportControlsPanel';
+import { ExcelExportService } from '../../services/ExcelExportService';
 
 export default class RenameFilesManagement extends React.Component<IRenameFilesManagementProps, IRenameFilesState> {
   private fileInputRef: React.RefObject<HTMLInputElement>;
@@ -61,6 +64,15 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
         fileFormat: 'xlsx'
       },
       isExporting: false,
+      // NEW: Export settings for status-based export
+      exportSettings: {
+        fileName: 'renamed_files_export',
+        includeHeaders: true,
+        includeStatusColumn: true,
+        includeTimestamps: true,
+        onlyCompletedRows: false,
+        fileFormat: 'xlsx'
+      },
       selectedFolder: undefined,
       showFolderDialog: false,
       availableFolders: [],
@@ -133,7 +145,12 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
         isRenaming: false,
         fileSearchResults: {},
         searchProgress: SearchProgressHelper.createInitialProgress(),
-        renameProgress: undefined
+        renameProgress: undefined,
+        // NEW: Reset export settings with file name
+        exportSettings: {
+          ...this.state.exportSettings,
+          fileName: this.generateExportFileName(file.name)
+        }
       });
 
       const processedData = await this.excelProcessor.processFile(
@@ -190,6 +207,12 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
         message
       }
     });
+  }
+
+  // NEW: Generate export filename based on original file
+  private generateExportFileName = (originalFileName: string): string => {
+    const baseName = originalFileName.replace(/\.(xlsx|xls|csv)$/i, '');
+    return `${baseName}_renamed`;
   }
 
   // Column management methods
@@ -530,8 +553,87 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     }
   }
 
+  // NEW: Export functionality methods
+  private handleExportSettingsChange = (newSettings: Partial<IRenameExportSettings>): void => {
+    this.setState({
+      exportSettings: {
+        ...this.state.exportSettings,
+        ...newSettings
+      }
+    });
+  }
+
+  private handleExport = async (): Promise<void> => {
+    const { data, fileSearchResults, renameProgress, exportSettings } = this.state;
+    
+    if (!data.originalFile) {
+      this.setState({ error: 'No data to export' });
+      return;
+    }
+
+    // Validate export settings
+    const validation = ExcelExportService.validateExportSettings(exportSettings);
+    if (!validation.isValid) {
+      this.setState({ error: `Export validation failed: ${validation.errors.join(', ')}` });
+      return;
+    }
+
+    this.setState({ isExporting: true, error: undefined });
+
+    try {
+      console.log('[RenameFilesManagement] Starting export...');
+      
+      const result = await ExcelExportService.exportRenameFilesData(
+        data,
+        fileSearchResults,
+        renameProgress,
+        exportSettings
+      );
+
+      if (!result.success) {
+        this.setState({ error: result.error || 'Export failed' });
+      } else {
+        console.log('[RenameFilesManagement] Export completed successfully:', result.fileName);
+        // Could show success notification here
+      }
+
+    } catch (error) {
+      console.error('[RenameFilesManagement] Export failed:', error);
+      this.setState({ error: error instanceof Error ? error.message : 'Export failed' });
+    } finally {
+      this.setState({ isExporting: false });
+    }
+  }
+
   private clearError = (): void => {
     this.setState({ error: undefined });
+  }
+
+  // NEW: Render export controls section
+  private renderExportControls = (): React.ReactNode => {
+    const { data, fileSearchResults, renameProgress, exportSettings, isExporting } = this.state;
+
+    if (!data.originalFile) {
+      return null;
+    }
+
+    // Get export statistics
+    const statistics = ExcelExportService.getRenameFilesExportStatistics(
+      data,
+      fileSearchResults,
+      renameProgress,
+      exportSettings
+    );
+
+    return (
+      <ExportControlsPanel
+        statistics={statistics}
+        exportSettings={exportSettings}
+        isExporting={isExporting}
+        onExportSettingsChange={this.handleExportSettingsChange}
+        onExport={this.handleExport}
+      />
+    );
   }
 
   public render(): React.ReactElement<IRenameFilesManagementProps> {
@@ -666,6 +768,9 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
               columnResizeHandler={this.columnResizeHandler}
               onCellEdit={this.updateCellData}
             />
+
+            {/* NEW: Export Controls Section */}
+            {this.renderExportControls()}
 
             {/* Additional info for debugging/development */}
             {process.env.NODE_ENV === 'development' && searchProgress.searchPlan && (

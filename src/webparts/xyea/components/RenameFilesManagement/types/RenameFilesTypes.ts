@@ -95,6 +95,49 @@ export interface IRenameFilesExportConfig {
 }
 
 /**
+ * Export settings for rename files data
+ */
+export interface IRenameExportSettings {
+  fileName: string;
+  includeHeaders: boolean;
+  includeStatusColumn: boolean;
+  includeTimestamps: boolean;
+  onlyCompletedRows: boolean; // Only export rows that have been processed (found/not-found/renamed/error)
+  fileFormat: 'xlsx' | 'csv';
+}
+
+/**
+ * Export statistics for rename files
+ */
+export interface IRenameExportStatistics {
+  totalRows: number;
+  exportableRows: number;
+  foundFiles: number;
+  notFoundFiles: number;
+  renamedFiles: number;
+  errorFiles: number;
+  skippedFiles: number;
+  searchingFiles: number;
+  estimatedFileSize: string;
+  canExport: boolean;
+}
+
+/**
+ * Enhanced file status with additional details for export
+ */
+export interface IFileStatusWithDetails {
+  rowIndex: number;
+  fileName: string;
+  directoryPath: string;
+  searchStatus: 'found' | 'not-found' | 'searching' | 'skipped';
+  renameStatus?: 'renaming' | 'renamed' | 'error' | 'skipped';
+  errorMessage?: string;
+  originalPath?: string;
+  newPath?: string;
+  timestamp?: Date;
+}
+
+/**
  * SharePoint folder interface
  */
 export interface ISharePointFolder {
@@ -192,7 +235,7 @@ export interface ISearchPlan {
 }
 
 /**
- * Interface for component state - UPDATED with skipped support
+ * Interface for component state - UPDATED with export support
  */
 export interface IRenameFilesState {
   // File and data
@@ -219,6 +262,9 @@ export interface IRenameFilesState {
   showExportDialog: boolean;
   exportConfig: IRenameFilesExportConfig;
   isExporting: boolean;
+  
+  // NEW: Export settings for status-based export
+  exportSettings: IRenameExportSettings;
   
   // SharePoint folder selection
   selectedFolder: ISharePointFolder | undefined;

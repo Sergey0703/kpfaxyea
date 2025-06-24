@@ -1,0 +1,607 @@
+// src/webparts/xyea/components/RenameFilesManagement/components/ExportControlsPanel.module.scss
+
+.exportControlsPanel {
+  margin-top: 24px;
+  padding: 20px;
+  background-color: #f8f8f8;
+  border-radius: 8px;
+  border: 1px solid #edebe9;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+  .header {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #edebe9;
+
+    .title {
+      margin: 0 0 8px 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: #323130;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .description {
+      margin: 0;
+      font-size: 14px;
+      color: #605e5c;
+      line-height: 1.4;
+    }
+  }
+
+  .content {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  // Export Statistics Section
+  .statisticsSection {
+    .sectionTitle {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: #323130;
+    }
+
+    .exportStats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      padding: 16px;
+      background-color: white;
+      border: 1px solid #edebe9;
+      border-radius: 6px;
+
+      .stat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 8px 12px;
+        background-color: #faf9f8;
+        border-radius: 4px;
+        transition: background-color 0.2s ease;
+
+        &:hover {
+          background-color: #f3f2f1;
+        }
+
+        .statLabel {
+          font-size: 11px;
+          color: #605e5c;
+          margin-bottom: 4px;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          text-align: center;
+        }
+
+        .statValue {
+          font-size: 18px;
+          font-weight: 600;
+          color: #323130;
+        }
+
+        // Special coloring for different stat types
+        &:nth-child(3) .statValue { // Found files
+          color: #107c10;
+        }
+
+        &:nth-child(4) .statValue { // Not found files
+          color: #d13438;
+        }
+
+        &:nth-child(5) .statValue { // Renamed files
+          color: #0078d4;
+        }
+
+        &:nth-child(6) .statValue { // Error files
+          color: #d13438;
+        }
+
+        &:nth-child(7) .statValue { // Skipped files
+          color: #ff6b35;
+        }
+
+        &:nth-child(8) .statValue { // Searching files
+          color: #ffb900;
+        }
+      }
+    }
+  }
+
+  // Export Settings Section
+  .settingsSection {
+    .sectionTitle {
+      margin: 0 0 16px 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: #323130;
+    }
+
+    .basicSettings {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      padding: 16px;
+      background-color: white;
+      border: 1px solid #edebe9;
+      border-radius: 6px;
+    }
+
+    .advancedToggle {
+      margin: 12px 0;
+
+      .toggleButton {
+        background: none;
+        border: none;
+        color: #0078d4;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        padding: 8px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: color 0.2s ease;
+
+        &:hover {
+          color: #106ebe;
+          text-decoration: underline;
+        }
+      }
+    }
+
+    .advancedSettings {
+      padding: 16px;
+      background-color: white;
+      border: 1px solid #edebe9;
+      border-radius: 6px;
+      border-top: 3px solid #0078d4;
+      animation: slideDown 0.3s ease-out;
+
+      .settingGroup {
+        margin-bottom: 12px;
+
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+    }
+
+    .settingGroup {
+      display: flex;
+      flex-direction: column;
+
+      .settingLabel {
+        font-size: 14px;
+        font-weight: 500;
+        color: #323130;
+        margin-bottom: 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .settingInput,
+      .settingSelect {
+        padding: 8px 12px;
+        border: 1px solid #c8c6c4;
+        border-radius: 4px;
+        font-size: 14px;
+        background: white;
+        transition: border-color 0.2s ease;
+
+        &:focus {
+          outline: none;
+          border-color: #0078d4;
+          box-shadow: 0 0 0 1px #0078d4;
+        }
+
+        &:disabled {
+          background-color: #f3f2f1;
+          color: #a19f9d;
+          cursor: not-allowed;
+        }
+      }
+
+      .checkboxLabel {
+        flex-direction: row !important;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        color: #323130;
+        padding: 8px 0;
+
+        input[type="checkbox"] {
+          margin: 0;
+          transform: scale(1.1);
+          cursor: pointer;
+
+          &:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+          }
+        }
+
+        &:hover:not(:has(input:disabled)) {
+          color: #0078d4;
+        }
+      }
+    }
+  }
+
+  // Export Button Section
+  .exportSection {
+    .exportButtonContainer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+
+      .exportButton {
+        background-color: #107c10;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 12px 24px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 200px;
+        justify-content: center;
+        box-shadow: 0 2px 4px rgba(16, 124, 16, 0.2);
+
+        &:hover:not(:disabled) {
+          background-color: #0e6e0e;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(16, 124, 16, 0.3);
+        }
+
+        &:active:not(:disabled) {
+          transform: translateY(0);
+          box-shadow: 0 2px 4px rgba(16, 124, 16, 0.2);
+        }
+
+        &:disabled {
+          background-color: #c8c6c4;
+          cursor: not-allowed;
+          transform: none;
+          box-shadow: none;
+        }
+
+        .spinner {
+          width: 16px;
+          height: 16px;
+          border: 2px solid transparent;
+          border-top: 2px solid currentColor;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+      }
+
+      .exportDisabledMessage {
+        color: #605e5c;
+        font-size: 14px;
+        text-align: center;
+        font-style: italic;
+        padding: 12px;
+        background-color: #fff4ce;
+        border: 1px solid #ffb900;
+        border-radius: 4px;
+        max-width: 400px;
+      }
+    }
+  }
+
+  // Export Information Section
+  .exportInfo {
+    padding: 16px;
+    background-color: white;
+    border: 1px solid #edebe9;
+    border-radius: 6px;
+    border-left: 4px solid #0078d4;
+
+    .infoItem {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 12px;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      .infoIcon {
+        font-size: 16px;
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+
+      .infoText {
+        font-size: 14px;
+        color: #605e5c;
+        line-height: 1.4;
+      }
+
+      // Special styling for different info types
+      &:has(.infoIcon:contains("⚠️")) {
+        .infoText {
+          color: #8a6914;
+        }
+      }
+
+      &:has(.infoIcon:contains("⏭️")) {
+        .infoText {
+          color: #d13438;
+        }
+      }
+    }
+  }
+}
+
+// Animations
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Responsive Design
+@media (max-width: 768px) {
+  .exportControlsPanel {
+    padding: 16px;
+    margin-top: 16px;
+
+    .header {
+      .title {
+        font-size: 16px;
+      }
+
+      .description {
+        font-size: 13px;
+      }
+    }
+
+    .content {
+      gap: 16px;
+    }
+
+    .statisticsSection {
+      .exportStats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        padding: 12px;
+
+        .stat {
+          padding: 6px 8px;
+
+          .statLabel {
+            font-size: 10px;
+          }
+
+          .statValue {
+            font-size: 16px;
+          }
+        }
+      }
+    }
+
+    .settingsSection {
+      .basicSettings {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 12px;
+      }
+
+      .advancedSettings {
+        padding: 12px;
+      }
+
+      .settingGroup {
+        .settingInput,
+        .settingSelect {
+          padding: 6px 8px;
+          font-size: 13px;
+        }
+
+        .checkboxLabel {
+          font-size: 13px;
+          padding: 6px 0;
+        }
+      }
+    }
+
+    .exportSection {
+      .exportButtonContainer {
+        .exportButton {
+          padding: 10px 20px;
+          font-size: 14px;
+          min-width: 180px;
+        }
+
+        .exportDisabledMessage {
+          font-size: 13px;
+          padding: 10px;
+        }
+      }
+    }
+
+    .exportInfo {
+      padding: 12px;
+
+      .infoItem {
+        gap: 6px;
+
+        .infoIcon {
+          font-size: 14px;
+        }
+
+        .infoText {
+          font-size: 13px;
+        }
+      }
+    }
+  }
+}
+
+// High Contrast Mode Support
+@media (prefers-contrast: high) {
+  .exportControlsPanel {
+    border: 2px solid #000;
+
+    .statisticsSection .exportStats {
+      border: 2px solid #000;
+
+      .stat {
+        border: 1px solid #000;
+      }
+    }
+
+    .settingsSection {
+      .basicSettings,
+      .advancedSettings {
+        border: 2px solid #000;
+      }
+
+      .settingGroup {
+        .settingInput,
+        .settingSelect {
+          border: 2px solid #000;
+
+          &:focus {
+            border: 3px solid #000;
+          }
+        }
+      }
+    }
+
+    .exportInfo {
+      border: 2px solid #000;
+      border-left: 4px solid #000;
+    }
+  }
+}
+
+// Print Styles
+@media print {
+  .exportControlsPanel {
+    .exportSection {
+      display: none;
+    }
+
+    .exportInfo {
+      display: none;
+    }
+
+    .settingsSection .advancedToggle {
+      display: none;
+    }
+  }
+}
+
+// Dark Mode Support (if implemented in future)
+@media (prefers-color-scheme: dark) {
+  .exportControlsPanel {
+    background-color: #2d2d30;
+    border-color: #3e3e42;
+
+    .header {
+      border-bottom-color: #3e3e42;
+
+      .title {
+        color: #e1e1e1;
+      }
+
+      .description {
+        color: #cccccc;
+      }
+    }
+
+    .statisticsSection,
+    .settingsSection {
+      .sectionTitle {
+        color: #e1e1e1;
+      }
+
+      .exportStats,
+      .basicSettings,
+      .advancedSettings {
+        background-color: #383838;
+        border-color: #3e3e42;
+
+        .stat {
+          background-color: #2d2d30;
+          border: 1px solid #3e3e42;
+
+          .statLabel {
+            color: #cccccc;
+          }
+
+          .statValue {
+            color: #e1e1e1;
+          }
+        }
+      }
+
+      .settingGroup {
+        .settingLabel {
+          color: #e1e1e1;
+        }
+
+        .settingInput,
+        .settingSelect {
+          background-color: #2d2d30;
+          border-color: #3e3e42;
+          color: #e1e1e1;
+
+          &:focus {
+            border-color: #0078d4;
+          }
+        }
+
+        .checkboxLabel {
+          color: #e1e1e1;
+        }
+      }
+
+      .toggleButton {
+        color: #569cd6;
+
+        &:hover {
+          color: #9cdcfe;
+        }
+      }
+    }
+
+    .exportInfo {
+      background-color: #383838;
+      border-color: #3e3e42;
+
+      .infoText {
+        color: #cccccc;
+      }
+    }
+  }
+}
