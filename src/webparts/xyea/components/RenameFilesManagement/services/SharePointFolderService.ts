@@ -402,36 +402,41 @@ export class SharePointFolderService {
   /**
    * Get the full SharePoint path for a directory
    */
-  public getFullDirectoryPath(relativePath: string, basePath: string): string {
-    console.log(`[SharePointFolderService] Building full path:`);
-    console.log(`  Base path: "${basePath}"`);
-    console.log(`  Relative path: "${relativePath}"`);
-    
-    // Convert RelativePath format (e.g., "634\2025\6") to SharePoint format
-    const normalizedRelative = relativePath.replace(/\\/g, '/');
-    const fullPath = `${basePath}/${normalizedRelative}`;
-    const normalizedFullPath = this.normalizePath(fullPath);
-    
-    console.log(`  Normalized relative: "${normalizedRelative}"`);
-    console.log(`  Combined path: "${fullPath}"`);
-    console.log(`  Final normalized: "${normalizedFullPath}"`);
-    
-    return normalizedFullPath;
-  }
+ public getFullDirectoryPath(relativePath: string, basePath: string): string {
+  console.log(`[SharePointFolderService] Building full path:`);
+  console.log(`  Base path: "${basePath}"`);
+  console.log(`  Relative path: "${relativePath}"`);
+  
+  // ИСПРАВЛЕНИЕ: НЕ приводим к нижнему регистру!
+  // Convert RelativePath format (e.g., "634\2025\6") to SharePoint format
+  const normalizedRelative = relativePath.replace(/\\/g, '/');
+  const fullPath = `${basePath}/${normalizedRelative}`;
+  
+  // ИСПРАВЛЕНИЕ: Убираем нормализацию, которая портила регистр
+  const cleanPath = fullPath
+    .replace(/\/+/g, '/')          // Remove duplicate slashes
+    .replace(/\/$/, '');           // Remove trailing slash
+  // НЕ ДЕЛАЕМ .toLowerCase() !!!
+  
+  console.log(`  Normalized relative: "${normalizedRelative}"`);
+  console.log(`  Combined path: "${fullPath}"`);
+  console.log(`  Final path: "${cleanPath}"`);
+  
+  return cleanPath;
+}
 
-  /**
-   * ENHANCED: Normalize path for consistent comparison
-   */
-  private normalizePath(path: string): string {
-    const normalized = path
-      .replace(/\\/g, '/')           // Convert backslashes to forward slashes
-      .replace(/\/+/g, '/')          // Remove duplicate slashes
-      .toLowerCase()                 // Case insensitive
-      .replace(/\/$/, '');           // Remove trailing slash
-    
-    console.log(`[SharePointFolderService] Path normalization: "${path}" -> "${normalized}"`);
-    return normalized;
-  }
+// Также исправьте метод normalizePath (если он используется для путей):
+private normalizePath(path: string): string {
+  // ТОЛЬКО для сравнения, НЕ для реальных API вызовов!
+  const normalized = path
+    .replace(/\\/g, '/')           // Convert backslashes to forward slashes
+    .replace(/\/+/g, '/')          // Remove duplicate slashes
+    .toLowerCase()                 // Case insensitive ТОЛЬКО для сравнения
+    .replace(/\/$/, '');           // Remove trailing slash
+  
+  console.log(`[SharePointFolderService] Path normalization FOR COMPARISON: "${path}" -> "${normalized}"`);
+  return normalized;
+}
 
   /**
    * Get cached folders (for debugging or display)

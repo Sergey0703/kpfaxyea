@@ -21,12 +21,23 @@ export class FileSearchService {
   // AGGRESSIVE: Much shorter timeouts to prevent hanging
   private readonly DIRECTORY_CHECK_TIMEOUT = 3000; // 3 seconds per directory
   private readonly FOLDER_LOAD_TIMEOUT = 8000; // 8 seconds for folder loading
-  private readonly BATCH_TIMEOUT = 2000; // 2 seconds per batch
 
   constructor(context: any) {
     this.context = context;
     this.folderService = new SharePointFolderService(context);
     this.excelProcessor = new ExcelFileProcessor();
+  }
+
+  /**
+   * Calculate adaptive timeout based on file count
+   */
+  private calculateTimeout(fileCount: number): number {
+    const baseTimeout = 2000;
+    const additionalTime = Math.min(fileCount * 50, 15000); // max 15 seconds
+    const adaptiveTimeout = baseTimeout + additionalTime;
+    
+    console.log(`[FileSearchService] 📊 Adaptive timeout for ${fileCount} files: ${adaptiveTimeout}ms`);
+    return adaptiveTimeout;
   }
 
   /**
@@ -403,7 +414,7 @@ export class FileSearchService {
   }
 
   /**
-   * OPTIMIZED STAGE 3: Search files with CORRECTED LOGIC and MINIMAL API calls
+   * OPTIMIZED STAGE 3: Search files with CORRECTED LOGIC and MINIMAL API calls + DETAILED LOGGING
    */
   private async executeOptimizedStage3_SearchFiles(
     currentProgress: ISearchProgress,
@@ -413,7 +424,7 @@ export class FileSearchService {
     statusCallback?: (progress: ISearchProgress) => void
   ): Promise<void> {
     
-    console.log('[FileSearchService] 🚀 OPTIMIZED STAGE 3: Searching files with MINIMAL API calls...');
+    console.log('[FileSearchService] 🚀 OPTIMIZED STAGE 3 with DETAILED LOGGING...');
     
     let progress = SearchProgressHelper.transitionToStage(
       currentProgress,
@@ -434,13 +445,15 @@ export class FileSearchService {
     
     console.log(`[FileSearchService] 📊 Built directory mapping:`);
     Object.entries(directoryToFilesMap).forEach(([dir, files]) => {
-      console.log(`  📁 "${dir}" -> ${files.length} files: [${files.slice(0, 3).map(f => f.fileName).join(', ')}...]`);
+      console.log(`  📁 "${dir}" -> ${files.length} files to search`);
     });
 
     let processedFiles = 0;
     let foundFiles = 0;
     const totalFiles = rows.length;
     const directories = Object.keys(directoryToFilesMap);
+
+    console.log(`[FileSearchService] 🎯 STARTING SEARCH: ${totalFiles} total files in ${directories.length} directories`);
 
     // STEP 2: Process each directory with ONE API call
     for (let dirIndex = 0; dirIndex < directories.length; dirIndex++) {
@@ -466,18 +479,49 @@ export class FileSearchService {
       statusCallback?.(progress);
 
       try {
-        // ONE API CALL to get directory contents
+        // ONE API CALL to get directory contents with adaptive timeout
         console.log(`[FileSearchService] 📞 API call: getFolderContents("${directoryPath}")`);
         const startTime = Date.now();
         
+        const adaptiveTimeout = this.calculateTimeout(filesFromExcel.length);
         const folderContentsPromise = this.folderService.getFolderContents(directoryPath);
         const folderContents = await Promise.race([
           folderContentsPromise,
-          this.createTimeoutPromise(this.BATCH_TIMEOUT, { files: [], folders: [] })
+          this.createTimeoutPromise(adaptiveTimeout, { files: [], folders: [] })
         ]) as {files: any[], folders: any[]};
         
         const endTime = Date.now();
-        console.log(`[FileSearchService] ✅ API response received in ${endTime - startTime}ms, found ${folderContents.files.length} files`);
+        console.log(`[FileSearchService] ✅ API response received in ${endTime - startTime}ms`);
+        console.log(`[FileSearchService] 📄 SharePoint files found: ${folderContents.files.length}`);
+        console.log(`[FileSearchService] 📁 SharePoint folders found: ${folderContents.folders.length}`);
+
+        // IMPROVED: Handle empty directories gracefully
+        if (folderContents.files.length === 0) {
+          console.log(`[FileSearchService] ⚠️ Directory is empty or doesn't exist: "${directoryPath}"`);
+          console.log(`[FileSearchService] 📝 Marking all ${filesFromExcel.length} files as NOT FOUND`);
+          
+          // Mark all files in this directory as not found
+          filesFromExcel.forEach(excelFile => {
+            if (!this.isCancelled) {
+              results[excelFile.rowIndex] = 'not-found';
+              progressCallback(excelFile.rowIndex, 'not-found');
+              processedFiles++;
+            }
+          });
+          
+          console.log(`[FileSearchService] 📁 DIRECTORY SUMMARY "${directoryPath}": 0/${filesFromExcel.length} files found (empty directory)`);
+          continue; // Skip to next directory
+        }
+
+        // Show sample of SharePoint files
+        console.log(`[FileSearchService] 📋 Sample SharePoint files:`, 
+          folderContents.files.slice(0, 5).map(f => `"${f.Name}"`).join(', ')
+        );
+
+        // Show sample of Excel files we're looking for
+        console.log(`[FileSearchService] 🔍 Sample Excel files to find:`, 
+          filesFromExcel.slice(0, 5).map(f => `"${f.fileName}"`).join(', ')
+        );
 
         // Create SharePoint files map (case-insensitive)
         const sharePointFilesMap = new Map<string, any>();
@@ -485,9 +529,12 @@ export class FileSearchService {
           sharePointFilesMap.set(file.Name.toLowerCase(), file);
         });
 
-        console.log(`[FileSearchService] 🗂️ Created SharePoint files map: ${sharePointFilesMap.size} files`);
+        console.log(`[FileSearchService] 🗂️ Created SharePoint files lookup map: ${sharePointFilesMap.size} entries`);
 
-        // CHECK each Excel file against SharePoint files
+        // CHECK each Excel file against SharePoint files with DETAILED LOGGING
+        let directoryFoundCount = 0;
+        const BATCH_SIZE = 20; // Process in batches of 20 for logging
+
         for (let fileIndex = 0; fileIndex < filesFromExcel.length; fileIndex++) {
           const excelFile = filesFromExcel[fileIndex];
           
@@ -501,18 +548,23 @@ export class FileSearchService {
           
           if (fileExists) {
             foundFiles++;
-            console.log(`[FileSearchService] ✅ FOUND: "${excelFile.fileName}" (row ${excelFile.rowIndex + 1})`);
+            directoryFoundCount++;
+            console.log(`[FileSearchService] ✅ FOUND ${foundFiles}: "${excelFile.fileName}" (row ${excelFile.rowIndex + 1})`);
           } else {
             console.log(`[FileSearchService] ❌ NOT FOUND: "${excelFile.fileName}" (row ${excelFile.rowIndex + 1})`);
           }
           
           processedFiles++;
 
-          // Update progress every 10 files
-          if (fileIndex % 10 === 0 || fileIndex === filesFromExcel.length - 1) {
+          // Batch progress logging
+          if ((fileIndex + 1) % BATCH_SIZE === 0 || fileIndex === filesFromExcel.length - 1) {
+            console.log(`[FileSearchService] 📦 BATCH PROGRESS: Processed ${fileIndex + 1}/${filesFromExcel.length} files in this directory`);
+            console.log(`[FileSearchService] 📊 Current totals: ${foundFiles} found out of ${processedFiles} processed`);
+            
+            // Update progress every batch
             progress = SearchProgressHelper.updateStageProgress(
               progress,
-              ((dirIndex + (fileIndex / filesFromExcel.length)) / directories.length) * 100,
+              ((dirIndex + ((fileIndex + 1) / filesFromExcel.length)) / directories.length) * 100,
               {
                 currentDirectory: directoryPath,
                 currentFileName: excelFile.fileName,
@@ -521,11 +573,27 @@ export class FileSearchService {
               }
             );
             statusCallback?.(progress);
+
+            // Small delay to prevent UI freezing
+            await this.delay(50);
           }
         }
 
+        console.log(`[FileSearchService] 📁 DIRECTORY SUMMARY "${directoryPath}":`);
+        console.log(`  ✅ Found: ${directoryFoundCount}/${filesFromExcel.length} files`);
+        console.log(`  📊 Success rate: ${filesFromExcel.length > 0 ? (directoryFoundCount / filesFromExcel.length * 100).toFixed(1) + '%' : '0%'}`);
+
       } catch (error) {
         console.error(`[FileSearchService] ❌ ERROR in directory "${directoryPath}":`, error);
+        console.error(`[FileSearchService] Error type: ${error?.constructor?.name || 'Unknown'}`);
+        console.error(`[FileSearchService] Error message: ${error instanceof Error ? error.message : String(error)}`);
+        
+        // IMPROVED: Better error handling for non-existent directories
+        if (error instanceof Error && (error.message.includes('404') || error.message.includes('Not Found'))) {
+          console.log(`[FileSearchService] 📝 Directory doesn't exist, marking ${filesFromExcel.length} files as NOT FOUND`);
+        } else {
+          console.log(`[FileSearchService] 📝 API error, marking ${filesFromExcel.length} files as NOT FOUND`);
+        }
         
         // Mark all files in this directory as not found
         filesFromExcel.forEach(excelFile => {
@@ -535,12 +603,15 @@ export class FileSearchService {
             processedFiles++;
           }
         });
+        
+        console.log(`[FileSearchService] 📁 DIRECTORY SUMMARY "${directoryPath}": 0/${filesFromExcel.length} files found (error/not exist)`);
       }
 
       // Delay between directories to avoid throttling
       await this.delay(200);
       
-      console.log(`[FileSearchService] 📊 Progress: ${processedFiles}/${totalFiles} files, ${foundFiles} found`);
+      console.log(`[FileSearchService] 📊 OVERALL PROGRESS: ${processedFiles}/${totalFiles} files, ${foundFiles} found`);
+      console.log(`[FileSearchService] ➡️ Moving to next directory...\n`);
     }
 
     console.log(`[FileSearchService] 🎯 OPTIMIZED SEARCH COMPLETED:`);
@@ -553,6 +624,7 @@ export class FileSearchService {
 
   /**
    * OPTIMIZATION: Build directory-to-files mapping for efficient processing
+   * FIXED: Only process directories that exist (exists: true)
    */
   private buildDirectoryToFilesMap(
     rows: IRenameTableRow[], 
@@ -560,15 +632,20 @@ export class FileSearchService {
   ): { [directoryPath: string]: Array<{ fileName: string; rowIndex: number }> } {
     
     console.log(`[FileSearchService] 🏗️ Building directory-to-files mapping...`);
+    console.log(`[FileSearchService] 📊 Total directories in plan: ${searchPlan.directoryGroups.length}`);
+    console.log(`[FileSearchService] ✅ Existing directories: ${searchPlan.existingDirectories}`);
+    console.log(`[FileSearchService] ❌ Missing directories: ${searchPlan.missingDirectories}`);
     
     const directoryToFilesMap: { [directoryPath: string]: Array<{ fileName: string; rowIndex: number }> } = {};
     
-    // Use searchPlan for efficient grouping
+    // CORRECTED: Only process directories that exist (exists: true)
     searchPlan.directoryGroups.forEach(dirGroup => {
       if (!dirGroup.exists) {
-        console.log(`[FileSearchService] ⏭️ Skipping non-existing directory: "${dirGroup.directoryPath}"`);
+        console.log(`[FileSearchService] ⏭️ Skipping non-existing directory: "${dirGroup.directoryPath}" (${dirGroup.fileCount} files skipped)`);
         return; // Skip non-existing directories
       }
+
+      console.log(`[FileSearchService] ✅ Processing existing directory: "${dirGroup.directoryPath}" (exists: ${dirGroup.exists})`);
 
       const filesInDirectory: Array<{ fileName: string; rowIndex: number }> = [];
       
@@ -584,14 +661,22 @@ export class FileSearchService {
 
       if (filesInDirectory.length > 0) {
         directoryToFilesMap[dirGroup.fullSharePointPath] = filesInDirectory;
-        console.log(`[FileSearchService] 📁 Directory "${dirGroup.directoryPath}" -> ${filesInDirectory.length} files`);
+        console.log(`[FileSearchService] ✅ Added existing directory "${dirGroup.directoryPath}" -> ${filesInDirectory.length} files`);
+        console.log(`[FileSearchService] 📋 Sample files: [${filesInDirectory.slice(0, 3).map(f => `"${f.fileName}"`).join(', ')}...]`);
+      } else {
+        console.log(`[FileSearchService] ⚠️ No files found for existing directory "${dirGroup.directoryPath}"`);
       }
     });
 
     const totalDirectories = Object.keys(directoryToFilesMap).length;
     const totalFiles = Object.values(directoryToFilesMap).reduce((sum, files) => sum + files.length, 0);
+    const skippedDirectories = searchPlan.directoryGroups.length - totalDirectories;
     
-    console.log(`[FileSearchService] 📊 Mapping created: ${totalDirectories} directories, ${totalFiles} files`);
+    console.log(`[FileSearchService] 📊 FINAL mapping created:`);
+    console.log(`[FileSearchService]   ✅ Existing directories to search: ${totalDirectories}`);
+    console.log(`[FileSearchService]   ⏭️ Skipped non-existing directories: ${skippedDirectories}`);
+    console.log(`[FileSearchService]   📄 Total files to search: ${totalFiles}`);
+    console.log(`[FileSearchService] 📁 Directories to process: ${Object.keys(directoryToFilesMap).map(path => path.split('/').slice(-3).join('/')).join(', ')}`);
     
     return directoryToFilesMap;
   }
