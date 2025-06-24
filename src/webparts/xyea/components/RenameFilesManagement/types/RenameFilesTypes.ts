@@ -628,7 +628,7 @@ export enum FileStatusIcon {
 }
 
 /**
- * Helper functions for file status
+ * Helper functions for file status - UPDATED with new status texts
  */
 export class FileStatusHelper {
   
@@ -669,24 +669,24 @@ export class FileStatusHelper {
   }
   
   /**
-   * Get tooltip text for status - UPDATED with skipped support
+   * Get tooltip text for status - UPDATED with new status texts
    */
   public static getTooltipText(status: 'found' | 'not-found' | 'searching' | 'skipped' | FileRenameStatus): string {
     switch (status) {
       case 'searching':
-        return 'Searching for file...';
+        return 'Folder not found';
       case 'found':
-        return 'File found in SharePoint';
+        return 'File found';
       case 'not-found':
-        return 'File not found in SharePoint';
+        return 'File not found';
       case 'skipped':
-        return 'Skipped - target file already exists';
+        return 'File skipped';
       case 'renaming':
-        return 'Renaming file...';
+        return 'Renaming...';
       case 'renamed':
-        return 'File renamed successfully';
+        return 'File renamed';
       case 'error':
-        return 'Error occurred during rename';
+        return 'File rename error';
       default:
         return '';
     }

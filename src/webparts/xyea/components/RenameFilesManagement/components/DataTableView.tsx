@@ -29,13 +29,13 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
 
     switch (searchResult) {
       case 'searching':
-        return <span className={styles.searchingIndicator} title="Searching...">🔍</span>;
+        return <span className={styles.searchingIndicator} title="Folder not found">🔍</span>;
       case 'found':
-        return <span className={styles.foundIndicator} title="File found in SharePoint">✅</span>;
+        return <span className={styles.foundIndicator} title="File found">✅</span>;
       case 'not-found':
-        return <span className={styles.notFoundIndicator} title="File not found in SharePoint">❌</span>;
+        return <span className={styles.notFoundIndicator} title="File not found">❌</span>;
       case 'skipped':
-        return <span className={styles.skippedIndicator} title="Skipped - target file already exists">⏭️</span>;
+        return <span className={styles.skippedIndicator} title="File skipped">⏭️</span>;
       default:
         return null;
     }

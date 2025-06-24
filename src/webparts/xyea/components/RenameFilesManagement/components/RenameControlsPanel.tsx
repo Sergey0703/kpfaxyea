@@ -71,11 +71,11 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
   };
 
   /**
-   * Get stage-specific status text
+   * Get stage-specific status text - UPDATED with new status texts
    */
   const getStageStatusText = (): string => {
     if (isRenaming && renameProgress) {
-      return `Renaming files: ${renameProgress.current}/${renameProgress.total} (${renameProgress.success} success, ${renameProgress.errors} errors, ${renameProgress.skipped} skipped)`;
+      return `Renaming files: ${renameProgress.current}/${renameProgress.total} (${renameProgress.success} renamed, ${renameProgress.errors} errors, ${renameProgress.skipped} skipped)`;
     }
 
     const stage = searchProgress.currentStage;
@@ -334,7 +334,7 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
   };
 
   /**
-   * Render rename progress with skipped files support
+   * Render rename progress with skipped files support - UPDATED with new status texts
    */
   const renderRenameProgress = () => {
     if (!renameProgress) return null;
@@ -379,15 +379,15 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
 
         <div className={styles.searchStats}>
           <div className={styles.stat}>
-            <span className={styles.statLabel}>Successfully Renamed:</span>
+            <span className={styles.statLabel}>Files Renamed:</span>
             <span className={styles.statValue}>{renameProgress.success}</span>
           </div>
           <div className={styles.stat}>
-            <span className={styles.statLabel}>Errors:</span>
+            <span className={styles.statLabel}>Rename Errors:</span>
             <span className={styles.statValue}>{renameProgress.errors}</span>
           </div>
           <div className={styles.stat}>
-            <span className={styles.statLabel}>Skipped (Target Exists):</span>
+            <span className={styles.statLabel}>Files Skipped:</span>
             <span className={styles.statValue}>{renameProgress.skipped}</span>
           </div>
           <div className={styles.stat}>

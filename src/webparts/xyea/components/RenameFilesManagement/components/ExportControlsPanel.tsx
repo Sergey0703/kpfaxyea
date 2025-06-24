@@ -85,34 +85,34 @@ export class ExportControlsPanel extends React.Component<IExportControlsPanelPro
           <span className={styles.statValue}>{statistics.exportableRows}</span>
         </div>
         <div className={styles.stat}>
-          <span className={styles.statLabel}>Found:</span>
+          <span className={styles.statLabel}>Files Found:</span>
           <span className={styles.statValue}>{statistics.foundFiles}</span>
         </div>
         <div className={styles.stat}>
-          <span className={styles.statLabel}>Not Found:</span>
+          <span className={styles.statLabel}>Files Not Found:</span>
           <span className={styles.statValue}>{statistics.notFoundFiles}</span>
         </div>
         {statistics.renamedFiles > 0 && (
           <div className={styles.stat}>
-            <span className={styles.statLabel}>Renamed:</span>
+            <span className={styles.statLabel}>Files Renamed:</span>
             <span className={styles.statValue}>{statistics.renamedFiles}</span>
           </div>
         )}
         {statistics.errorFiles > 0 && (
           <div className={styles.stat}>
-            <span className={styles.statLabel}>Errors:</span>
+            <span className={styles.statLabel}>Rename Errors:</span>
             <span className={styles.statValue}>{statistics.errorFiles}</span>
           </div>
         )}
         {statistics.skippedFiles > 0 && (
           <div className={styles.stat}>
-            <span className={styles.statLabel}>Skipped:</span>
+            <span className={styles.statLabel}>Files Skipped:</span>
             <span className={styles.statValue}>{statistics.skippedFiles}</span>
           </div>
         )}
         {statistics.searchingFiles > 0 && (
           <div className={styles.stat}>
-            <span className={styles.statLabel}>Searching:</span>
+            <span className={styles.statLabel}>Folders Not Found:</span>
             <span className={styles.statValue}>{statistics.searchingFiles}</span>
           </div>
         )}
@@ -215,7 +215,7 @@ export class ExportControlsPanel extends React.Component<IExportControlsPanelPro
               onChange={this.handleOnlyCompletedRowsChange}
               disabled={isExporting}
             />
-            Export only completed rows (exclude "searching")
+            Export only completed rows (exclude "folders not found")
           </label>
         </div>
       </div>
@@ -303,7 +303,7 @@ export class ExportControlsPanel extends React.Component<IExportControlsPanelPro
             <span className={styles.infoIcon}>ℹ️</span>
             <span className={styles.infoText}>
               The exported file will include all your data columns plus a status column showing 
-              whether each file was found, renamed, or skipped.
+              whether each file was found, renamed, or had errors.
             </span>
           </div>
           
@@ -311,8 +311,8 @@ export class ExportControlsPanel extends React.Component<IExportControlsPanelPro
             <div className={styles.infoItem}>
               <span className={styles.infoIcon}>⚠️</span>
               <span className={styles.infoText}>
-                {statistics.searchingFiles} files are still being searched. 
-                You can export now or wait for the search to complete.
+                {statistics.searchingFiles} files have "Folder not found" status. 
+                You can export now or wait for a complete search.
               </span>
             </div>
           )}

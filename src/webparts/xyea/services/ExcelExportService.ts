@@ -470,7 +470,7 @@ export class ExcelExportService {
   }
 
   /**
-   * NEW: Get human-readable status text
+   * NEW: Get human-readable status text - UPDATED with new status texts
    */
   private static getRenameStatusText(
     searchStatus: 'found' | 'not-found' | 'searching' | 'skipped',
@@ -488,24 +488,24 @@ export class ExcelExportService {
     // If rename is in progress or completed, show rename status
     if (renameProgress && renameProgress.current > 0) {
       if (renameProgress.success > 0) {
-        return 'Renamed Successfully';
+        return 'File renamed';
       } else if (renameProgress.errors > 0) {
-        return 'Rename Failed';
+        return 'File rename error';
       } else if (renameProgress.skipped > 0) {
-        return 'Skipped (Target Exists)';
+        return 'File skipped';
       }
     }
     
-    // Otherwise show search status
+    // Otherwise show search status with updated texts
     switch (searchStatus) {
       case 'found':
-        return 'Found in SharePoint';
+        return 'File found';
       case 'not-found':
-        return 'Not Found';
+        return 'File not found';
       case 'searching':
-        return 'Searching...';
+        return 'Folder not found';
       case 'skipped':
-        return 'Skipped';
+        return 'File skipped';
       default:
         return 'Unknown';
     }

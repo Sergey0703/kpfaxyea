@@ -651,7 +651,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     
     const hasData = data.originalFile !== undefined;
 
-    // Calculate search statistics for display
+    // Calculate search statistics for display - UPDATED with skipped support
     const searchStats = {
       totalFiles: Object.keys(fileSearchResults).length,
       foundFiles: Object.values(fileSearchResults).filter(r => r === 'found').length,
@@ -726,7 +726,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
                     {' | '}
                     <strong> Search Results:</strong> {searchStats.foundFiles} found, {searchStats.notFoundFiles} not found
                     {searchStats.searchingFiles > 0 && (
-                      <>, {searchStats.searchingFiles} searching</>
+                      <>, {searchStats.searchingFiles} folders not found</>
                     )}
                     {searchStats.skippedFiles > 0 && (
                       <>, {searchStats.skippedFiles} skipped</>
