@@ -1665,3 +1665,163 @@
     animation: spin 1s linear infinite;
   }
 }
+
+// NEW: Directory and File Status Indicators
+          .checkingDirectoryIndicator {
+            color: #0078d4;
+            animation: pulse 1.5s ease-in-out infinite;
+          }
+
+          .directoryExistsIndicator {
+            color: #107c10;
+            filter: drop-shadow(0 0 2px rgba(16, 124, 16, 0.3));
+          }
+
+          .directoryNotExistsIndicator {
+            color: #d13438;
+            filter: drop-shadow(0 0 2px rgba(209, 52, 56, 0.3));
+          }
+
+          .directoryErrorIndicator {
+            color: #ff6b35;
+            filter: drop-shadow(0 0 2px rgba(255, 107, 53, 0.3));
+          }
+
+          // Row styling based on status
+          .fileFoundRow {
+            background-color: rgba(16, 124, 16, 0.05);
+            
+            &:hover {
+              background-color: rgba(16, 124, 16, 0.1);
+            }
+          }
+
+          .fileNotFoundRow {
+            background-color: rgba(209, 52, 56, 0.05);
+            
+            &:hover {
+              background-color: rgba(209, 52, 56, 0.1);
+            }
+          }
+
+          .directoryNotExistsRow {
+            background-color: rgba(255, 193, 7, 0.05);
+            
+            &:hover {
+              background-color: rgba(255, 193, 7, 0.1);
+            }
+          }
+
+          .directoryErrorRow {
+            background-color: rgba(255, 107, 53, 0.05);
+            
+            &:hover {
+              background-color: rgba(255, 107, 53, 0.1);
+            }
+          }
+
+    // Status Legend
+    .statusLegend {
+      margin-top: 12px;
+      padding: 12px 16px;
+      background-color: #f8f9fa;
+      border: 1px solid #edebe9;
+      border-radius: 4px;
+      font-size: 12px;
+
+      .legendTitle {
+        font-weight: 600;
+        color: #323130;
+        margin-bottom: 8px;
+      }
+
+      .legendItems {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .legendItem {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+
+        .legendIcon {
+          font-size: 14px;
+          line-height: 1;
+        }
+
+        .legendText {
+          color: #605e5c;
+          font-size: 11px;
+        }
+      }
+    }
+
+// NEW: Mobile-specific styles for stage indicators
+        .searchProgressInfo {
+          .stageIndicators {
+            flex-direction: column;
+            gap: 12px;
+
+            &::before {
+              display: none;
+            }
+
+            .stageIndicator {
+              flex-direction: row;
+              justify-content: flex-start;
+              align-items: center;
+              max-width: none;
+
+              .stageNumber {
+                margin-bottom: 0;
+                margin-right: 12px;
+                width: 24px;
+                height: 24px;
+                font-size: 12px;
+              }
+
+              .stageName {
+                text-align: left;
+                font-size: 13px;
+              }
+            }
+          }
+
+          .searchStats {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+
+            .stat {
+              padding: 6px 8px;
+
+              .statLabel {
+                font-size: 10px;
+              }
+
+              .statValue {
+                font-size: 16px;
+              }
+            }
+          }
+
+          .operationDetails {
+            padding: 10px;
+
+            .currentOperation,
+            .currentDirectory,
+            .rowProgress {
+              font-size: 12px;
+            }
+          }
+        }
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}

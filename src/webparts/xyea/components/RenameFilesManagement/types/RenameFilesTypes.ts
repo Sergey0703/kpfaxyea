@@ -149,6 +149,16 @@ export interface ISharePointFolder {
 }
 
 /**
+ * NEW: Directory check result type
+ */
+export type DirectoryStatus = 'checking' | 'exists' | 'not-exists' | 'error';
+
+/**
+ * NEW: File search result type - separate from directory status
+ */
+export type FileSearchStatus = 'searching' | 'found' | 'not-found' | 'skipped';
+
+/**
  * Search stages enum
  */
 export enum SearchStage {
@@ -235,7 +245,7 @@ export interface ISearchPlan {
 }
 
 /**
- * Interface for component state - NEW: Added individual file rename tracking
+ * Interface for component state - UPDATED: Added separate directory and file status tracking
  */
 export interface IRenameFilesState {
   // File and data
@@ -263,7 +273,7 @@ export interface IRenameFilesState {
   exportConfig: IRenameFilesExportConfig;
   isExporting: boolean;
   
-  // NEW: Export settings for status-based export
+  // Export settings for status-based export
   exportSettings: IRenameExportSettings;
   
   // SharePoint folder selection
@@ -272,10 +282,11 @@ export interface IRenameFilesState {
   availableFolders: ISharePointFolder[];
   loadingFolders: boolean;
   
-  // File searching and renaming - NEW: Added individual file rename tracking
+  // UPDATED: Separate directory and file status tracking
   searchingFiles: boolean;
-  fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' | 'skipped' };
-  fileRenameResults: { [rowIndex: number]: 'renaming' | 'renamed' | 'error' | 'skipped' | undefined }; // NEW: Track individual file rename status
+  directoryResults: { [rowIndex: number]: DirectoryStatus }; // NEW: Directory check results (after Stage 2)
+  fileSearchResults: { [rowIndex: number]: FileSearchStatus }; // UPDATED: Only file search results (after Stage 3)
+  fileRenameResults: { [rowIndex: number]: 'renaming' | 'renamed' | 'error' | 'skipped' | undefined }; // Individual file rename status
   searchProgress: ISearchProgress; // Enhanced progress tracking
   
   // Rename state with skipped support
@@ -286,7 +297,7 @@ export interface IRenameFilesState {
     fileName: string;
     success: number;
     errors: number;
-    skipped: number; // NEW: Track skipped files
+    skipped: number;
   };
 }
 
@@ -348,15 +359,16 @@ export interface IUploadProgress {
 }
 
 /**
- * Interface for file search result - UPDATED with skipped support
+ * Interface for file search result - UPDATED with separate directory and file status
  */
 export interface IFileSearchResult {
   rowIndex: number;
   fileName: string;
-  searchStatus: 'found' | 'not-found' | 'searching' | 'skipped'; // UPDATED: Added 'skipped'
+  directoryStatus: DirectoryStatus; // NEW: Separate directory status
+  searchStatus: FileSearchStatus; // UPDATED: Only file search status
   foundPath?: string;
   searchTime?: number;
-  skipReason?: string; // NEW: Reason why file was skipped
+  skipReason?: string; // Reason why file was skipped
 }
 
 /**
@@ -365,9 +377,9 @@ export interface IFileSearchResult {
 export interface IRenameOperationResult {
   success: number;
   errors: number;
-  skipped: number; // NEW: Number of skipped files
+  skipped: number; // Number of skipped files
   errorDetails: string[];
-  skippedDetails: string[]; // NEW: Details of skipped files
+  skippedDetails: string[]; // Details of skipped files
 }
 
 /**
@@ -619,6 +631,13 @@ export class RenameProgressHelper {
  * Enum for different types of file status icons
  */
 export enum FileStatusIcon {
+  // Directory status icons
+  CHECKING_DIRECTORY = '🔍',
+  DIRECTORY_EXISTS = '📂',
+  DIRECTORY_NOT_EXISTS = '📂❌',
+  DIRECTORY_ERROR = '📂⚠️',
+  
+  // File status icons  
   SEARCHING = '🔍',
   FOUND = '✅',
   NOT_FOUND = '❌',
@@ -629,14 +648,32 @@ export enum FileStatusIcon {
 }
 
 /**
- * Helper functions for file status - UPDATED with new status texts
+ * Helper functions for file status - UPDATED with separate directory and file status
  */
 export class FileStatusHelper {
   
   /**
-   * Get icon for file search status - UPDATED with skipped support
+   * NEW: Get icon for directory status
    */
-  public static getSearchIcon(status: 'found' | 'not-found' | 'searching' | 'skipped'): string {
+  public static getDirectoryIcon(status: DirectoryStatus): string {
+    switch (status) {
+      case 'checking':
+        return FileStatusIcon.CHECKING_DIRECTORY;
+      case 'exists':
+        return FileStatusIcon.DIRECTORY_EXISTS;
+      case 'not-exists':
+        return FileStatusIcon.DIRECTORY_NOT_EXISTS;
+      case 'error':
+        return FileStatusIcon.DIRECTORY_ERROR;
+      default:
+        return '';
+    }
+  }
+  
+  /**
+   * UPDATED: Get icon for file search status
+   */
+  public static getFileSearchIcon(status: FileSearchStatus): string {
     switch (status) {
       case 'searching':
         return FileStatusIcon.SEARCHING;
@@ -670,12 +707,30 @@ export class FileStatusHelper {
   }
   
   /**
-   * Get tooltip text for status - UPDATED with new status texts
+   * NEW: Get tooltip text for directory status
    */
-  public static getTooltipText(status: 'found' | 'not-found' | 'searching' | 'skipped' | FileRenameStatus): string {
+  public static getDirectoryTooltipText(status: DirectoryStatus): string {
+    switch (status) {
+      case 'checking':
+        return 'Checking directory...';
+      case 'exists':
+        return 'Directory exists';
+      case 'not-exists':
+        return 'Directory not found';
+      case 'error':
+        return 'Directory check error';
+      default:
+        return '';
+    }
+  }
+  
+  /**
+   * UPDATED: Get tooltip text for file status
+   */
+  public static getFileTooltipText(status: FileSearchStatus | FileRenameStatus): string {
     switch (status) {
       case 'searching':
-        return 'Folder not found';
+        return 'Searching for file...';
       case 'found':
         return 'File found';
       case 'not-found':
@@ -730,7 +785,7 @@ export interface IRenameStatistics {
 }
 
 /**
- * Type definitions for callback functions - UPDATED with skipped support
+ * Type definitions for callback functions - UPDATED with separate directory and file callbacks
  */
 export type SearchProgressCallback = (progress: ISearchProgress) => void;
 export type RenameProgressCallback = (progress: {
@@ -742,7 +797,8 @@ export type RenameProgressCallback = (progress: {
   skipped: number;
 }) => void;
 export type FileStatusCallback = (rowIndex: number, status: FileRenameStatus) => void;
-export type SearchResultCallback = (rowIndex: number, result: 'found' | 'not-found' | 'searching') => void;
+export type DirectoryStatusCallback = (rowIndex: number, status: DirectoryStatus) => void; // NEW
+export type FileSearchResultCallback = (rowIndex: number, result: FileSearchStatus) => void; // UPDATED
 
 /**
  * Constants for file operation timeouts
