@@ -110,8 +110,15 @@ export class ExcelFileProcessor {
     const headers = jsonData[0] || [];
     const dataRows = jsonData.slice(1);
 
-    console.log(`[ExcelFileProcessor] Starting to process ${dataRows.length} data rows...`);
-    console.log(`[ExcelFileProcessor] Headers found:`, headers);
+    console.log(`[ExcelFileProcessor] 🚀 STARTING DATA PROCESSING`);
+    console.log(`[ExcelFileProcessor] Processing ${dataRows.length} data rows...`);
+    console.log(`[ExcelFileProcessor] Headers found (${headers.length}):`, headers.map((h, i) => `${i}: "${h}"`));
+
+    // ОТЛАДКА: Показываем первые несколько строк данных
+    console.log(`[ExcelFileProcessor] 📋 SAMPLE DATA (first 3 rows):`);
+    dataRows.slice(0, 3).forEach((row, index) => {
+      console.log(`  Row ${index + 1}:`, row.map((cell, i) => `${i}:"${cell}"`));
+    });
 
     // NEW: Create both filename and directory custom columns
     const filenameColumn: ICustomColumn = {
@@ -168,14 +175,66 @@ export class ExcelFileProcessor {
       });
     });
 
+    // ОТЛАДКА: Показываем созданные колонки
+    console.log(`[ExcelFileProcessor] 📊 CREATED COLUMNS (${columns.length}):`);
+    columns.forEach(col => {
+      console.log(`  ${col.id}: "${col.name}" (index: ${col.currentIndex}, custom: ${col.isCustom})`);
+    });
+
     // Create table rows
     const rows: IRenameTableRow[] = dataRows.map((row, rowIndex) => {
       const cells: { [columnId: string]: ITableCell } = {};
 
+      // ОТЛАДКА: Анализируем каждую строку
+      console.log(`[ExcelFileProcessor] 🔍 ANALYZING ROW ${rowIndex + 1}:`);
+      console.log(`  All headers (${headers.length}):`, headers.map((h, i) => `${i}:"${h}"`));
+      console.log(`  All values (${row.length}):`, row.map((v, i) => `${i}:"${v}"`));
+
+      // Ищем возможные staffID колонки в текущей строке
+      const possibleStaffIDData: Array<{index: number, header: string, value: any}> = [];
+      headers.forEach((header, index) => {
+        const headerLower = String(header || '').toLowerCase();
+        const cellValue = row[index];
+        
+        if (headerLower.includes('staff') || 
+            headerLower.includes('id') || 
+            headerLower === 'id' ||
+            /^(staff|id|employee|emp)(_?id)?$/i.test(headerLower)) {
+          possibleStaffIDData.push({
+            index,
+            header: String(header),
+            value: cellValue
+          });
+          console.log(`[ExcelFileProcessor] 🎯 Potential staffID column found:`);
+          console.log(`    Header[${index}]: "${header}" -> Value: "${cellValue}"`);
+        }
+      });
+
+      if (possibleStaffIDData.length === 0) {
+        console.log(`[ExcelFileProcessor] ⚠️ No obvious staffID columns found in headers. Checking for numeric/short string values...`);
+        
+        // Ищем колонки с числовыми значениями или короткими строками (возможные ID)
+        headers.forEach((header, index) => {
+          const cellValue = row[index];
+          const cellStr = String(cellValue || '').trim();
+          
+          if (cellStr && /^[0-9A-Za-z]{1,10}$/.test(cellStr)) {
+            possibleStaffIDData.push({
+              index,
+              header: String(header),
+              value: cellValue
+            });
+            console.log(`[ExcelFileProcessor] 🔍 Possible ID-like value found:`);
+            console.log(`    Header[${index}]: "${header}" -> Value: "${cellValue}" (looks like ID)`);
+          }
+        });
+      }
+
       // NEW: Extract both filename and directory from the row data
       const pathAnalysis = this.analyzeRowPaths(row, headers, rowIndex);
       
-      console.log(`[ExcelFileProcessor] Row ${rowIndex + 1}: Analysis result:`, pathAnalysis);
+      console.log(`[ExcelFileProcessor] Row ${rowIndex + 1} path analysis:`, pathAnalysis);
+      console.log(`[ExcelFileProcessor] Row ${rowIndex + 1} staffID candidates:`, possibleStaffIDData);
 
       // Populate filename column
       cells[filenameColumn.id] = {
@@ -217,6 +276,57 @@ export class ExcelFileProcessor {
       };
     });
 
+    // ОТЛАДКА: Показываем примеры обработанных данных
+    console.log(`[ExcelFileProcessor] 📋 SAMPLE PROCESSED DATA (first row):`);
+    if (rows.length > 0) {
+      const firstRow = rows[0];
+      Object.entries(firstRow.cells).forEach(([columnId, cell]) => {
+        const column = columns.find(c => c.id === columnId);
+        console.log(`  ${columnId} (${column?.name}): "${cell.value}"`);
+      });
+    }
+
+    // ОТЛАДКА: Ищем и показываем все возможные staffID колонки
+    console.log(`[ExcelFileProcessor] 🔍 STAFFID COLUMN ANALYSIS:`);
+    const possibleStaffIDColumns = columns.filter(col => 
+      col.name.toLowerCase().includes('staff') || 
+      col.name.toLowerCase().includes('id') ||
+      col.id.toLowerCase().includes('staff') ||
+      col.id.toLowerCase().includes('id') ||
+      /^(staff|id|employee|emp)(_?id)?$/i.test(col.name.toLowerCase())
+    );
+
+    if (possibleStaffIDColumns.length > 0) {
+      console.log(`Found ${possibleStaffIDColumns.length} possible staffID columns:`);
+      possibleStaffIDColumns.forEach(col => {
+        console.log(`  - ${col.id} (${col.name})`);
+        
+        // Показываем примеры значений из первых 3 строк
+        const sampleValues = rows.slice(0, 3).map(row => row.cells[col.id]?.value);
+        console.log(`    Sample values: [${sampleValues.map(v => `"${v}"`).join(', ')}]`);
+      });
+    } else {
+      console.warn(`[ExcelFileProcessor] ⚠️ NO staffID columns found!`);
+      console.log(`Available columns:`, columns.map(c => `${c.id}(${c.name})`).join(', '));
+      
+      // Попробуем найти колонки с числовыми значениями
+      console.log(`[ExcelFileProcessor] 🔍 Looking for numeric/ID-like columns...`);
+      columns.forEach(col => {
+        if (col.isCustom) return; // Skip custom columns
+        
+        const sampleValues = rows.slice(0, 5).map(row => row.cells[col.id]?.value);
+        const numericCount = sampleValues.filter(v => {
+          const str = String(v || '').trim();
+          return str && /^[0-9A-Za-z]{1,10}$/.test(str);
+        }).length;
+        
+        if (numericCount >= 3) { // At least 3 out of 5 samples look like IDs
+          console.log(`  Potential ID column: ${col.id} (${col.name})`);
+          console.log(`    Sample values: [${sampleValues.map(v => `"${v}"`).join(', ')}]`);
+        }
+      });
+    }
+
     // Create sheet structure
     const sheet: IExcelSheet = {
       name: sheetName,
@@ -228,7 +338,7 @@ export class ExcelFileProcessor {
 
     excelFile.sheets = [sheet];
 
-    return {
+    const finalData = {
       originalFile: excelFile,
       currentSheet: sheet,
       columns,
@@ -237,6 +347,16 @@ export class ExcelFileProcessor {
       totalRows: dataRows.length,
       editedCellsCount: 0
     };
+
+    // ФИНАЛЬНАЯ ОТЛАДКА
+    console.log(`[ExcelFileProcessor] 🎯 FINAL PROCESSING SUMMARY:`);
+    console.log(`  📊 Total rows: ${finalData.totalRows}`);
+    console.log(`  📋 Total columns: ${finalData.columns.length}`);
+    console.log(`  🔧 Custom columns: ${finalData.customColumns.length}`);
+    console.log(`  📁 Files with paths: ${rows.filter(r => r.cells['custom_0']?.value).length}`);
+    console.log(`  📂 Files with directories: ${rows.filter(r => r.cells['custom_1']?.value).length}`);
+
+    return finalData;
   }
 
   /**
@@ -248,19 +368,13 @@ export class ExcelFileProcessor {
     rowIndex: number
   ): { fileName: string; directoryPath: string; relativePath: string; pathFound: boolean } {
     
-    console.log(`[ExcelFileProcessor] Analyzing paths for row ${rowIndex + 1}`);
-    
-    // Log all cell values for debugging
-    headers.forEach((header, index) => {
-      const cellValue = String(row[index] || '');
-      console.log(`  Header[${index}]: "${header}" -> Value: "${cellValue}"`);
-    });
+    console.log(`[ExcelFileProcessor] 🔍 ANALYZING PATHS for row ${rowIndex + 1}`);
     
     // Step 1: Find RelativePath column or path-like content
     const relativePath = this.extractRelativePathFromRowData(row, headers, rowIndex);
     
     if (!relativePath) {
-      console.log(`[ExcelFileProcessor] No path found in row ${rowIndex + 1}`);
+      console.log(`[ExcelFileProcessor] ❌ No path found in row ${rowIndex + 1}`);
       return {
         fileName: '',
         directoryPath: '',
@@ -272,12 +386,10 @@ export class ExcelFileProcessor {
     // Step 2: Split the path into directory and filename
     const pathComponents = this.splitPathAndFilename(relativePath);
     
-    console.log(`[ExcelFileProcessor] Row ${rowIndex + 1} path analysis:`, {
-      relativePath,
-      directoryPath: pathComponents.directoryPath,
-      fileName: pathComponents.fileName,
-      pathFound: true
-    });
+    console.log(`[ExcelFileProcessor] ✅ Row ${rowIndex + 1} path analysis complete:`);
+    console.log(`  📄 Original path: "${relativePath}"`);
+    console.log(`  📁 Directory: "${pathComponents.directoryPath}"`);
+    console.log(`  📄 Filename: "${pathComponents.fileName}"`);
     
     return {
       fileName: pathComponents.fileName,
@@ -292,7 +404,7 @@ export class ExcelFileProcessor {
     headers: (string | number | boolean | undefined)[],
     rowIndex: number
   ): string {
-    console.log(`[ExcelFileProcessor] Searching for RelativePath in row ${rowIndex + 1}`);
+    console.log(`[ExcelFileProcessor] 🔍 Searching for RelativePath in row ${rowIndex + 1}`);
     
     // FIRST: Look specifically for RelativePath column by header name
     for (let i = 0; i < headers.length; i++) {
@@ -302,7 +414,7 @@ export class ExcelFileProcessor {
       if (header.includes('relativepath') || 
           header.includes('relative_path') ||
           header.includes('relative path')) {
-        console.log(`[ExcelFileProcessor] Found RelativePath by header "${header}" in column ${i}: "${cellValue}"`);
+        console.log(`[ExcelFileProcessor] ✅ Found RelativePath by header "${header}" in column ${i}: "${cellValue}"`);
         return cellValue;
       }
     }
@@ -316,7 +428,7 @@ export class ExcelFileProcessor {
           header.includes('filepath') || 
           header.includes('file_path') ||
           header.includes('file path')) {
-        console.log(`[ExcelFileProcessor] Found path by header "${header}" in column ${i}: "${cellValue}"`);
+        console.log(`[ExcelFileProcessor] ✅ Found path by header "${header}" in column ${i}: "${cellValue}"`);
         return cellValue;
       }
     }
@@ -325,12 +437,12 @@ export class ExcelFileProcessor {
     for (let i = 0; i < row.length; i++) {
       const cellValue = String(row[i] || '');
       if (cellValue && this.looksLikeValidFilePath(cellValue)) {
-        console.log(`[ExcelFileProcessor] Found path by content pattern in column ${i}: "${cellValue}"`);
+        console.log(`[ExcelFileProcessor] ✅ Found path by content pattern in column ${i}: "${cellValue}"`);
         return cellValue;
       }
     }
     
-    console.log(`[ExcelFileProcessor] No valid path found in row ${rowIndex + 1}`);
+    console.log(`[ExcelFileProcessor] ❌ No valid path found in row ${rowIndex + 1}`);
     return '';
   }
 

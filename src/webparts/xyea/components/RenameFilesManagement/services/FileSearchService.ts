@@ -175,7 +175,7 @@ export class FileSearchService {
   }
 
   /**
-   * NEW: Rename found files with staffID prefix
+   * NEW: Rename found files with staffID prefix - ИСПРАВЛЕННАЯ ВЕРСИЯ
    */
   public async renameFoundFiles(
     rows: IRenameTableRow[],
@@ -191,7 +191,7 @@ export class FileSearchService {
     
     console.log(`[FileSearchService] 🏷️ STARTING FILE RENAME (Search ID: ${searchId})`);
     
-    // Find files to rename (only found files with staffID)
+    // ИСПРАВЛЕНИЕ 1: Более безопасная подготовка файлов для переименования
     const filesToRename: Array<{
       rowIndex: number;
       originalFileName: string;
@@ -199,20 +199,50 @@ export class FileSearchService {
       directoryPath: string;
       fullOriginalPath: string;
       fullNewPath: string;
+      newFileName: string;
     }> = [];
 
+    // Собираем и валидируем файлы для переименования
     rows.forEach(row => {
       const searchResult = fileSearchResults[row.rowIndex];
       
       if (searchResult === 'found') {
         const originalFileName = String(row.cells['custom_0']?.value || '').trim();
-        const staffID = String(row.cells['staffID']?.value || '').trim();
         const directoryPath = String(row.cells['custom_1']?.value || '').trim();
+        
+        // ИСПРАВЛЕНИЕ 2: Более гибкий поиск staffID в разных колонках
+        let staffID = '';
+        
+        // Пробуем найти staffID в разных возможных колонках
+        const staffIDColumns = ['staffID', 'staffid', 'StaffID', 'staff_id', 'ID', 'id'];
+        for (const columnName of staffIDColumns) {
+          const cellValue = String(row.cells[columnName]?.value || '').trim();
+          if (cellValue) {
+            staffID = cellValue;
+            break;
+          }
+        }
+        
+        // Если не нашли в именованных колонках, ищем в Excel колонках
+        if (!staffID) {
+          const excelColumns = Object.keys(row.cells).filter(key => key.startsWith('excel_'));
+          for (const columnId of excelColumns) {
+            const cellValue = String(row.cells[columnId]?.value || '').trim();
+            // Проверяем, похоже ли значение на ID (число или короткая строка)
+            if (cellValue && /^[0-9A-Za-z]{1,10}$/.test(cellValue)) {
+              staffID = cellValue;
+              console.log(`[FileSearchService] 📋 Found staffID "${staffID}" in column ${columnId} for row ${row.rowIndex}`);
+              break;
+            }
+          }
+        }
         
         if (originalFileName && staffID && directoryPath) {
           const directorySharePointPath = this.buildDirectoryPath(directoryPath, baseFolderPath);
           const fullOriginalPath = `${directorySharePointPath}/${originalFileName}`;
-          const newFileName = `${staffID} ${originalFileName}`;
+          
+          // ИСПРАВЛЕНИЕ 3: Используем улучшенную генерацию имени
+          const newFileName = this.generateSafeFileName(originalFileName, staffID, directorySharePointPath);
           const fullNewPath = `${directorySharePointPath}/${newFileName}`;
           
           filesToRename.push({
@@ -221,12 +251,17 @@ export class FileSearchService {
             staffID,
             directoryPath,
             fullOriginalPath,
-            fullNewPath
+            fullNewPath,
+            newFileName
           });
           
           console.log(`[FileSearchService] 📝 Prepared rename: "${originalFileName}" -> "${newFileName}"`);
         } else {
-          console.warn(`[FileSearchService] ⚠️ Missing data for row ${row.rowIndex}: fileName="${originalFileName}", staffID="${staffID}"`);
+          console.warn(`[FileSearchService] ⚠️ Missing data for row ${row.rowIndex}:`);
+          console.warn(`  fileName: "${originalFileName}"`);
+          console.warn(`  staffID: "${staffID}"`);
+          console.warn(`  directoryPath: "${directoryPath}"`);
+          console.warn(`  Available columns:`, Object.keys(row.cells));
         }
       }
     });
@@ -234,7 +269,8 @@ export class FileSearchService {
     console.log(`[FileSearchService] 📊 Prepared ${filesToRename.length} files for renaming`);
 
     if (filesToRename.length === 0) {
-      return { success: 0, errors: 0, errorDetails: [] };
+      console.warn(`[FileSearchService] ⚠️ No files prepared for renaming. Check staffID column mapping.`);
+      return { success: 0, errors: 0, errorDetails: ['No files prepared for renaming. Check staffID column mapping.'] };
     }
 
     let processedFiles = 0;
@@ -246,8 +282,8 @@ export class FileSearchService {
       // Get SharePoint request digest once
       const requestDigest = await this.getRequestDigest();
       
-      // Process files in small batches to avoid overwhelming SharePoint
-      const BATCH_SIZE = 3;
+      // ИСПРАВЛЕНИЕ 4: Еще меньший batch size и больше задержек для стабильности
+      const BATCH_SIZE = 2; // Очень маленький batch size
       
       for (let i = 0; i < filesToRename.length; i += BATCH_SIZE) {
         if (this.isCancelled || this.currentSearchId !== searchId) {
@@ -273,26 +309,44 @@ export class FileSearchService {
               errors: errorCount
             });
 
+            // ИСПРАВЛЕНИЕ 5: Добавляем дополнительные проверки перед переименованием
+            console.log(`[FileSearchService] 🔄 Processing file ${processedFiles + 1}/${filesToRename.length}:`);
+            console.log(`  Original: "${fileInfo.originalFileName}"`);
+            console.log(`  New: "${fileInfo.newFileName}"`);
+            console.log(`  StaffID: "${fileInfo.staffID}"`);
+
             await this.renameSingleFile(fileInfo.fullOriginalPath, fileInfo.fullNewPath, requestDigest);
             
             successCount++;
             progressCallback(fileInfo.rowIndex, 'renamed');
-            console.log(`[FileSearchService] ✅ SUCCESS: "${fileInfo.originalFileName}" -> "${fileInfo.staffID} ${fileInfo.originalFileName}"`);
+            console.log(`[FileSearchService] ✅ SUCCESS: "${fileInfo.originalFileName}" -> "${fileInfo.newFileName}"`);
             
           } catch (error) {
             errorCount++;
             const errorMessage = error instanceof Error ? error.message : String(error);
-            errorDetails.push(`${fileInfo.originalFileName}: ${errorMessage}`);
+            const detailedError = `Row ${fileInfo.rowIndex + 1} - ${fileInfo.originalFileName}: ${errorMessage}`;
+            errorDetails.push(detailedError);
             progressCallback(fileInfo.rowIndex, 'error');
+            
             console.error(`[FileSearchService] ❌ ERROR: "${fileInfo.originalFileName}": ${errorMessage}`);
+            
+            // ИСПРАВЛЕНИЕ 6: Логируем дополнительную диагностическую информацию
+            console.error(`[FileSearchService] 🔍 Error details:`);
+            console.error(`  Full original path: "${fileInfo.fullOriginalPath}"`);
+            console.error(`  Full new path: "${fileInfo.fullNewPath}"`);
+            console.error(`  Directory: "${fileInfo.directoryPath}"`);
           }
           
           processedFiles++;
+          
+          // ИСПРАВЛЕНИЕ 7: Увеличенная задержка между файлами
+          await this.delay(1000); // 1 секунда между файлами
         }
 
-        // Small delay between batches
+        // ИСПРАВЛЕНИЕ 8: Увеличенная задержка между batch'ами
         if (i + BATCH_SIZE < filesToRename.length) {
-          await this.delay(500);
+          console.log(`[FileSearchService] ⏳ Waiting 2 seconds before next batch...`);
+          await this.delay(2000); // 2 секунды между batch'ами
         }
       }
 
@@ -301,6 +355,14 @@ export class FileSearchService {
       console.log(`  ✅ Successful: ${successCount}`);
       console.log(`  ❌ Failed: ${errorCount}`);
       console.log(`  📈 Success rate: ${filesToRename.length > 0 ? (successCount / filesToRename.length * 100).toFixed(1) + '%' : '0%'}`);
+
+      // ИСПРАВЛЕНИЕ 9: Показываем первые несколько ошибок в консоли для диагностики
+      if (errorDetails.length > 0) {
+        console.error(`[FileSearchService] 📋 First few errors:`);
+        errorDetails.slice(0, 3).forEach((error, index) => {
+          console.error(`  ${index + 1}. ${error}`);
+        });
+      }
 
       return { success: successCount, errors: errorCount, errorDetails };
 
@@ -319,7 +381,40 @@ export class FileSearchService {
   }
 
   /**
-   * Rename a single file using SharePoint REST API
+   * ИСПРАВЛЕНИЕ 4: Улучшенная генерация нового имени файла
+   */
+  private generateSafeFileName(originalFileName: string, staffID: string, directoryPath: string): string {
+    // Очищаем staffID от недопустимых символов
+    const cleanStaffID = staffID.replace(/[<>:"/\\|?*]/g, '').trim();
+    
+    // Проверяем, не начинается ли уже файл с этого staffID
+    if (originalFileName.toLowerCase().startsWith(cleanStaffID.toLowerCase())) {
+      console.log(`[FileSearchService] ⚠️ File already starts with staffID: "${originalFileName}"`);
+      return originalFileName; // Не добавляем префикс повторно
+    }
+    
+    // Добавляем префикс с разделителем
+    const newFileName = `${cleanStaffID} ${originalFileName}`;
+    
+    // Проверяем длину пути (SharePoint ограничение ~400 символов)
+    const fullPath = `${directoryPath}/${newFileName}`;
+    if (fullPath.length > 380) {
+      console.warn(`[FileSearchService] ⚠️ Path too long, truncating filename`);
+      
+      // Сокращаем имя файла
+      const extension = originalFileName.split('.').pop();
+      const baseName = originalFileName.substring(0, originalFileName.lastIndexOf('.'));
+      const maxBaseLength = 200 - cleanStaffID.length - extension!.length - 3; // 3 for " " and "."
+      const truncatedBase = baseName.substring(0, maxBaseLength);
+      
+      return `${cleanStaffID} ${truncatedBase}.${extension}`;
+    }
+    
+    return newFileName;
+  }
+
+  /**
+   * Rename a single file using SharePoint REST API with better error handling
    */
   private async renameSingleFile(originalPath: string, newPath: string, requestDigest: string): Promise<void> {
     console.log(`[FileSearchService] 🔄 Renaming file:`);
@@ -327,7 +422,100 @@ export class FileSearchService {
     console.log(`  To: "${newPath}"`);
     
     const webUrl = this.context.pageContext.web.absoluteUrl;
-    const moveToUrl = `${webUrl}/_api/web/getFileByServerRelativeUrl('${encodeURIComponent(originalPath)}')/MoveTo('${encodeURIComponent(newPath)}', 1)`;
+    
+    try {
+      // ИСПРАВЛЕНИЕ 1: Проверим, существует ли файл с новым именем
+      const checkNewFileUrl = `${webUrl}/_api/web/getFileByServerRelativeUrl('${encodeURIComponent(newPath)}')`;
+      const checkResponse = await fetch(checkNewFileUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json;odata=verbose'
+        }
+      });
+      
+      if (checkResponse.ok) {
+        // Файл с таким именем уже существует - добавим суффикс
+        const pathParts = newPath.split('/');
+        const fileName = pathParts[pathParts.length - 1];
+        const directory = pathParts.slice(0, -1).join('/');
+        const fileNameParts = fileName.split('.');
+        const extension = fileNameParts.pop();
+        const baseName = fileNameParts.join('.');
+        
+        // Создаем уникальное имя с timestamp
+        const timestamp = new Date().getTime();
+        const uniqueFileName = `${baseName}_${timestamp}.${extension}`;
+        newPath = `${directory}/${uniqueFileName}`;
+        
+        console.log(`[FileSearchService] ⚠️ File exists, using unique name: "${newPath}"`);
+      }
+      
+      // ИСПРАВЛЕНИЕ 2: Используем более современный SP.MoveCopyUtil API
+      const moveApiUrl = `${webUrl}/_api/SP.MoveCopyUtil.MoveFileByPath()`;
+      
+      const movePayload = {
+        srcPath: {
+          __metadata: { type: "SP.ResourcePath" },
+          DecodedUrl: originalPath
+        },
+        destPath: {
+          __metadata: { type: "SP.ResourcePath" },
+          DecodedUrl: newPath
+        },
+        options: {
+          __metadata: { type: "SP.MoveCopyOptions" },
+          KeepBoth: false, // Не сохранять оба файла
+          ResetAuthorAndCreatedOnCopy: false,
+          ShouldBypassSharedLocks: true
+        }
+      };
+      
+      console.log(`[FileSearchService] 📞 Using SP.MoveCopyUtil.MoveFileByPath API`);
+      
+      const response = await fetch(moveApiUrl, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json;odata=verbose',
+          'Content-Type': 'application/json;odata=verbose',
+          'X-RequestDigest': requestDigest
+        },
+        body: JSON.stringify(movePayload)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[FileSearchService] Modern API failed, trying fallback. Error:`, errorText);
+        
+        // FALLBACK: Используем старый MoveTo API с флагом overwrite
+        await this.renameSingleFileWithMoveTo(originalPath, newPath, requestDigest);
+      } else {
+        console.log(`[FileSearchService] ✅ File renamed successfully using modern API`);
+      }
+      
+    } catch (error) {
+      console.error(`[FileSearchService] Error in modern API, trying fallback:`, error);
+      
+      // FALLBACK: Используем старый MoveTo API
+      await this.renameSingleFileWithMoveTo(originalPath, newPath, requestDigest);
+    }
+  }
+
+  /**
+   * Fallback method using old MoveTo API
+   */
+  private async renameSingleFileWithMoveTo(originalPath: string, newPath: string, requestDigest: string): Promise<void> {
+    console.log(`[FileSearchService] 🔄 Using fallback MoveTo API`);
+    
+    const webUrl = this.context.pageContext.web.absoluteUrl;
+    
+    // ИСПРАВЛЕНИЕ 3: Используем правильное кодирование URL и флаг overwrite
+    const encodedOriginalPath = encodeURIComponent(originalPath);
+    const encodedNewPath = encodeURIComponent(newPath);
+    
+    // flags=1 означает overwrite existing file
+    const moveToUrl = `${webUrl}/_api/web/getFileByServerRelativeUrl('${encodedOriginalPath}')/MoveTo(newurl='${encodedNewPath}',flags=1)`;
+    
+    console.log(`[FileSearchService] 📞 MoveTo URL:`, moveToUrl);
     
     const response = await fetch(moveToUrl, {
       method: 'POST',
@@ -340,10 +528,23 @@ export class FileSearchService {
     
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
+      console.error(`[FileSearchService] ❌ MoveTo API also failed:`, errorText);
+      
+      // Попробуем распарсить ошибку
+      let errorMessage = errorText;
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error && errorData.error.message) {
+          errorMessage = errorData.error.message.value || errorData.error.message;
+        }
+      } catch (e) {
+        // Игнорируем ошибки парсинга
+      }
+      
+      throw new Error(`HTTP ${response.status}: ${errorMessage}`);
     }
     
-    console.log(`[FileSearchService] ✅ File renamed successfully`);
+    console.log(`[FileSearchService] ✅ File renamed successfully using MoveTo API`);
   }
 
   /**
@@ -379,9 +580,6 @@ export class FileSearchService {
     const fullPath = `${basePath}/${normalizedRelative}`;
     return fullPath.replace(/\/+/g, '/').replace(/\/$/, '');
   }
-
-  // ... Rest of the existing methods (executeStage1_AnalyzeDirectories, executeStage2_CheckDirectoryExistence, etc.)
-  // [All the existing methods remain exactly the same - I'll include them for completeness]
 
   /**
    * STAGE 1: Analyze directories with timeout protection
