@@ -112,18 +112,28 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
   };
 
   /**
-   * NEW: Render combined status indicators (directory + file)
+   * UPDATED: Render combined status indicators with proper priority logic
    */
   const renderStatusIndicators = (rowIndex: number) => {
     const directoryStatus = directoryResults[rowIndex];
     const fileSearchStatus = fileSearchResults[rowIndex];
     
-    // Show priority: File status (if available) > Directory status
-    if (fileSearchStatus) {
-      // Stage 3 completed: Show file search result
+    // UPDATED: Priority logic:
+    // 1. If directory doesn't exist or has error -> ALWAYS show directory status
+    // 2. If directory exists and we have file search results -> show file status
+    // 3. If directory exists but no file search yet -> show directory status
+    
+    if (directoryStatus === 'not-exists' || directoryStatus === 'error') {
+      // Directory doesn't exist or has error - ALWAYS show directory status
+      console.log(`[DataTableView] Row ${rowIndex + 1}: Showing directory status (${directoryStatus}) - directory unavailable`);
+      return renderDirectoryIndicator(rowIndex);
+    } else if (fileSearchStatus && directoryStatus === 'exists') {
+      // Directory exists AND we have file search results - show file status
+      console.log(`[DataTableView] Row ${rowIndex + 1}: Showing file status (${fileSearchStatus}) - directory exists, file searched`);
       return renderFileSearchIndicator(rowIndex);
     } else if (directoryStatus) {
-      // Stage 2 completed but Stage 3 not started: Show directory status
+      // Directory exists but no file search yet - show directory status
+      console.log(`[DataTableView] Row ${rowIndex + 1}: Showing directory status (${directoryStatus}) - waiting for file search`);
       return renderDirectoryIndicator(rowIndex);
     }
     
@@ -134,21 +144,28 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
 
 
   /**
-   * NEW: Determine if row should have special styling based on status
+   * UPDATED: Determine row styling with proper priority for directory vs file status
    */
   const getRowStatusClass = (rowIndex: number): string => {
     const directoryStatus = directoryResults[rowIndex];
     const fileSearchStatus = fileSearchResults[rowIndex];
     
-    // Apply styling based on current status
-    if (fileSearchStatus === 'found') {
-      return styles.fileFoundRow;
-    } else if (fileSearchStatus === 'not-found') {
-      return styles.fileNotFoundRow;
-    } else if (directoryStatus === 'not-exists') {
+    // UPDATED: Priority logic for styling:
+    // 1. If directory doesn't exist -> style based on directory status
+    // 2. If directory exists and file search completed -> style based on file status  
+    // 3. Otherwise no special styling
+    
+    if (directoryStatus === 'not-exists') {
       return styles.directoryNotExistsRow;
     } else if (directoryStatus === 'error') {
       return styles.directoryErrorRow;
+    } else if (fileSearchStatus && directoryStatus === 'exists') {
+      // Directory exists and we have file search results
+      if (fileSearchStatus === 'found') {
+        return styles.fileFoundRow;
+      } else if (fileSearchStatus === 'not-found') {
+        return styles.fileNotFoundRow;
+      }
     }
     
     return '';

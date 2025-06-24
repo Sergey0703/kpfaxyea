@@ -124,12 +124,6 @@ export class FileSearchService {
     const results: { [rowIndex: number]: FileSearchStatus } = {}; // UPDATED: Use typed results
     
     try {
-      // Initialize all rows as searching
-      rows.forEach(row => {
-        results[row.rowIndex] = 'searching';
-        progressCallback(row.rowIndex, 'searching');
-      });
-
       // OPTIMIZED STAGE 3: Search files with MINIMAL API calls
       await this.executeOptimizedStage3_SearchFiles(
         searchProgress,
@@ -177,234 +171,6 @@ export class FileSearchService {
       statusCallback?.(errorProgress);
       
       return results;
-    }
-  }
-
-  /**
-   * Rename found files with staffID prefix - UPDATED: Skip if target exists
-   */
-  public async renameFoundFiles(
-    rows: IRenameTableRow[],
-    fileSearchResults: { [rowIndex: number]: FileSearchStatus }, // UPDATED: Use typed results
-    baseFolderPath: string,
-    progressCallback: (rowIndex: number, status: 'renaming' | 'renamed' | 'error' | 'skipped') => void,
-    statusCallback?: (progress: { 
-      current: number; 
-      total: number; 
-      fileName: string; 
-      success: number; 
-      errors: number; 
-      skipped: number;
-    }) => void
-  ): Promise<{ 
-    success: number; 
-    errors: number; 
-    skipped: number;
-    errorDetails: string[];
-    skippedDetails: string[];
-  }> {
-    
-    this.currentSearchId = Date.now().toString();
-    const searchId = this.currentSearchId;
-    this.isCancelled = false;
-    
-    console.log(`[FileSearchService] 🏷️ STARTING FILE RENAME (Search ID: ${searchId})`);
-    
-    // Подготовка файлов для переименования
-    const filesToRename: Array<{
-      rowIndex: number;
-      originalFileName: string;
-      staffID: string;
-      directoryPath: string;
-      fullOriginalPath: string;
-      fullNewPath: string;
-      newFileName: string;
-    }> = [];
-
-    // Собираем и валидируем файлы для переименования
-    rows.forEach(row => {
-      const searchResult = fileSearchResults[row.rowIndex];
-      
-      if (searchResult === 'found') {
-        const originalFileName = String(row.cells['custom_0']?.value || '').trim();
-        const directoryPath = String(row.cells['custom_1']?.value || '').trim();
-        
-        // Поиск staffID в разных возможных колонках
-        let staffID = '';
-        
-        const staffIDColumns = ['staffID', 'staffid', 'StaffID', 'staff_id', 'ID', 'id'];
-        for (const columnName of staffIDColumns) {
-          const cellValue = String(row.cells[columnName]?.value || '').trim();
-          if (cellValue) {
-            staffID = cellValue;
-            break;
-          }
-        }
-        
-        if (!staffID) {
-          const excelColumns = Object.keys(row.cells).filter(key => key.startsWith('excel_'));
-          for (const columnId of excelColumns) {
-            const cellValue = String(row.cells[columnId]?.value || '').trim();
-            if (cellValue && /^[0-9A-Za-z]{1,10}$/.test(cellValue)) {
-              staffID = cellValue;
-              console.log(`[FileSearchService] 📋 Found staffID "${staffID}" in column ${columnId} for row ${row.rowIndex}`);
-              break;
-            }
-          }
-        }
-        
-        if (originalFileName && staffID && directoryPath) {
-          const directorySharePointPath = this.buildDirectoryPath(directoryPath, baseFolderPath);
-          const fullOriginalPath = `${directorySharePointPath}/${originalFileName}`;
-          
-          const newFileName = this.generateSafeFileName(originalFileName, staffID, directorySharePointPath);
-          const fullNewPath = `${directorySharePointPath}/${newFileName}`;
-          
-          filesToRename.push({
-            rowIndex: row.rowIndex,
-            originalFileName,
-            staffID,
-            directoryPath,
-            fullOriginalPath,
-            fullNewPath,
-            newFileName
-          });
-          
-          console.log(`[FileSearchService] 📝 Prepared rename: "${originalFileName}" -> "${newFileName}"`);
-        } else {
-          console.warn(`[FileSearchService] ⚠️ Missing data for row ${row.rowIndex}`);
-        }
-      }
-    });
-
-    console.log(`[FileSearchService] 📊 Prepared ${filesToRename.length} files for renaming`);
-
-    if (filesToRename.length === 0) {
-      console.warn(`[FileSearchService] ⚠️ No files prepared for renaming`);
-      return { 
-        success: 0, 
-        errors: 0, 
-        skipped: 0, 
-        errorDetails: ['No files prepared for renaming'], 
-        skippedDetails: [] 
-      };
-    }
-
-    let processedFiles = 0;
-    let successCount = 0;
-    let errorCount = 0;
-    let skippedCount = 0; // Counter for skipped files
-    const errorDetails: string[] = [];
-    const skippedDetails: string[] = []; // Details for skipped files
-
-    try {
-      const requestDigest = await this.getRequestDigest();
-      const BATCH_SIZE = 1;
-      
-      for (let i = 0; i < filesToRename.length; i += BATCH_SIZE) {
-        if (this.isCancelled || this.currentSearchId !== searchId) {
-          console.log('[FileSearchService] ❌ Rename operation cancelled');
-          break;
-        }
-
-        const batch = filesToRename.slice(i, i + BATCH_SIZE);
-        console.log(`[FileSearchService] 📦 Processing file ${i + 1}/${filesToRename.length}`);
-
-        for (const fileInfo of batch) {
-          if (this.isCancelled) break;
-
-          try {
-            progressCallback(fileInfo.rowIndex, 'renaming');
-            
-            statusCallback?.({
-              current: processedFiles + 1,
-              total: filesToRename.length,
-              fileName: fileInfo.originalFileName,
-              success: successCount,
-              errors: errorCount,
-              skipped: skippedCount
-            });
-
-            console.log(`[FileSearchService] 🔄 Processing file ${processedFiles + 1}/${filesToRename.length}:`);
-            console.log(`  Original: "${fileInfo.originalFileName}"`);
-            console.log(`  New: "${fileInfo.newFileName}"`);
-            console.log(`  StaffID: "${fileInfo.staffID}"`);
-
-            await this.renameSingleFile(fileInfo.fullOriginalPath, fileInfo.fullNewPath, requestDigest);
-            
-            successCount++;
-            progressCallback(fileInfo.rowIndex, 'renamed');
-            console.log(`[FileSearchService] ✅ SUCCESS: "${fileInfo.originalFileName}" -> "${fileInfo.newFileName}"`);
-            
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            
-            // Check if this is a "file already exists" error
-            if (errorMessage.startsWith('FILE_ALREADY_EXISTS:')) {
-              // File already exists - skip it
-              skippedCount++;
-              const skippedMessage = `Row ${fileInfo.rowIndex + 1} - ${fileInfo.originalFileName}: Target file already exists, skipped to avoid overwrite`;
-              skippedDetails.push(skippedMessage);
-              progressCallback(fileInfo.rowIndex, 'skipped');
-              console.log(`[FileSearchService] ⏭️ SKIPPED: "${fileInfo.originalFileName}" (target exists)`);
-            } else {
-              // Other error - count as error
-              errorCount++;
-              const detailedError = `Row ${fileInfo.rowIndex + 1} - ${fileInfo.originalFileName}: ${errorMessage}`;
-              errorDetails.push(detailedError);
-              progressCallback(fileInfo.rowIndex, 'error');
-              console.error(`[FileSearchService] ❌ ERROR: "${fileInfo.originalFileName}": ${errorMessage}`);
-            }
-          }
-          
-          processedFiles++;
-          await this.delay(2000);
-        }
-      }
-
-      console.log(`[FileSearchService] 🎯 Rename completed:`);
-      console.log(`  📊 Total files: ${filesToRename.length}`);
-      console.log(`  ✅ Successful: ${successCount}`);
-      console.log(`  ❌ Failed: ${errorCount}`);
-      console.log(`  ⏭️ Skipped: ${skippedCount}`);
-      console.log(`  📈 Success rate: ${filesToRename.length > 0 ? (successCount / filesToRename.length * 100).toFixed(1) + '%' : '0%'}`);
-
-      // Log skipped files
-      if (skippedDetails.length > 0) {
-        console.log(`[FileSearchService] 📋 Skipped files (target already exists):`);
-        skippedDetails.slice(0, 3).forEach((skipped, index) => {
-          console.log(`  ${index + 1}. ${skipped}`);
-        });
-      }
-
-      if (errorDetails.length > 0) {
-        console.error(`[FileSearchService] 📋 Error details:`);
-        errorDetails.slice(0, 3).forEach((error, index) => {
-          console.error(`  ${index + 1}. ${error}`);
-        });
-      }
-
-      return { 
-        success: successCount, 
-        errors: errorCount, 
-        skipped: skippedCount,
-        errorDetails, 
-        skippedDetails
-      };
-
-    } catch (error) {
-      console.error('[FileSearchService] ❌ Critical error in rename operation:', error);
-      
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      errorDetails.push(`Critical error: ${errorMessage}`);
-      
-      return { 
-        success: successCount, 
-        errors: filesToRename.length - successCount - skippedCount, 
-        skipped: skippedCount,
-        errorDetails, 
-        skippedDetails
-      };
     }
   }
 
@@ -721,9 +487,36 @@ export class FileSearchService {
     const totalFiles = rows.length;
     const directories = Object.keys(directoryToFilesMap);
 
-    console.log(`[FileSearchService] 🎯 STARTING SEARCH: ${totalFiles} total files in ${directories.length} directories`);
+    console.log(`[FileSearchService] 🎯 STARTING SEARCH: ${totalFiles} total files in ${directories.length} EXISTING directories`);
+    console.log(`[FileSearchService] ⚠️ Note: Only searching in directories that exist (were confirmed in Stage 2)`);
 
-    // STEP 2: Process each directory with ONE API call
+    // Count files that will be skipped due to non-existing directories
+    const totalRowsToSearch = Object.values(directoryToFilesMap).reduce((sum, files) => sum + files.length, 0);
+    const skippedFiles = totalFiles - totalRowsToSearch;
+    
+    if (skippedFiles > 0) {
+      console.log(`[FileSearchService] ⏭️ Skipping ${skippedFiles} files in non-existing directories`);
+    }
+
+    // UPDATED: Initialize only rows with existing directories as 'searching'
+    // Do NOT change status for rows with non-existing directories
+    rows.forEach(row => {
+      // Only set 'searching' if we don't have a directory status showing 'not-exists' or 'error'
+      // This preserves the directory status from Stage 2
+      const shouldSearch = this.shouldSearchInRow(row, searchPlan);
+      
+      if (shouldSearch) {
+        results[row.rowIndex] = 'searching';
+        progressCallback(row.rowIndex, 'searching');
+      } else {
+        // Keep the row in 'not-found' state for non-existing directories
+        results[row.rowIndex] = 'not-found';
+        progressCallback(row.rowIndex, 'not-found');
+        console.log(`[FileSearchService] ⏭️ Skipping row ${row.rowIndex + 1} - directory doesn't exist`);
+      }
+    });
+
+    // STEP 2: Process each EXISTING directory with ONE API call
     for (let dirIndex = 0; dirIndex < directories.length; dirIndex++) {
       const directoryPath = directories[dirIndex];
       const filesFromExcel = directoryToFilesMap[directoryPath];
@@ -731,7 +524,7 @@ export class FileSearchService {
       if (this.isCancelled) break;
 
       console.log(`[FileSearchService] 🔍 DIRECTORY ${dirIndex + 1}/${directories.length}: "${directoryPath}"`);
-      console.log(`[FileSearchService] 📋 Looking for ${filesFromExcel.length} Excel files in this directory`);
+      console.log(`[FileSearchService] 📋 Looking for ${filesFromExcel.length} Excel files in this EXISTING directory`);
 
       // Update progress
       progress = SearchProgressHelper.updateStageProgress(
@@ -890,6 +683,45 @@ export class FileSearchService {
   }
 
   /**
+   * NEW: Check if we should search for files in this row based on directory existence
+   */
+  private shouldSearchInRow(row: IRenameTableRow, searchPlan: ISearchPlan): boolean {
+    // Get directory path for this row
+    const directoryCell = row.cells['custom_1'];
+    let directoryPath = '';
+    
+    if (directoryCell && directoryCell.value) {
+      directoryPath = String(directoryCell.value).trim();
+    } else {
+      directoryPath = this.excelProcessor.extractDirectoryPathFromRow(row);
+    }
+    
+    if (!directoryPath) {
+      console.log(`[FileSearchService] ⚠️ Row ${row.rowIndex + 1}: No directory path found`);
+      return false;
+    }
+    
+    // Find the directory group for this row
+    const directoryGroup = searchPlan.directoryGroups.find(group => 
+      group.rowIndexes.includes(row.rowIndex)
+    );
+    
+    if (!directoryGroup) {
+      console.log(`[FileSearchService] ⚠️ Row ${row.rowIndex + 1}: Directory group not found`);
+      return false;
+    }
+    
+    // Only search if directory exists
+    const shouldSearch = directoryGroup.exists;
+    
+    if (!shouldSearch) {
+      console.log(`[FileSearchService] ⏭️ Row ${row.rowIndex + 1}: Skipping search - directory "${directoryGroup.directoryPath}" doesn't exist`);
+    }
+    
+    return shouldSearch;
+  }
+
+  /**
    * OPTIMIZATION: Build directory-to-files mapping for efficient processing
    * FIXED: Only process directories that exist (exists: true)
    */
@@ -946,6 +778,234 @@ export class FileSearchService {
     console.log(`[FileSearchService] 📁 Directories to process: ${Object.keys(directoryToFilesMap).map(path => path.split('/').slice(-3).join('/')).join(', ')}`);
     
     return directoryToFilesMap;
+  }
+
+  /**
+   * Rename found files with staffID prefix - UPDATED: Skip if target exists
+   */
+  public async renameFoundFiles(
+    rows: IRenameTableRow[],
+    fileSearchResults: { [rowIndex: number]: FileSearchStatus }, // UPDATED: Use typed results
+    baseFolderPath: string,
+    progressCallback: (rowIndex: number, status: 'renaming' | 'renamed' | 'error' | 'skipped') => void,
+    statusCallback?: (progress: { 
+      current: number; 
+      total: number; 
+      fileName: string; 
+      success: number; 
+      errors: number; 
+      skipped: number;
+    }) => void
+  ): Promise<{ 
+    success: number; 
+    errors: number; 
+    skipped: number;
+    errorDetails: string[];
+    skippedDetails: string[];
+  }> {
+    
+    this.currentSearchId = Date.now().toString();
+    const searchId = this.currentSearchId;
+    this.isCancelled = false;
+    
+    console.log(`[FileSearchService] 🏷️ STARTING FILE RENAME (Search ID: ${searchId})`);
+    
+    // Подготовка файлов для переименования
+    const filesToRename: Array<{
+      rowIndex: number;
+      originalFileName: string;
+      staffID: string;
+      directoryPath: string;
+      fullOriginalPath: string;
+      fullNewPath: string;
+      newFileName: string;
+    }> = [];
+
+    // Собираем и валидируем файлы для переименования
+    rows.forEach(row => {
+      const searchResult = fileSearchResults[row.rowIndex];
+      
+      if (searchResult === 'found') {
+        const originalFileName = String(row.cells['custom_0']?.value || '').trim();
+        const directoryPath = String(row.cells['custom_1']?.value || '').trim();
+        
+        // Поиск staffID в разных возможных колонках
+        let staffID = '';
+        
+        const staffIDColumns = ['staffID', 'staffid', 'StaffID', 'staff_id', 'ID', 'id'];
+        for (const columnName of staffIDColumns) {
+          const cellValue = String(row.cells[columnName]?.value || '').trim();
+          if (cellValue) {
+            staffID = cellValue;
+            break;
+          }
+        }
+        
+        if (!staffID) {
+          const excelColumns = Object.keys(row.cells).filter(key => key.startsWith('excel_'));
+          for (const columnId of excelColumns) {
+            const cellValue = String(row.cells[columnId]?.value || '').trim();
+            if (cellValue && /^[0-9A-Za-z]{1,10}$/.test(cellValue)) {
+              staffID = cellValue;
+              console.log(`[FileSearchService] 📋 Found staffID "${staffID}" in column ${columnId} for row ${row.rowIndex}`);
+              break;
+            }
+          }
+        }
+        
+        if (originalFileName && staffID && directoryPath) {
+          const directorySharePointPath = this.buildDirectoryPath(directoryPath, baseFolderPath);
+          const fullOriginalPath = `${directorySharePointPath}/${originalFileName}`;
+          
+          const newFileName = this.generateSafeFileName(originalFileName, staffID, directorySharePointPath);
+          const fullNewPath = `${directorySharePointPath}/${newFileName}`;
+          
+          filesToRename.push({
+            rowIndex: row.rowIndex,
+            originalFileName,
+            staffID,
+            directoryPath,
+            fullOriginalPath,
+            fullNewPath,
+            newFileName
+          });
+          
+          console.log(`[FileSearchService] 📝 Prepared rename: "${originalFileName}" -> "${newFileName}"`);
+        } else {
+          console.warn(`[FileSearchService] ⚠️ Missing data for row ${row.rowIndex}`);
+        }
+      }
+    });
+
+    console.log(`[FileSearchService] 📊 Prepared ${filesToRename.length} files for renaming`);
+
+    if (filesToRename.length === 0) {
+      console.warn(`[FileSearchService] ⚠️ No files prepared for renaming`);
+      return { 
+        success: 0, 
+        errors: 0, 
+        skipped: 0, 
+        errorDetails: ['No files prepared for renaming'], 
+        skippedDetails: [] 
+      };
+    }
+
+    let processedFiles = 0;
+    let successCount = 0;
+    let errorCount = 0;
+    let skippedCount = 0; // Counter for skipped files
+    const errorDetails: string[] = [];
+    const skippedDetails: string[] = []; // Details for skipped files
+
+    try {
+      const requestDigest = await this.getRequestDigest();
+      const BATCH_SIZE = 1;
+      
+      for (let i = 0; i < filesToRename.length; i += BATCH_SIZE) {
+        if (this.isCancelled || this.currentSearchId !== searchId) {
+          console.log('[FileSearchService] ❌ Rename operation cancelled');
+          break;
+        }
+
+        const batch = filesToRename.slice(i, i + BATCH_SIZE);
+        console.log(`[FileSearchService] 📦 Processing file ${i + 1}/${filesToRename.length}`);
+
+        for (const fileInfo of batch) {
+          if (this.isCancelled) break;
+
+          try {
+            progressCallback(fileInfo.rowIndex, 'renaming');
+            
+            statusCallback?.({
+              current: processedFiles + 1,
+              total: filesToRename.length,
+              fileName: fileInfo.originalFileName,
+              success: successCount,
+              errors: errorCount,
+              skipped: skippedCount
+            });
+
+            console.log(`[FileSearchService] 🔄 Processing file ${processedFiles + 1}/${filesToRename.length}:`);
+            console.log(`  Original: "${fileInfo.originalFileName}"`);
+            console.log(`  New: "${fileInfo.newFileName}"`);
+            console.log(`  StaffID: "${fileInfo.staffID}"`);
+
+            await this.renameSingleFile(fileInfo.fullOriginalPath, fileInfo.fullNewPath, requestDigest);
+            
+            successCount++;
+            progressCallback(fileInfo.rowIndex, 'renamed');
+            console.log(`[FileSearchService] ✅ SUCCESS: "${fileInfo.originalFileName}" -> "${fileInfo.newFileName}"`);
+            
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            
+            // Check if this is a "file already exists" error
+            if (errorMessage.startsWith('FILE_ALREADY_EXISTS:')) {
+              // File already exists - skip it
+              skippedCount++;
+              const skippedMessage = `Row ${fileInfo.rowIndex + 1} - ${fileInfo.originalFileName}: Target file already exists, skipped to avoid overwrite`;
+              skippedDetails.push(skippedMessage);
+              progressCallback(fileInfo.rowIndex, 'skipped');
+              console.log(`[FileSearchService] ⏭️ SKIPPED: "${fileInfo.originalFileName}" (target exists)`);
+            } else {
+              // Other error - count as error
+              errorCount++;
+              const detailedError = `Row ${fileInfo.rowIndex + 1} - ${fileInfo.originalFileName}: ${errorMessage}`;
+              errorDetails.push(detailedError);
+              progressCallback(fileInfo.rowIndex, 'error');
+              console.error(`[FileSearchService] ❌ ERROR: "${fileInfo.originalFileName}": ${errorMessage}`);
+            }
+          }
+          
+          processedFiles++;
+          await this.delay(2000);
+        }
+      }
+
+      console.log(`[FileSearchService] 🎯 Rename completed:`);
+      console.log(`  📊 Total files: ${filesToRename.length}`);
+      console.log(`  ✅ Successful: ${successCount}`);
+      console.log(`  ❌ Failed: ${errorCount}`);
+      console.log(`  ⏭️ Skipped: ${skippedCount}`);
+      console.log(`  📈 Success rate: ${filesToRename.length > 0 ? (successCount / filesToRename.length * 100).toFixed(1) + '%' : '0%'}`);
+
+      // Log skipped files
+      if (skippedDetails.length > 0) {
+        console.log(`[FileSearchService] 📋 Skipped files (target already exists):`);
+        skippedDetails.slice(0, 3).forEach((skipped, index) => {
+          console.log(`  ${index + 1}. ${skipped}`);
+        });
+      }
+
+      if (errorDetails.length > 0) {
+        console.error(`[FileSearchService] 📋 Error details:`);
+        errorDetails.slice(0, 3).forEach((error, index) => {
+          console.error(`  ${index + 1}. ${error}`);
+        });
+      }
+
+      return { 
+        success: successCount, 
+        errors: errorCount, 
+        skipped: skippedCount,
+        errorDetails, 
+        skippedDetails
+      };
+
+    } catch (error) {
+      console.error('[FileSearchService] ❌ Critical error in rename operation:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      errorDetails.push(`Critical error: ${errorMessage}`);
+      
+      return { 
+        success: successCount, 
+        errors: filesToRename.length - successCount - skippedCount, 
+        skipped: skippedCount,
+        errorDetails, 
+        skippedDetails
+      };
+    }
   }
 
   /**
