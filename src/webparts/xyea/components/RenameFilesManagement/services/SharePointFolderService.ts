@@ -11,13 +11,27 @@ export interface ICachedFolder {
   TimeLastModified: string;
 }
 
+// FIXED: Define specific interface instead of using 'any'
+interface IWebPartContext {
+  pageContext: {
+    user: {
+      displayName: string;
+    };
+    web: {
+      absoluteUrl: string;
+      serverRelativeUrl: string;
+    };
+  };
+  aadTokenProviderFactory?: unknown;
+}
+
 export class SharePointFolderService {
-  private context: any;
+  private context: IWebPartContext; // FIXED: specific type instead of any
   private cachedFolders: ICachedFolder[] = [];
   private isLoadingAllFolders: boolean = false;
   private allFoldersLoaded: boolean = false;
 
-  constructor(context: any) {
+  constructor(context: IWebPartContext) { // FIXED: specific type instead of any
     this.context = context;
   }
 
@@ -35,7 +49,7 @@ export class SharePointFolderService {
         '/Shared%20Documents'
       ];
       
-      let foldersData: any = null;
+      let foldersData: { d?: { results?: ISharePointFolder[] }; value?: ISharePointFolder[] } | undefined = undefined; // FIXED: specific type instead of any
       let workingPath = '';
       
       // Try each possible path
@@ -113,12 +127,12 @@ export class SharePointFolderService {
       
       // Filter out system folders
       const userFolders = folders
-        .filter((folder: any) => 
+        .filter((folder: ISharePointFolder) => // FIXED: specific type instead of any
           !folder.Name.startsWith('Forms') && 
           !folder.Name.startsWith('_') &&
           folder.Name !== 'Forms'
         )
-        .map((folder: any) => ({
+        .map((folder: ISharePointFolder) => ({ // FIXED: specific type instead of any
           Name: folder.Name,
           ServerRelativeUrl: folder.ServerRelativeUrl,
           ItemCount: folder.ItemCount || 0,
@@ -209,7 +223,7 @@ export class SharePointFolderService {
     try {
       // NEW: Set a global timeout for the entire loading process
       const loadingPromise = this.loadFoldersRecursively(baseFolderPath, progressCallback);
-      const timeoutPromise = new Promise((_, reject) => {
+      const timeoutPromise = new Promise<void>((resolve, reject) => { // FIXED: parameter names
         setTimeout(() => reject(new Error('Folder loading timeout after 30 seconds')), 30000);
       });
       
@@ -282,7 +296,7 @@ export class SharePointFolderService {
         console.log(`[SharePointFolderService] Found ${folders.length} folders in ${folderPath}`);
         
         // Filter out system folders
-        const userFolders = folders.filter((folder: any) => 
+        const userFolders = folders.filter((folder: ISharePointFolder) => // FIXED: specific type instead of any
           !folder.Name.startsWith('_') && 
           !folder.Name.startsWith('Forms') &&
           folder.Name !== 'Forms'
@@ -467,7 +481,7 @@ private normalizePath(path: string): string {
 
   // Existing methods remain unchanged...
 
-  public async getFolderContents(folderPath: string): Promise<{files: any[], folders: any[]}> {
+  public async getFolderContents(folderPath: string): Promise<{files: ISharePointFolder[], folders: ISharePointFolder[]}> { // FIXED: specific types instead of any
     try {
       const { context } = this;
       const webUrl = context.pageContext.web.absoluteUrl;
@@ -494,11 +508,11 @@ private normalizePath(path: string): string {
       const folders = foldersResponse.ok ? (await foldersResponse.json()).d?.results || [] : [];
 
       console.log(`[SharePointFolderService] Folder contents: ${files.length} files, ${folders.length} folders`);
-      console.log(`[SharePointFolderService] Files found:`, files.map((f: any) => f.Name).slice(0, 5));
+      console.log(`[SharePointFolderService] Files found:`, files.map((f: ISharePointFolder) => f.Name).slice(0, 5)); // FIXED: specific type
 
       return {
-        files: files.filter((file: any) => !file.Name.startsWith('~')), // Filter out temp files
-        folders: folders.filter((folder: any) => !folder.Name.startsWith('_') && !folder.Name.startsWith('Forms'))
+        files: files.filter((file: ISharePointFolder) => !file.Name.startsWith('~')), // Filter out temp files // FIXED: specific type
+        folders: folders.filter((folder: ISharePointFolder) => !folder.Name.startsWith('_') && !folder.Name.startsWith('Forms')) // FIXED: specific type
       };
     } catch (error) {
       console.error('[SharePointFolderService] Error getting folder contents:', error);
