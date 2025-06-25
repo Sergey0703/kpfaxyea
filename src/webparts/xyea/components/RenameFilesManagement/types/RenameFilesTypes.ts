@@ -3,6 +3,29 @@
 import { IExcelFile, IExcelSheet } from '../../../interfaces/ExcelInterfaces';
 
 /**
+ * NEW: Status codes enum for simple text-based statuses
+ */
+export enum StatusCode {
+  // Directory status codes
+  CHECKING_DIRECTORY = 'CHK',
+  DIRECTORY_EXISTS = 'DIR', 
+  DIRECTORY_NOT_EXISTS = 'NDF',
+  DIRECTORY_ERROR = 'ERR',
+  
+  // File search status codes
+  SEARCHING = 'SCH',
+  FOUND = 'FND',
+  NOT_FOUND = 'NFD',
+  SKIPPED = 'SKP',
+  
+  // File rename status codes
+  RENAMING = 'RNG',
+  RENAMED = 'REN',
+  RENAME_ERROR = 'ERR',
+  RENAME_SKIPPED = 'SKP'
+}
+
+/**
  * Interface for a custom column that can be added to the table
  */
 export interface ICustomColumn {
@@ -648,103 +671,95 @@ export enum FileStatusIcon {
 }
 
 /**
- * Helper functions for file status - UPDATED with separate directory and file status
+ * Helper functions for file status - UPDATED with simple text codes instead of icons
  */
 export class FileStatusHelper {
   
   /**
-   * NEW: Get icon for directory status
+   * NEW: Get status code for directory status
    */
-  public static getDirectoryIcon(status: DirectoryStatus): string {
+  public static getDirectoryStatusCode(status: DirectoryStatus): StatusCode {
     switch (status) {
       case 'checking':
-        return FileStatusIcon.CHECKING_DIRECTORY;
+        return StatusCode.CHECKING_DIRECTORY;
       case 'exists':
-        return FileStatusIcon.DIRECTORY_EXISTS;
+        return StatusCode.DIRECTORY_EXISTS;
       case 'not-exists':
-        return FileStatusIcon.DIRECTORY_NOT_EXISTS;
+        return StatusCode.DIRECTORY_NOT_EXISTS;
       case 'error':
-        return FileStatusIcon.DIRECTORY_ERROR;
+        return StatusCode.DIRECTORY_ERROR;
       default:
-        return '';
+        return StatusCode.CHECKING_DIRECTORY;
     }
   }
   
   /**
-   * UPDATED: Get icon for file search status
+   * NEW: Get status code for file search status
    */
-  public static getFileSearchIcon(status: FileSearchStatus): string {
+  public static getFileSearchStatusCode(status: FileSearchStatus): StatusCode {
     switch (status) {
       case 'searching':
-        return FileStatusIcon.SEARCHING;
+        return StatusCode.SEARCHING;
       case 'found':
-        return FileStatusIcon.FOUND;
+        return StatusCode.FOUND;
       case 'not-found':
-        return FileStatusIcon.NOT_FOUND;
+        return StatusCode.NOT_FOUND;
       case 'skipped':
-        return FileStatusIcon.SKIPPED;
+        return StatusCode.SKIPPED;
       default:
-        return '';
+        return StatusCode.SEARCHING;
     }
   }
   
   /**
-   * Get icon for file rename status
+   * NEW: Get status code for file rename status
    */
-  public static getRenameIcon(status: FileRenameStatus): string {
+  public static getRenameStatusCode(status: FileRenameStatus): StatusCode {
     switch (status) {
       case 'renaming':
-        return FileStatusIcon.RENAMING;
+        return StatusCode.RENAMING;
       case 'renamed':
-        return FileStatusIcon.RENAMED;
+        return StatusCode.RENAMED;
       case 'skipped':
-        return FileStatusIcon.SKIPPED;
+        return StatusCode.RENAME_SKIPPED;
       case 'error':
-        return FileStatusIcon.ERROR;
+        return StatusCode.RENAME_ERROR;
       default:
-        return '';
+        return StatusCode.RENAMING;
     }
   }
   
   /**
-   * NEW: Get tooltip text for directory status
+   * NEW: Get tooltip text for status code
    */
-  public static getDirectoryTooltipText(status: DirectoryStatus): string {
-    switch (status) {
-      case 'checking':
+  public static getStatusTooltip(statusCode: StatusCode): string {
+    switch (statusCode) {
+      case StatusCode.CHECKING_DIRECTORY:
         return 'Checking directory...';
-      case 'exists':
+      case StatusCode.DIRECTORY_EXISTS:
         return 'Directory exists';
-      case 'not-exists':
+      case StatusCode.DIRECTORY_NOT_EXISTS:
         return 'Directory not found';
-      case 'error':
+      case StatusCode.DIRECTORY_ERROR:
         return 'Directory check error';
-      default:
-        return '';
-    }
-  }
-  
-  /**
-   * UPDATED: Get tooltip text for file status
-   */
-  public static getFileTooltipText(status: FileSearchStatus | FileRenameStatus): string {
-    switch (status) {
-      case 'searching':
+      case StatusCode.SEARCHING:
         return 'Searching for file...';
-      case 'found':
+      case StatusCode.FOUND:
         return 'File found';
-      case 'not-found':
+      case StatusCode.NOT_FOUND:
         return 'File not found';
-      case 'skipped':
+      case StatusCode.SKIPPED:
         return 'File skipped';
-      case 'renaming':
-        return 'Renaming...';
-      case 'renamed':
-        return 'File renamed';
-      case 'error':
+      case StatusCode.RENAMING:
+        return 'Renaming file...';
+      case StatusCode.RENAMED:
+        return 'File renamed successfully';
+      case StatusCode.RENAME_ERROR:
         return 'File rename error';
+      case StatusCode.RENAME_SKIPPED:
+        return 'File rename skipped';
       default:
-        return '';
+        return 'Unknown status';
     }
   }
 }
