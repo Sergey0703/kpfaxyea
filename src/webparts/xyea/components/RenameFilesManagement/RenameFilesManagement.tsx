@@ -401,7 +401,8 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       console.log('[RenameFilesManagement] File search completed:', {
         totalResults: Object.keys(results).length,
         foundFiles: Object.values(results).filter(r => r === 'found').length,
-        notFoundFiles: Object.values(results).filter(r => r === 'not-found').length
+        notFoundFiles: Object.values(results).filter(r => r === 'not-found').length,
+        directoryMissingFiles: Object.values(results).filter(r => r === 'directory-missing').length
       });
       
       this.setState({ 
@@ -698,17 +699,24 @@ private updateDirectoryStatus: DirectoryStatusCallback = (rowIndexes: number[], 
     
     const hasData = data.originalFile !== undefined;
 
-    // UPDATED: Calculate statistics with separate directory and file status
+    // UPDATED: Calculate statistics with separate directory and file status + FIXED logic
     const searchStats = {
       // Directory statistics (available after Stage 2)
       totalDirectories: Object.keys(directoryResults).length,
       existingDirectories: Object.values(directoryResults).filter(status => status === 'exists').length,
       missingDirectories: Object.values(directoryResults).filter(status => status === 'not-exists').length,
       
-      // File statistics (available after Stage 3)
+      // FIXED: File statistics with correct separation
       totalFiles: Object.keys(fileSearchResults).length,
       foundFiles: Object.values(fileSearchResults).filter(r => r === 'found').length,
+      
+      // CORRECTED: Only files NOT found in EXISTING directories
       notFoundFiles: Object.values(fileSearchResults).filter(r => r === 'not-found').length,
+      
+      // NEW: Files in missing directories (separate category)
+      directoryMissingFiles: Object.values(fileSearchResults).filter(r => r === 'directory-missing').length,
+      
+      // Other statuses
       searchingFiles: Object.values(fileSearchResults).filter(r => r === 'searching').length,
       skippedFiles: Object.values(fileSearchResults).filter(r => r === 'skipped').length
     };
@@ -778,14 +786,17 @@ private updateDirectoryStatus: DirectoryStatusCallback = (rowIndexes: number[], 
                 {searchStats.totalDirectories > 0 && (
                   <>
                     {' | '}
-                    <strong> Directories:</strong> {searchStats.existingDirectories} exist, {searchStats.missingDirectories} missing
+                    <strong> Should be files in directories:</strong> {searchStats.existingDirectories}, {searchStats.missingDirectories} missing
                   </>
                 )}
-                {/* UPDATED: Show file statistics after Stage 3 */}
+                {/* UPDATED: Show CORRECTED file statistics after Stage 3 */}
                 {searchStats.totalFiles > 0 && (
                   <>
                     {' | '}
                     <strong> Files:</strong> {searchStats.foundFiles} found, {searchStats.notFoundFiles} not found
+                    {searchStats.directoryMissingFiles > 0 && (
+                      <>, {searchStats.directoryMissingFiles} dirs missing</>
+                    )}
                     {searchStats.searchingFiles > 0 && (
                       <>, {searchStats.searchingFiles} searching</>
                     )}
@@ -855,12 +866,6 @@ private updateDirectoryStatus: DirectoryStatusCallback = (rowIndexes: number[], 
                   fontFamily: '"Segoe UI", "Segoe UI Web (West European)", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif'
                 }}>Debug Information</h4>
                 <p style={{ margin: '4px 0', lineHeight: 1.4 }}>
-                  <strong style={{ color: '#323130' }}>Search Plan:</strong> {searchProgress.searchPlan.totalDirectories} directories, {searchProgress.searchPlan.existingDirectories} exist
-                </p>
-                <p style={{ margin: '4px 0', lineHeight: 1.4 }}>
-                  <strong style={{ color: '#323130' }}>Stage:</strong> {searchProgress.currentStage} ({searchProgress.stageProgress.toFixed(1)}%)
-                </p>
-                <p style={{ margin: '4px 0', lineHeight: 1.4 }}>
                   <strong style={{ color: '#323130' }}>Overall:</strong> {searchProgress.overallProgress.toFixed(1)}%
                 </p>
                 <p style={{ margin: '4px 0', lineHeight: 1.4 }}>
@@ -868,6 +873,12 @@ private updateDirectoryStatus: DirectoryStatusCallback = (rowIndexes: number[], 
                 </p>
                 <p style={{ margin: '4px 0', lineHeight: 1.4 }}>
                   <strong style={{ color: '#323130' }}>Found Files:</strong> {searchStats.foundFiles} ready for rename
+                </p>
+                <p style={{ margin: '4px 0', lineHeight: 1.4 }}>
+                  <strong style={{ color: '#323130' }}>Not Found in Existing Dirs:</strong> {searchStats.notFoundFiles}
+                </p>
+                <p style={{ margin: '4px 0', lineHeight: 1.4 }}>
+                  <strong style={{ color: '#323130' }}>Directory Missing:</strong> {searchStats.directoryMissingFiles}
                 </p>
                 {searchStats.skippedFiles > 0 && (
                   <p style={{ margin: '4px 0', lineHeight: 1.4 }}>
@@ -895,4 +906,4 @@ private updateDirectoryStatus: DirectoryStatusCallback = (rowIndexes: number[], 
       </div>
     );
   }
-}
+} 

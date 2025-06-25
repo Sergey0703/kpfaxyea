@@ -152,11 +152,20 @@ export class FileSearchService {
     } catch (error) {
       console.error('[FileSearchService] Error during file search:', error);
       
-      // Mark all unprocessed rows as not found
+      // NEW: Mark all unprocessed rows with appropriate status
       rows.forEach(row => {
         if (results[row.rowIndex] === 'searching') {
-          results[row.rowIndex] = 'not-found';
-          progressCallback(row.rowIndex, 'not-found');
+          // Determine if this is due to missing directory or actual search failure
+          const directoryPath = this.getDirectoryFromRow(row);
+          const directoryExists = this.checkDirectoryExistsInPlan(directoryPath, searchProgress.searchPlan);
+          
+          if (!directoryExists) {
+            results[row.rowIndex] = 'directory-missing';
+            progressCallback(row.rowIndex, 'directory-missing');
+          } else {
+            results[row.rowIndex] = 'not-found';
+            progressCallback(row.rowIndex, 'not-found');
+          }
         }
       });
 
@@ -458,7 +467,7 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
 }
 
   /**
-   * OPTIMIZED STAGE 3: Search files with CORRECTED LOGIC and MINIMAL API calls + DETAILED LOGGING
+   * UPDATED: OPTIMIZED STAGE 3: Search files with CORRECTED LOGIC and NEW status handling
    */
   private async executeOptimizedStage3_SearchFiles(
     currentProgress: ISearchProgress,
@@ -468,7 +477,7 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
     statusCallback?: (progress: ISearchProgress) => void
   ): Promise<void> {
     
-    console.log('[FileSearchService] 🚀 OPTIMIZED STAGE 3 with DETAILED LOGGING...');
+    console.log('[FileSearchService] 🚀 OPTIMIZED STAGE 3 with NEW STATUS LOGIC...');
     
     let progress = SearchProgressHelper.transitionToStage(
       currentProgress,
@@ -484,7 +493,10 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
       throw new Error('Search plan not found');
     }
 
-    // STEP 1: Build directory-to-files mapping
+    // STEP 1: Initialize ALL rows with appropriate status FIRST
+    this.initializeAllRowsWithCorrectStatus(rows, searchPlan, results, progressCallback);
+
+    // STEP 2: Build directory-to-files mapping for EXISTING directories only
     const directoryToFilesMap = this.buildDirectoryToFilesMap(rows, searchPlan);
     
     console.log(`[FileSearchService] 📊 Built directory mapping:`);
@@ -494,39 +506,12 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
 
     let processedFiles = 0;
     let foundFiles = 0;
-    const totalFiles = rows.length;
     const directories = Object.keys(directoryToFilesMap);
+    const totalFilesToSearch = Object.values(directoryToFilesMap).reduce((sum, files) => sum + files.length, 0);
 
-    console.log(`[FileSearchService] 🎯 STARTING SEARCH: ${totalFiles} total files in ${directories.length} EXISTING directories`);
-    console.log(`[FileSearchService] ⚠️ Note: Only searching in directories that exist (were confirmed in Stage 2)`);
+    console.log(`[FileSearchService] 🎯 STARTING SEARCH: ${totalFilesToSearch} files in ${directories.length} EXISTING directories`);
 
-    // Count files that will be skipped due to non-existing directories
-    const totalRowsToSearch = Object.values(directoryToFilesMap).reduce((sum, files) => sum + files.length, 0);
-    const skippedFiles = totalFiles - totalRowsToSearch;
-    
-    if (skippedFiles > 0) {
-      console.log(`[FileSearchService] ⏭️ Skipping ${skippedFiles} files in non-existing directories`);
-    }
-
-    // UPDATED: Initialize only rows with existing directories as 'searching'
-    // Do NOT change status for rows with non-existing directories
-    rows.forEach(row => {
-      // Only set 'searching' if we don't have a directory status showing 'not-exists' or 'error'
-      // This preserves the directory status from Stage 2
-      const shouldSearch = this.shouldSearchInRow(row, searchPlan);
-      
-      if (shouldSearch) {
-        results[row.rowIndex] = 'searching';
-        progressCallback(row.rowIndex, 'searching');
-      } else {
-        // Keep the row in 'not-found' state for non-existing directories
-        results[row.rowIndex] = 'not-found';
-        progressCallback(row.rowIndex, 'not-found');
-        console.log(`[FileSearchService] ⏭️ Skipping row ${row.rowIndex + 1} - directory doesn't exist`);
-      }
-    });
-
-    // STEP 2: Process each EXISTING directory with ONE API call
+    // STEP 3: Process each EXISTING directory with ONE API call
     for (let dirIndex = 0; dirIndex < directories.length; dirIndex++) {
       const directoryPath = directories[dirIndex];
       const filesFromExcel = directoryToFilesMap[directoryPath];
@@ -680,55 +665,79 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
       // Delay between directories to avoid throttling
       await this.delay(200);
       
-      console.log(`[FileSearchService] 📊 OVERALL PROGRESS: ${processedFiles}/${totalFiles} files, ${foundFiles} found`);
+      console.log(`[FileSearchService] 📊 OVERALL PROGRESS: ${processedFiles}/${totalFilesToSearch} files searched, ${foundFiles} found`);
       console.log(`[FileSearchService] ➡️ Moving to next directory...\n`);
     }
 
     console.log(`[FileSearchService] 🎯 OPTIMIZED SEARCH COMPLETED:`);
-    console.log(`  📊 Files processed: ${processedFiles}/${totalFiles}`);
+    console.log(`  📊 Files processed: ${processedFiles}/${totalFilesToSearch}`);
     console.log(`  ✅ Files found: ${foundFiles}`);
     console.log(`  📈 Success rate: ${processedFiles > 0 ? (foundFiles / processedFiles * 100).toFixed(1) + '%' : '0%'}`);
-    console.log(`  🏗️ API calls made: ${directories.length} (instead of ${totalFiles})`);
-    console.log(`  ⚡ Performance improvement: ${totalFiles > 0 ? Math.round(totalFiles / directories.length) : 0}x fewer API calls`);
+    console.log(`  🏗️ API calls made: ${directories.length} (instead of total files)`);
+    console.log(`  ⚡ Performance improvement: ${totalFilesToSearch > 0 ? Math.round(totalFilesToSearch / directories.length) : 0}x fewer API calls`);
   }
 
   /**
-   * NEW: Check if we should search for files in this row based on directory existence
+   * NEW: Initialize all rows with correct status based on directory existence
    */
-  private shouldSearchInRow(row: IRenameTableRow, searchPlan: ISearchPlan): boolean {
-    // Get directory path for this row
+  private initializeAllRowsWithCorrectStatus(
+    rows: IRenameTableRow[],
+    searchPlan: ISearchPlan,
+    results: { [rowIndex: number]: FileSearchStatus },
+    progressCallback: FileSearchResultCallback
+  ): void {
+    console.log('[FileSearchService] 📋 Initializing all rows with correct status...');
+    
+    let directoryMissingCount = 0;
+    let searchingCount = 0;
+    
+    rows.forEach(row => {
+      const directoryPath = this.getDirectoryFromRow(row);
+      const directoryGroup = searchPlan.directoryGroups.find(group => 
+        group.rowIndexes.includes(row.rowIndex)
+      );
+      
+      if (!directoryGroup || !directoryGroup.exists) {
+        // Files in missing directories get 'directory-missing' status
+        results[row.rowIndex] = 'directory-missing';
+        progressCallback(row.rowIndex, 'directory-missing');
+        directoryMissingCount++;
+        console.log(`[FileSearchService] 📁❌ Row ${row.rowIndex + 1}: directory-missing (${directoryPath})`);
+      } else {
+        // Files in existing directories get 'searching' status (will be updated during search)
+        results[row.rowIndex] = 'searching';
+        progressCallback(row.rowIndex, 'searching');
+        searchingCount++;
+      }
+    });
+    
+    console.log(`[FileSearchService] ✅ Status initialization complete:`);
+    console.log(`  📁❌ Directory missing: ${directoryMissingCount} files`);
+    console.log(`  🔍 Ready to search: ${searchingCount} files`);
+  }
+
+  /**
+   * NEW: Helper method to get directory path from row
+   */
+  private getDirectoryFromRow(row: IRenameTableRow): string {
     const directoryCell = row.cells['custom_1'];
-    let directoryPath = '';
-    
     if (directoryCell && directoryCell.value) {
-      directoryPath = String(directoryCell.value).trim();
-    } else {
-      directoryPath = this.excelProcessor.extractDirectoryPathFromRow(row);
+      return String(directoryCell.value).trim();
     }
+    return this.excelProcessor.extractDirectoryPathFromRow(row);
+  }
+
+  /**
+   * NEW: Check if directory exists in search plan
+   */
+  private checkDirectoryExistsInPlan(directoryPath: string, searchPlan?: ISearchPlan): boolean {
+    if (!searchPlan) return false;
     
-    if (!directoryPath) {
-      console.log(`[FileSearchService] ⚠️ Row ${row.rowIndex + 1}: No directory path found`);
-      return false;
-    }
-    
-    // Find the directory group for this row
     const directoryGroup = searchPlan.directoryGroups.find(group => 
-      group.rowIndexes.includes(row.rowIndex)
+      group.directoryPath === directoryPath
     );
     
-    if (!directoryGroup) {
-      console.log(`[FileSearchService] ⚠️ Row ${row.rowIndex + 1}: Directory group not found`);
-      return false;
-    }
-    
-    // Only search if directory exists
-    const shouldSearch = directoryGroup.exists;
-    
-    if (!shouldSearch) {
-      console.log(`[FileSearchService] ⏭️ Row ${row.rowIndex + 1}: Skipping search - directory "${directoryGroup.directoryPath}" doesn't exist`);
-    }
-    
-    return shouldSearch;
+    return directoryGroup?.exists || false;
   }
 
   /**

@@ -12,7 +12,9 @@ import {
   IRenameFilesData,
   IRenameExportSettings,
   IRenameExportStatistics,
-  StatusCode
+  StatusCode,
+  FileSearchStatus,
+  FileRenameStatus
 } from '../components/RenameFilesManagement/types/RenameFilesTypes';
 
 // Type definitions for better type safety
@@ -114,12 +116,12 @@ export class ExcelExportService {
   }
 
   /**
-   * NEW: Export rename files data with status information - UPDATED with individual file rename status
+   * UPDATED: Export rename files data with ALL status information including renamed files
    */
   public static async exportRenameFilesData(
     data: IRenameFilesData,
-    fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' | 'skipped' },
-    fileRenameResults: { [rowIndex: number]: 'renaming' | 'renamed' | 'error' | 'skipped' | undefined }, // NEW: Individual file rename status
+    fileSearchResults: { [rowIndex: number]: FileSearchStatus },
+    fileRenameResults: { [rowIndex: number]: FileRenameStatus | undefined },
     renameProgress?: {
       current: number;
       total: number;
@@ -131,9 +133,11 @@ export class ExcelExportService {
     exportSettings?: IRenameExportSettings
   ): Promise<{ success: boolean; fileName?: string; error?: string }> {
     try {
-      console.log('[ExcelExportService] Starting rename files export:', {
+      console.log('[ExcelExportService] Starting rename files export with all statuses:', {
         totalRows: data.totalRows,
         columns: data.columns.length,
+        fileSearchResults: Object.keys(fileSearchResults).length,
+        fileRenameResults: Object.keys(fileRenameResults).length,
         exportSettings
       });
 
@@ -147,11 +151,11 @@ export class ExcelExportService {
         fileFormat: 'xlsx'
       };
 
-      // Prepare export data with status information
+      // Prepare export data with ALL status information
       const exportData = this.prepareRenameFilesExportData(
         data,
         fileSearchResults,
-        fileRenameResults, // NEW: Pass individual file rename results
+        fileRenameResults,
         renameProgress,
         settings
       );
@@ -193,12 +197,12 @@ export class ExcelExportService {
   }
 
   /**
-   * NEW: Get export statistics for rename files - UPDATED with individual file rename status
+   * UPDATED: Get export statistics for rename files with ALL statuses
    */
   public static getRenameFilesExportStatistics(
     data: IRenameFilesData,
-    fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' | 'skipped' },
-    fileRenameResults: { [rowIndex: number]: 'renaming' | 'renamed' | 'error' | 'skipped' | undefined }, // NEW: Individual file rename status
+    fileSearchResults: { [rowIndex: number]: FileSearchStatus },
+    fileRenameResults: { [rowIndex: number]: FileRenameStatus | undefined },
     renameProgress?: {
       current: number;
       total: number;
@@ -219,19 +223,21 @@ export class ExcelExportService {
       fileFormat: 'xlsx'
     };
 
-    // Count different statuses
+    // Count ALL different statuses with priority logic
     let foundFiles = 0;
     let notFoundFiles = 0;
+    let directoryMissingFiles = 0; // NEW: Files in missing directories
     let searchingFiles = 0;
     let skippedFiles = 0;
     let renamedFiles = 0;
     let errorFiles = 0;
+    let renameSkippedFiles = 0; // NEW: Files skipped during rename
 
     data.rows.forEach(row => {
       const searchStatus = fileSearchResults[row.rowIndex];
       const renameStatus = fileRenameResults[row.rowIndex];
       
-      // Count rename status first if available
+      // Priority: rename status > search status
       if (renameStatus) {
         switch (renameStatus) {
           case 'renamed':
@@ -241,7 +247,11 @@ export class ExcelExportService {
             errorFiles++;
             break;
           case 'skipped':
-            skippedFiles++;
+            renameSkippedFiles++;
+            break;
+          case 'renaming':
+            // Still in progress, count as found for now
+            foundFiles++;
             break;
         }
       } else {
@@ -252,6 +262,9 @@ export class ExcelExportService {
             break;
           case 'not-found':
             notFoundFiles++;
+            break;
+          case 'directory-missing': // NEW: Separate category
+            directoryMissingFiles++;
             break;
           case 'searching':
             searchingFiles++;
@@ -266,21 +279,22 @@ export class ExcelExportService {
     // Calculate exportable rows
     let exportableRows = data.totalRows;
     if (settings.onlyCompletedRows) {
-      exportableRows = foundFiles + notFoundFiles + renamedFiles + errorFiles + skippedFiles;
+      // Only count rows that have been fully processed
+      exportableRows = foundFiles + notFoundFiles + directoryMissingFiles + renamedFiles + errorFiles + renameSkippedFiles;
     }
 
     // Estimate file size
-    const estimatedFileSize = this.formatFileSize(exportableRows * (data.columns.length + 1) * 20);
+    const estimatedFileSize = this.formatFileSize(exportableRows * (data.columns.length + 2) * 25); // +2 for status and timestamp columns
 
     return {
       totalRows: data.totalRows,
       exportableRows,
       foundFiles,
-      notFoundFiles,
+      notFoundFiles: notFoundFiles + directoryMissingFiles, // Combine for display compatibility
       renamedFiles,
       errorFiles,
-      skippedFiles,
-      searchingFiles,
+      skippedFiles: skippedFiles + renameSkippedFiles, // Combine skipped files
+      searchingFiles, // Files in missing directories OR still searching
       estimatedFileSize,
       canExport: exportableRows > 0
     };
@@ -336,7 +350,7 @@ export class ExcelExportService {
   }
 
   /**
-   * NEW: Generate export filename for rename files
+   * Generate export filename for rename files
    */
   private static generateRenameExportFileName(baseName: string, format: 'xlsx' | 'csv'): string {
     // Remove existing extension
@@ -382,12 +396,12 @@ export class ExcelExportService {
   }
 
   /**
-   * NEW: Prepare rename files data for export - UPDATED with individual file rename status
+   * UPDATED: Prepare rename files data for export with ALL statuses
    */
   private static prepareRenameFilesExportData(
     data: IRenameFilesData,
-    fileSearchResults: { [rowIndex: number]: 'found' | 'not-found' | 'searching' | 'skipped' },
-    fileRenameResults: { [rowIndex: number]: 'renaming' | 'renamed' | 'error' | 'skipped' | undefined }, // NEW: Individual file rename status
+    fileSearchResults: { [rowIndex: number]: FileSearchStatus },
+    fileRenameResults: { [rowIndex: number]: FileRenameStatus | undefined },
     renameProgress?: {
       current: number;
       total: number;
@@ -426,6 +440,8 @@ export class ExcelExportService {
       // Add status column
       if (exportSettings.includeStatusColumn) {
         headers.push('Status');
+        headers.push('Status Code');
+        headers.push('Status Description');
       }
       
       // Add timestamp column
@@ -439,12 +455,12 @@ export class ExcelExportService {
     // Process each row
     data.rows.forEach(row => {
       const searchStatus = fileSearchResults[row.rowIndex];
-      const renameStatus = fileRenameResults[row.rowIndex]; // NEW: Get individual file rename status
+      const renameStatus = fileRenameResults[row.rowIndex];
       
       // Filter rows based on settings
       if (exportSettings.onlyCompletedRows) {
-        if (searchStatus === 'searching') {
-          return; // Skip rows that are still searching
+        if (searchStatus === 'searching' && !renameStatus) {
+          return; // Skip rows that are still searching and not renamed
         }
       }
       
@@ -470,8 +486,10 @@ export class ExcelExportService {
       
       // Add status information
       if (exportSettings.includeStatusColumn) {
-        const statusText = this.getRenameStatusText(searchStatus, renameStatus); // NEW: Use individual rename status
-        rowData.push(statusText);
+        const statusInfo = this.getRenameStatusInfo(searchStatus, renameStatus);
+        rowData.push(statusInfo.statusText); // Full status text
+        rowData.push(statusInfo.statusCode); // Status code (CHK, FND, etc.)
+        rowData.push(statusInfo.description); // Human readable description
       }
       
       // Add timestamp
@@ -486,41 +504,81 @@ export class ExcelExportService {
   }
 
   /**
-   * NEW: Get status code text for export - UPDATED to use StatusCode enum
+   * UPDATED: Get comprehensive status info for export with ALL statuses
    */
-  private static getRenameStatusText(
-    searchStatus: 'found' | 'not-found' | 'searching' | 'skipped',
-    renameStatus?: 'renaming' | 'renamed' | 'error' | 'skipped' | undefined // NEW: Individual file rename status
-  ): string {
+  private static getRenameStatusInfo(
+    searchStatus: FileSearchStatus,
+    renameStatus?: FileRenameStatus | undefined
+  ): { statusText: string; statusCode: string; description: string } {
     
-    // NEW: If we have a rename status for this specific file, use it
+    // Priority: rename status > search status
     if (renameStatus) {
       switch (renameStatus) {
         case 'renaming':
-          return `${StatusCode.RENAMING} - Renaming...`;
+          return {
+            statusText: `${StatusCode.RENAMING} - Renaming in progress`,
+            statusCode: StatusCode.RENAMING,
+            description: 'File is currently being renamed'
+          };
         case 'renamed':
-          return `${StatusCode.RENAMED} - File renamed`;
+          return {
+            statusText: `${StatusCode.RENAMED} - File successfully renamed`,
+            statusCode: StatusCode.RENAMED,
+            description: 'File has been successfully renamed with Staff ID'
+          };
         case 'error':
-          return `${StatusCode.RENAME_ERROR} - File rename error`;
+          return {
+            statusText: `${StatusCode.RENAME_ERROR} - Rename failed`,
+            statusCode: StatusCode.RENAME_ERROR,
+            description: 'Error occurred during file rename operation'
+          };
         case 'skipped':
-          return `${StatusCode.RENAME_SKIPPED} - File skipped`;
-        default:
-          break;
+          return {
+            statusText: `${StatusCode.RENAME_SKIPPED} - Rename skipped`,
+            statusCode: StatusCode.RENAME_SKIPPED,
+            description: 'File rename skipped (target file already exists)'
+          };
       }
     }
     
-    // Otherwise use search status with status codes
+    // Use search status
     switch (searchStatus) {
       case 'found':
-        return `${StatusCode.FOUND} - File found`;
+        return {
+          statusText: `${StatusCode.FOUND} - File found in directory`,
+          statusCode: StatusCode.FOUND,
+          description: 'File found in SharePoint directory, ready for rename'
+        };
       case 'not-found':
-        return `${StatusCode.NOT_FOUND} - File not found`;
+        return {
+          statusText: `${StatusCode.NOT_FOUND} - File not found in directory`,
+          statusCode: StatusCode.NOT_FOUND,
+          description: 'File not found in the existing SharePoint directory'
+        };
+      case 'directory-missing':
+        return {
+          statusText: `${StatusCode.DIRECTORY_MISSING} - Directory missing`,
+          statusCode: StatusCode.DIRECTORY_MISSING,
+          description: 'Directory does not exist in SharePoint'
+        };
       case 'searching':
-        return `${StatusCode.SEARCHING} - Folder not found`;
+        return {
+          statusText: `${StatusCode.SEARCHING} - Search in progress`,
+          statusCode: StatusCode.SEARCHING,
+          description: 'File search is currently in progress'
+        };
       case 'skipped':
-        return `${StatusCode.SKIPPED} - File skipped`;
+        return {
+          statusText: `${StatusCode.SKIPPED} - Search skipped`,
+          statusCode: StatusCode.SKIPPED,
+          description: 'File search was skipped'
+        };
       default:
-        return 'Unknown';
+        return {
+          statusText: 'Unknown status',
+          statusCode: 'UNK',
+          description: 'Status is unknown or not set'
+        };
     }
   }
 
@@ -608,7 +666,7 @@ export class ExcelExportService {
   }
 
   /**
-   * NEW: Create export file for rename files data
+   * Create export file for rename files data
    */
   private static async createRenameFilesExportFile(
     data: any[][],
@@ -623,7 +681,7 @@ export class ExcelExportService {
   }
 
   /**
-   * NEW: Create CSV blob from data array
+   * Create CSV blob from data array
    */
   private static createCSVBlobFromData(data: any[][]): Blob {
     const csvContent = data
@@ -643,13 +701,13 @@ export class ExcelExportService {
   }
 
   /**
-   * NEW: Create Excel blob from data array
+   * Create Excel blob from data array
    */
   private static createExcelBlobFromData(data: any[][], sheetName: string = 'Sheet1'): Blob {
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.aoa_to_sheet(data);
     
-    // Auto-adjust column widths
+    // Auto-adjust column widths for rename files export
     const columnWidths = this.calculateRenameColumnWidths(data);
     worksheet['!cols'] = columnWidths;
     
@@ -693,7 +751,7 @@ export class ExcelExportService {
   }
 
   /**
-   * NEW: Calculate column widths for rename files export
+   * UPDATED: Calculate column widths for rename files export with status columns
    */
   private static calculateRenameColumnWidths(data: any[][]): Array<{ wch: number }> {
     if (data.length === 0) return [];
@@ -704,10 +762,21 @@ export class ExcelExportService {
     for (let col = 0; col < columnCount; col++) {
       let maxWidth = 10; // Minimum width
       
-      data.forEach(row => {
+      data.forEach((row, rowIndex) => {
         if (row[col] !== undefined && row[col] !== null) {
           const cellLength = String(row[col]).length;
-          maxWidth = Math.max(maxWidth, Math.min(cellLength, 50)); // Max width of 50
+          
+          // Special handling for status columns (usually the last few columns)
+          if (rowIndex === 0 && data[0]) { // Header row
+            const header = String(row[col]).toLowerCase();
+            if (header.includes('status') || header.includes('code') || header.includes('description')) {
+              maxWidth = Math.max(maxWidth, Math.min(cellLength + 5, 35)); // Extra width for status columns
+            } else {
+              maxWidth = Math.max(maxWidth, Math.min(cellLength + 2, 50));
+            }
+          } else {
+            maxWidth = Math.max(maxWidth, Math.min(cellLength, 50)); // Max width of 50
+          }
         }
       });
       
@@ -718,7 +787,7 @@ export class ExcelExportService {
   }
 
   /**
-   * NEW: Download file helper method
+   * Download file helper method
    */
   private static downloadFile(blob: Blob, fileName: string): void {
     const url = window.URL.createObjectURL(blob);
@@ -852,7 +921,7 @@ export class ExcelExportService {
   }
 
   /**
-   * NEW: Create default export settings for Rename Files Management
+   * Create default export settings for Rename Files Management
    */
   public static createDefaultRenameExportSettings(baseName?: string): IRenameExportSettings {
     return {

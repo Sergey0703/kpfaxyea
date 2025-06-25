@@ -17,6 +17,7 @@ export enum StatusCode {
   FOUND = 'FND',
   NOT_FOUND = 'NFD',
   SKIPPED = 'SKP',
+  DIRECTORY_MISSING = 'DMG', // NEW: For files in missing directories
   
   // File rename status codes
   RENAMING = 'RNG',
@@ -152,7 +153,7 @@ export interface IFileStatusWithDetails {
   rowIndex: number;
   fileName: string;
   directoryPath: string;
-  searchStatus: 'found' | 'not-found' | 'searching' | 'skipped';
+  searchStatus: 'found' | 'not-found' | 'searching' | 'skipped' | 'directory-missing'; // UPDATED: Added directory-missing
   renameStatus?: 'renaming' | 'renamed' | 'error' | 'skipped';
   errorMessage?: string;
   originalPath?: string;
@@ -177,9 +178,9 @@ export interface ISharePointFolder {
 export type DirectoryStatus = 'checking' | 'exists' | 'not-exists' | 'error';
 
 /**
- * NEW: File search result type - separate from directory status
+ * NEW: File search result type - UPDATED with directory-missing status
  */
-export type FileSearchStatus = 'searching' | 'found' | 'not-found' | 'skipped';
+export type FileSearchStatus = 'searching' | 'found' | 'not-found' | 'skipped' | 'directory-missing';
 
 /**
  * Search stages enum
@@ -665,6 +666,7 @@ export enum FileStatusIcon {
   FOUND = '✅',
   NOT_FOUND = '❌',
   SKIPPED = '⏭️',
+  DIRECTORY_MISSING = '📁❌', // NEW: For files in missing directories
   RENAMING = '🔄',
   RENAMED = '✅',
   ERROR = '❌'
@@ -694,7 +696,7 @@ export class FileStatusHelper {
   }
   
   /**
-   * NEW: Get status code for file search status
+   * NEW: Get status code for file search status - UPDATED with directory-missing
    */
   public static getFileSearchStatusCode(status: FileSearchStatus): StatusCode {
     switch (status) {
@@ -706,6 +708,8 @@ export class FileStatusHelper {
         return StatusCode.NOT_FOUND;
       case 'skipped':
         return StatusCode.SKIPPED;
+      case 'directory-missing':
+        return StatusCode.DIRECTORY_MISSING;
       default:
         return StatusCode.SEARCHING;
     }
@@ -730,7 +734,7 @@ export class FileStatusHelper {
   }
   
   /**
-   * NEW: Get tooltip text for status code
+   * NEW: Get tooltip text for status code - UPDATED with directory-missing
    */
   public static getStatusTooltip(statusCode: StatusCode): string {
     switch (statusCode) {
@@ -750,6 +754,8 @@ export class FileStatusHelper {
         return 'File not found';
       case StatusCode.SKIPPED:
         return 'File skipped';
+      case StatusCode.DIRECTORY_MISSING:
+        return 'Directory missing';
       case StatusCode.RENAMING:
         return 'Renaming file...';
       case StatusCode.RENAMED:
