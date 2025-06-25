@@ -15,18 +15,40 @@ import {
 import { SharePointFolderService } from './SharePointFolderService';
 import { ExcelFileProcessor } from './ExcelFileProcessor';
 
+// FIXED: Define specific interfaces instead of using 'any'
+interface IWebPartContext {
+  pageContext: {
+    user: {
+      displayName: string;
+    };
+    web: {
+      absoluteUrl: string;
+      serverRelativeUrl: string;
+    };
+  };
+  aadTokenProviderFactory?: unknown;
+}
+
+interface ISharePointFolder {
+  Name: string;
+  ServerRelativeUrl: string;
+  ItemCount: number;
+  TimeCreated: string;
+  TimeLastModified: string;
+}
+
 export class FileSearchService {
-  private context: any;
+  private context: IWebPartContext; // FIXED: specific type instead of any
   private folderService: SharePointFolderService;
   private excelProcessor: ExcelFileProcessor;
   private isCancelled: boolean = false;
-  private currentSearchId: string | null = null;
+  private currentSearchId: string | undefined = undefined; // FIXED: undefined instead of null
 
   // AGGRESSIVE: Much shorter timeouts to prevent hanging
   private readonly DIRECTORY_CHECK_TIMEOUT = 3000; // 3 seconds per directory
   private readonly FOLDER_LOAD_TIMEOUT = 8000; // 8 seconds for folder loading
 
-  constructor(context: any) {
+  constructor(context: IWebPartContext) { // FIXED: specific type instead of any
     this.context = context;
     this.folderService = new SharePointFolderService(context);
     this.excelProcessor = new ExcelFileProcessor();
@@ -211,7 +233,7 @@ export class FileSearchService {
     let validRows = 0;
 
     rows.forEach(row => {
-      const directoryCell = row.cells['custom_1'];
+      const directoryCell = row.cells.custom_1; // FIXED: dot notation
       let directoryPath = '';
       
       if (directoryCell && directoryCell.value) {
@@ -226,8 +248,7 @@ export class FileSearchService {
         if (!directoryToRows.has(directoryPath)) {
           directoryToRows.set(directoryPath, []);
         }
-        directoryToRows.get(directoryPath)!.push(row.rowIndex);
-        validRows++;
+        directoryToRows.get(directoryPath)?.push(row.rowIndex); // FIXED: optional chaining instead of non-null assertion
       }
     });
 
@@ -544,7 +565,7 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
         const folderContents = await Promise.race([
           folderContentsPromise,
           this.createTimeoutPromise(adaptiveTimeout, { files: [], folders: [] })
-        ]) as {files: any[], folders: any[]};
+        ]) as {files: ISharePointFolder[], folders: ISharePointFolder[]}; // FIXED: specific type instead of any
         
         const endTime = Date.now();
         console.log(`[FileSearchService] ✅ API response received in ${endTime - startTime}ms`);
@@ -580,7 +601,7 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
         );
 
         // Create SharePoint files map (case-insensitive)
-        const sharePointFilesMap = new Map<string, any>();
+        const sharePointFilesMap = new Map<string, ISharePointFolder>(); // FIXED: specific type instead of any
         folderContents.files.forEach(file => {
           sharePointFilesMap.set(file.Name.toLowerCase(), file);
         });
@@ -720,7 +741,7 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
    * NEW: Helper method to get directory path from row
    */
   private getDirectoryFromRow(row: IRenameTableRow): string {
-    const directoryCell = row.cells['custom_1'];
+    const directoryCell = row.cells.custom_1; // FIXED: dot notation
     if (directoryCell && directoryCell.value) {
       return String(directoryCell.value).trim();
     }
@@ -770,7 +791,7 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
       dirGroup.rowIndexes.forEach(rowIndex => {
         const row = rows.find(r => r.rowIndex === rowIndex);
         if (row) {
-          const fileName = String(row.cells['custom_0']?.value || '').trim();
+          const fileName = String(row.cells.custom_0?.value || '').trim(); // FIXED: dot notation
           if (fileName) {
             filesInDirectory.push({ fileName, rowIndex });
           }
@@ -845,8 +866,8 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
       const searchResult = fileSearchResults[row.rowIndex];
       
       if (searchResult === 'found') {
-        const originalFileName = String(row.cells['custom_0']?.value || '').trim();
-        const directoryPath = String(row.cells['custom_1']?.value || '').trim();
+        const originalFileName = String(row.cells.custom_0?.value || '').trim(); // FIXED: dot notation
+        const directoryPath = String(row.cells.custom_1?.value || '').trim(); // FIXED: dot notation
         
         // Поиск staffID в разных возможных колонках
         let staffID = '';
@@ -917,13 +938,20 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
     const skippedDetails: string[] = []; // Details for skipped files
 
     try {
-      let requestDigest = await this.getRequestDigest();
+      let requestDigest = await this.getRequestDigest(); // FIXED: changed to let
       const BATCH_SIZE = 1;
       
       for (let i = 0; i < filesToRename.length; i += BATCH_SIZE) {
         if (this.isCancelled || this.currentSearchId !== searchId) {
           console.log('[FileSearchService] ❌ Rename operation cancelled');
           break;
+        }
+
+        // Обновляем Request Digest каждые 100 файлов для длительных операций
+        if (processedFiles % 100 === 0) {
+          console.log(`[FileSearchService] 🔄 Refreshing request digest after ${processedFiles} files...`);
+          requestDigest = await this.getRequestDigest();
+          console.log(`[FileSearchService] ✅ Request digest refreshed`);
         }
 
         const batch = filesToRename.slice(i, i + BATCH_SIZE);
@@ -978,11 +1006,6 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
           
           processedFiles++;
           await this.delay(2000);
-          if (processedFiles % 100 === 0) {
-  console.log(`[FileSearchService] 🔄 Refreshing request digest after ${processedFiles} files...`);
-  requestDigest = await this.getRequestDigest();
-  console.log(`[FileSearchService] ✅ Request digest refreshed`);
-}
         }
       }
 
@@ -1051,7 +1074,7 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
       
       const extension = originalFileName.split('.').pop();
       const baseName = originalFileName.substring(0, originalFileName.lastIndexOf('.'));
-      const maxBaseLength = 200 - cleanStaffID.length - extension!.length - 3;
+      const maxBaseLength = 200 - cleanStaffID.length - (extension?.length || 0) - 3; // FIXED: optional chaining
       const truncatedBase = baseName.substring(0, maxBaseLength);
       
       return `${cleanStaffID} ${truncatedBase}.${extension}`;
@@ -1280,13 +1303,13 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
    * Helper method to create timeout promise
    */
   private createTimeoutPromise<T>(timeoutMs: number, errorMessage: string | T): Promise<T> {
-    return new Promise((_, reject) => {
+    return new Promise((resolve, reject) => { // FIXED: parameter names
       setTimeout(() => {
         if (typeof errorMessage === 'string') {
           reject(new Error(errorMessage));
         } else {
           // For boolean returns, resolve with the fallback value
-          reject(errorMessage);
+          resolve(errorMessage);
         }
       }, timeoutMs);
     });
@@ -1295,11 +1318,11 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
   public cancelSearch(): void {
     console.log('[FileSearchService] Cancelling file search...');
     this.isCancelled = true;
-    this.currentSearchId = null;
+    this.currentSearchId = undefined;
   }
 
   public isSearchActive(): boolean {
-    return this.currentSearchId !== null && !this.isCancelled;
+    return this.currentSearchId !== undefined && !this.isCancelled;
   }
 
   private delay(ms: number): Promise<void> {
@@ -1322,7 +1345,7 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
       const folderContents = await this.folderService.getFolderContents(folderPath);
       const files = folderContents.files;
       
-      const fileFound = files.some((file: any) => 
+      const fileFound = files.some((file: ISharePointFolder) => // FIXED: specific type instead of any
         file.Name.toLowerCase() === fileName.toLowerCase()
       );
       
@@ -1337,7 +1360,7 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
     }
   }
 
-  public async getFileDetails(filePath: string): Promise<any> {
+  public async getFileDetails(filePath: string): Promise<ISharePointFolder | undefined> { // FIXED: specific type instead of any
     try {
       const webUrl = this.context.pageContext.web.absoluteUrl;
       
@@ -1353,15 +1376,15 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
         return data.d || data;
       }
 
-      return null;
+      return undefined;
     } catch (error) {
       console.error('[FileSearchService] Error getting file details:', error);
-      return null;
+      return undefined;
     }
   }
 
   public getFileNameFromRow(row: IRenameTableRow): string {
-    const fileName = String(row.cells['custom_0']?.value || '');
+    const fileName = String(row.cells.custom_0?.value || ''); // FIXED: dot notation
     console.log(`[FileSearchService] getFileNameFromRow for row ${row.rowIndex}: "${fileName}"`);
     return fileName;
   }
