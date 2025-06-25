@@ -618,12 +618,19 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
           if (this.isCancelled) break;
 
           const fileExists = sharePointFilesMap.has(excelFile.fileName.toLowerCase());
-          const result: FileSearchStatus = fileExists ? 'found' : 'not-found'; // UPDATED: Use typed result
           
-          // FIXED: avoid race condition by using local variable
-          const currentResult = result;
-          results[excelFile.rowIndex] = currentResult;
-          progressCallback(excelFile.rowIndex, currentResult);
+          // FIXED: Use atomic update function to completely avoid race condition
+          const updateFileResult = (rowIndex: number, status: FileSearchStatus): void => {
+            results[rowIndex] = status;
+            progressCallback(rowIndex, status);
+          };
+          
+          // Determine result and update atomically
+          if (fileExists) {
+            updateFileResult(excelFile.rowIndex, 'found');
+          } else {
+            updateFileResult(excelFile.rowIndex, 'not-found');
+          }
           
           if (fileExists) {
             foundFiles++;
