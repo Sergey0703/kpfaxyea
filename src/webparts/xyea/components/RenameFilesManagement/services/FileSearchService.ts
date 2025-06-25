@@ -917,7 +917,7 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
     const skippedDetails: string[] = []; // Details for skipped files
 
     try {
-      const requestDigest = await this.getRequestDigest();
+      let requestDigest = await this.getRequestDigest();
       const BATCH_SIZE = 1;
       
       for (let i = 0; i < filesToRename.length; i += BATCH_SIZE) {
@@ -978,6 +978,11 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
           
           processedFiles++;
           await this.delay(2000);
+          if (processedFiles % 100 === 0) {
+  console.log(`[FileSearchService] 🔄 Refreshing request digest after ${processedFiles} files...`);
+  requestDigest = await this.getRequestDigest();
+  console.log(`[FileSearchService] ✅ Request digest refreshed`);
+}
         }
       }
 

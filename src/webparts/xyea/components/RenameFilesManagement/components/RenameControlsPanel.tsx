@@ -53,7 +53,7 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
   /**
    * Get current stage information
    */
-  const getCurrentStageInfo = () => {
+  const getCurrentStageInfo = (): typeof SEARCH_STAGES[SearchStage] => {
     return SEARCH_STAGES[searchProgress.currentStage] || SEARCH_STAGES[SearchStage.IDLE];
   };
 
@@ -126,7 +126,7 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
   /**
    * Render stage indicators
    */
-  const renderStageIndicators = () => {
+  const renderStageIndicators = (): React.ReactNode => {
     if (isRenaming) {
       return null; // Hide stage indicators during rename
     }
@@ -168,10 +168,19 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
   /**
    * Determine which buttons to show based on current state
    */
-  const getButtonState = () => {
-    const hasSearchPlan = searchProgress.searchPlan && searchProgress.searchPlan.totalDirectories > 0;
+  const getButtonState = (): {
+    showAnalyzeButton: boolean;
+    showSearchButton: boolean;
+    showRenameButton: boolean;
+    showCancelButton: boolean;
+    analyzeButtonText: string;
+    searchButtonText: string;
+    renameButtonText: string;
+    cancelButtonText: string;
+  } => {
+    const hasSearchPlan = Boolean(searchProgress.searchPlan && searchProgress.searchPlan.totalDirectories > 0);
     const isAnalysisComplete = searchProgress.currentStage === SearchStage.CHECKING_EXISTENCE || 
-                              (searchProgress.searchPlan && searchProgress.existingDirectories !== undefined);
+                              Boolean(searchProgress.searchPlan && typeof searchProgress.existingDirectories === 'number');
     const isSearchComplete = searchProgress.currentStage === SearchStage.COMPLETED && foundFilesCount > 0;
     
     return {
@@ -189,7 +198,7 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
   /**
    * Render detailed progress information
    */
-  const renderDetailedProgress = () => {
+  const renderDetailedProgress = (): React.ReactNode => {
     if ((!searchingFiles && !isRenaming) || searchProgress.currentStage === SearchStage.IDLE) {
       return null;
     }
@@ -336,7 +345,7 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
   /**
    * Render rename progress with skipped files support - UPDATED with new status texts
    */
-  const renderRenameProgress = () => {
+  const renderRenameProgress = (): React.ReactNode => {
     if (!renameProgress) return null;
 
     const progressPercentage = renameProgress.total > 0 ? (renameProgress.current / renameProgress.total) * 100 : 0;
