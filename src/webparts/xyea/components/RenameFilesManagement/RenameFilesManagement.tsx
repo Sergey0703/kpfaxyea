@@ -12,7 +12,8 @@ import {
   DirectoryStatus,
   FileSearchStatus,
   DirectoryStatusCallback,
-  FileSearchResultCallback
+  FileSearchResultCallback,
+  TimeTrackingHelper
 } from './types/RenameFilesTypes';
 import { ExcelFileProcessor } from './services/ExcelFileProcessor';
 import { SharePointFolderService } from './services/SharePointFolderService';
@@ -33,6 +34,9 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
   private fileSearchService: FileSearchService;
   private columnResizeHandler: ColumnResizeHandler;
   private cellEditingHandler: CellEditingHandler;
+  
+  // NEW: Timer interval for updating current timer
+  private timerInterval: number | undefined = undefined;
 
   constructor(props: IRenameFilesManagementProps) {
     super(props);
@@ -89,7 +93,9 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       searchProgress: SearchProgressHelper.createInitialProgress(),
       // Rename state with skipped support
       isRenaming: false,
-      renameProgress: undefined
+      renameProgress: undefined,
+      // NEW: Time tracking state
+      timeTracking: TimeTrackingHelper.createInitialState()
     };
 
     this.fileInputRef = React.createRef<HTMLInputElement>();
@@ -104,15 +110,89 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
 
   public componentDidMount(): void {
     this.columnResizeHandler.addEventListeners();
+    this.startTimerInterval();
   }
 
   public componentWillUnmount(): void {
     this.columnResizeHandler.removeEventListeners();
+    this.stopTimerInterval();
     
     // Cancel any active search or rename
     if (this.state.searchingFiles) {
       this.fileSearchService.cancelSearch();
     }
+  }
+
+  // NEW: Timer management methods
+  private startTimerInterval = (): void => {
+    this.timerInterval = setInterval(() => {
+      this.updateCurrentTimer();
+    }, 1000); // Update every second
+  }
+
+  private stopTimerInterval = (): void => {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = undefined;
+    }
+  }
+
+  private updateCurrentTimer = (): void => {
+    const { timeTracking } = this.state;
+    
+    if (timeTracking.currentTimer && timeTracking.currentTimer.isActive) {
+      const updatedTimer = TimeTrackingHelper.updateTimer(timeTracking.currentTimer);
+      
+      this.setState({
+        timeTracking: {
+          ...timeTracking,
+          currentTimer: updatedTimer
+        }
+      });
+    }
+  }
+
+  private startOperationTimer = (
+    operationType: 'analyze' | 'search' | 'rename',
+    operationDescription: string
+  ): void => {
+    const timer = TimeTrackingHelper.startTimer(operationType, operationDescription);
+    
+    this.setState({
+      timeTracking: {
+        ...this.state.timeTracking,
+        currentTimer: timer
+      }
+    });
+  }
+
+  private completeOperationTimer = (success: boolean, itemsProcessed?: number): void => {
+    const { timeTracking } = this.state;
+    
+    if (timeTracking.currentTimer) {
+      const completedOperation = TimeTrackingHelper.completeOperation(
+        timeTracking.currentTimer,
+        success,
+        itemsProcessed
+      );
+      
+      this.setState({
+        timeTracking: {
+          ...timeTracking,
+          currentTimer: undefined,
+          completedOperations: [...timeTracking.completedOperations, completedOperation]
+        }
+      });
+    }
+  }
+
+  private cancelOperationTimer = (): void => {
+    this.setState({
+      timeTracking: {
+        ...this.state.timeTracking,
+        currentTimer: undefined
+      }
+    });
   }
 
   // File handling methods
@@ -159,7 +239,9 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
         exportSettings: {
           ...this.state.exportSettings,
           fileName: this.generateExportFileName(file.name)
-        }
+        },
+        // Reset time tracking for new file
+        timeTracking: TimeTrackingHelper.createInitialState()
       });
 
       const processedData = await this.excelProcessor.processFile(
@@ -211,7 +293,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
   private handleUploadProgress = (stage: string, progress: number, message: string): void => {
     this.setState({
       uploadProgress: {
-        stage: stage as 'idle' | 'uploading' | 'parsing' | 'complete' | 'error', // FIXED: specific type instead of any
+        stage: stage as 'idle' | 'uploading' | 'parsing' | 'complete' | 'error',
         progress,
         message
       }
@@ -266,7 +348,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     }
   }
 
-  private handleFolderSelect = (folder: { Name: string; ServerRelativeUrl: string; ItemCount: number; TimeCreated: string; TimeLastModified: string }): void => { // FIXED: inline type instead of interface
+  private handleFolderSelect = (folder: { Name: string; ServerRelativeUrl: string; ItemCount: number; TimeCreated: string; TimeLastModified: string }): void => {
     this.setState({ 
       selectedFolder: folder,
       showFolderDialog: false,
@@ -276,7 +358,9 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       fileRenameResults: {}, // Clear rename results
       searchProgress: SearchProgressHelper.createInitialProgress(), // Reset progress
       isRenaming: false,
-      renameProgress: undefined
+      renameProgress: undefined,
+      // Reset time tracking when selecting new folder
+      timeTracking: TimeTrackingHelper.createInitialState()
     });
   }
 
@@ -292,11 +376,13 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       fileRenameResults: {}, // Clear rename results
       searchProgress: SearchProgressHelper.createInitialProgress(),
       isRenaming: false,
-      renameProgress: undefined
+      renameProgress: undefined,
+      // Reset time tracking when clearing folder
+      timeTracking: TimeTrackingHelper.createInitialState()
     });
   }
 
-  // UPDATED: Handle directory analysis (Stages 1-2) with directory status callback
+  // UPDATED: Handle directory analysis (Stages 1-2) with timing
   private handleAnalyzeDirectories = async (): Promise<void> => {
     const { selectedFolder, data } = this.state;
     
@@ -312,6 +398,9 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     
     console.log('[RenameFilesManagement] Starting directory analysis...');
     
+    // NEW: Start operation timer
+    this.startOperationTimer('analyze', `Analyzing ${data.rows.length} data rows`);
+    
     this.setState({ 
       searchingFiles: true, 
       error: undefined,
@@ -323,7 +412,8 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
         SearchStage.ANALYZING_DIRECTORIES,
         {
           totalRows: data.rows.length,
-          currentFileName: 'Starting directory analysis...'
+          currentFileName: 'Starting directory analysis...',
+          operationStartTime: new Date() // NEW: Set operation start time
         }
       ),
       isRenaming: false,
@@ -335,7 +425,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
         selectedFolder.ServerRelativeUrl,
         data.rows,
         this.updateSearchProgress,
-        this.updateDirectoryStatus // NEW: Pass directory status callback
+        this.updateDirectoryStatus
       );
       
       console.log('[RenameFilesManagement] Directory analysis completed:', {
@@ -346,6 +436,9 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       this.setState({ 
         searchProgress: analysisProgress
       });
+      
+      // NEW: Complete operation timer
+      this.completeOperationTimer(true, analysisProgress.searchPlan?.totalDirectories);
       
     } catch (error) {
       console.error('Error analyzing directories:', error);
@@ -360,12 +453,15 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
           }
         )
       });
+      
+      // NEW: Complete operation timer with failure
+      this.completeOperationTimer(false);
     } finally {
       this.setState({ searchingFiles: false });
     }
   }
 
-  // UPDATED: Handle file search (Stage 3 only) with file search callback
+  // UPDATED: Handle file search (Stage 3 only) with timing
   private handleSearchFiles = async (): Promise<void> => {
     const { data, searchProgress } = this.state;
     
@@ -381,6 +477,9 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     
     console.log('[RenameFilesManagement] Starting file search...');
     
+    // NEW: Start operation timer
+    this.startOperationTimer('search', `Searching ${data.rows.length} file entries`);
+    
     this.setState({ 
       searchingFiles: true, 
       error: undefined,
@@ -394,7 +493,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       const results = await this.fileSearchService.searchFilesInDirectories(
         searchProgress,
         data.rows,
-        this.updateFileSearchResult, // NEW: Use separate file search callback
+        this.updateFileSearchResult,
         this.updateSearchProgress
       );
       
@@ -409,17 +508,24 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
         fileSearchResults: results
       });
       
+      // NEW: Complete operation timer
+      const foundFiles = Object.values(results).filter(r => r === 'found').length;
+      this.completeOperationTimer(true, foundFiles);
+      
     } catch (error) {
       console.error('Error searching files:', error);
       this.setState({ 
         error: error instanceof Error ? error.message : 'Failed to search files'
       });
+      
+      // NEW: Complete operation timer with failure
+      this.completeOperationTimer(false);
     } finally {
       this.setState({ searchingFiles: false });
     }
   }
 
-  // Handle file renaming with skipped support
+  // UPDATED: Handle file renaming with timing
   private handleRenameFiles = async (): Promise<void> => {
     const { data, fileSearchResults, selectedFolder } = this.state;
     
@@ -435,6 +541,9 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     }
     
     console.log(`[RenameFilesManagement] Starting rename of ${foundFilesCount} files...`);
+    
+    // NEW: Start operation timer
+    this.startOperationTimer('rename', `Renaming ${foundFilesCount} files`);
     
     this.setState({ 
       isRenaming: true, 
@@ -461,6 +570,9 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       
       console.log('[RenameFilesManagement] Rename completed:', results);
       
+      // NEW: Complete operation timer
+      this.completeOperationTimer(results.success > 0, results.success);
+      
       // Updated error handling for skipped files
       if (results.errors > 0 || results.skipped > 0) {
         let errorMessage = `Rename completed: ${results.success} files renamed successfully`;
@@ -482,7 +594,6 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
         this.setState({ 
           error: undefined
         });
-        // Success message could be shown here if needed
       }
       
     } catch (error) {
@@ -490,16 +601,22 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
       this.setState({ 
         error: error instanceof Error ? error.message : 'Failed to rename files'
       });
+      
+      // NEW: Complete operation timer with failure
+      this.completeOperationTimer(false);
     } finally {
       this.setState({ isRenaming: false });
     }
   }
 
-  // Cancel rename operation
+  // Handle cancel operations with timer cleanup
   private handleCancelRename = (): void => {
     console.log('[RenameFilesManagement] Cancelling rename...');
     
-    this.fileSearchService.cancelSearch(); // Reuse the same cancel mechanism
+    this.fileSearchService.cancelSearch();
+    
+    // NEW: Cancel operation timer
+    this.cancelOperationTimer();
     
     this.setState({ 
       isRenaming: false,
@@ -511,6 +628,9 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     console.log('[RenameFilesManagement] Cancelling search...');
     
     this.fileSearchService.cancelSearch();
+    
+    // NEW: Cancel operation timer
+    this.cancelOperationTimer();
     
     this.setState({ 
       searchingFiles: false,
@@ -537,20 +657,20 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     });
   }
 
-// NEW: Bulk directory status update (39 calls instead of 6000+)
-private updateDirectoryStatus: DirectoryStatusCallback = (rowIndexes: number[], status: DirectoryStatus): void => {
-  console.log(`[RenameFilesManagement] Bulk directory update: ${rowIndexes.length} rows -> ${status}`);
-  
-  this.setState(prevState => {
-    const newDirectoryResults = { ...prevState.directoryResults };
-    rowIndexes.forEach(rowIndex => {
-      newDirectoryResults[rowIndex] = status;
+  // NEW: Bulk directory status update (39 calls instead of 6000+)
+  private updateDirectoryStatus: DirectoryStatusCallback = (rowIndexes: number[], status: DirectoryStatus): void => {
+    console.log(`[RenameFilesManagement] Bulk directory update: ${rowIndexes.length} rows -> ${status}`);
+    
+    this.setState(prevState => {
+      const newDirectoryResults = { ...prevState.directoryResults };
+      rowIndexes.forEach(rowIndex => {
+        newDirectoryResults[rowIndex] = status;
+      });
+      return {
+        directoryResults: newDirectoryResults
+      };
     });
-    return {
-      directoryResults: newDirectoryResults
-    };
-  });
-}
+  }
 
   // NEW: Separate callback for file search results (called after Stage 3)
   private updateFileSearchResult: FileSearchResultCallback = (rowIndex: number, result: FileSearchStatus): void => {
@@ -631,7 +751,7 @@ private updateDirectoryStatus: DirectoryStatusCallback = (rowIndexes: number[], 
       const result = await ExcelExportService.exportRenameFilesData(
         data,
         fileSearchResults,
-        fileRenameResults, // Pass individual file rename results
+        fileRenameResults,
         renameProgress,
         exportSettings
       );
@@ -640,7 +760,6 @@ private updateDirectoryStatus: DirectoryStatusCallback = (rowIndexes: number[], 
         this.setState({ error: result.error || 'Export failed' });
       } else {
         console.log('[RenameFilesManagement] Export completed successfully:', result.fileName);
-        // Could show success notification here
       }
 
     } catch (error) {
@@ -667,7 +786,7 @@ private updateDirectoryStatus: DirectoryStatusCallback = (rowIndexes: number[], 
     const statistics = ExcelExportService.getRenameFilesExportStatistics(
       data,
       fileSearchResults,
-      fileRenameResults, // Pass individual file rename results
+      fileRenameResults,
       renameProgress,
       exportSettings
     );
@@ -690,11 +809,12 @@ private updateDirectoryStatus: DirectoryStatusCallback = (rowIndexes: number[], 
       error, 
       uploadProgress, 
       searchProgress,
-      directoryResults, // NEW: Directory status
-      fileSearchResults, // UPDATED: Only file search status
+      directoryResults,
+      fileSearchResults,
       selectedFolder,
       isRenaming,
-      renameProgress
+      renameProgress,
+      timeTracking // NEW: Pass time tracking state
     } = this.state;
     
     const hasData = data.originalFile !== undefined;
@@ -825,6 +945,7 @@ private updateDirectoryStatus: DirectoryStatusCallback = (rowIndexes: number[], 
               foundFilesCount={searchStats.foundFiles}
               isRenaming={isRenaming}
               renameProgress={renameProgress}
+              timeTracking={timeTracking} // NEW: Pass time tracking state
               onSelectFolder={this.handleSelectFolder}
               onClearFolder={this.clearSelectedFolder}
               onAnalyzeDirectories={this.handleAnalyzeDirectories}
@@ -863,7 +984,7 @@ private updateDirectoryStatus: DirectoryStatusCallback = (rowIndexes: number[], 
                   fontSize: '12px',
                   fontWeight: 600,
                   color: '#323130',
-                  fontFamily: '&ldquo;Segoe UI&rdquo;, &ldquo;Segoe UI Web (West European)&rdquo;, &ldquo;Segoe UI&rdquo;, -apple-system, BlinkMacSystemFont, Roboto, &ldquo;Helvetica Neue&rdquo;, sans-serif'
+                  fontFamily: '"Segoe UI", "Segoe UI Web (West European)", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif'
                 }}>Debug Information</h4>
                 <p style={{ margin: '4px 0', lineHeight: 1.4 }}>
                   <strong style={{ color: '#323130' }}>Overall:</strong> {searchProgress.overallProgress.toFixed(1)}%

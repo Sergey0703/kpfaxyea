@@ -6,7 +6,9 @@ import {
   ISharePointFolder, 
   ISearchProgress, 
   SearchStage, 
-  SEARCH_STAGES 
+  SEARCH_STAGES,
+  ITimeTrackingState,
+  TimeTrackingHelper
 } from '../types/RenameFilesTypes';
 
 export interface IRenameControlsPanelProps {
@@ -16,14 +18,15 @@ export interface IRenameControlsPanelProps {
   loading: boolean;
   foundFilesCount: number;
   isRenaming: boolean;
-  renameProgress?: { // UPDATED: Include skipped support
+  renameProgress?: {
     current: number;
     total: number;
     fileName: string;
     success: number;
     errors: number;
-    skipped: number; // NEW: Include skipped
+    skipped: number;
   };
+  timeTracking: ITimeTrackingState; // NEW: Time tracking state
   onSelectFolder: () => void;
   onClearFolder: () => void;
   onAnalyzeDirectories: () => void;
@@ -41,6 +44,7 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
   foundFilesCount,
   isRenaming,
   renameProgress,
+  timeTracking, // NEW: Time tracking prop
   onSelectFolder,
   onClearFolder,
   onAnalyzeDirectories,
@@ -121,6 +125,87 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
       default:
         return 'Ready to start analysis';
     }
+  };
+
+  /**
+   * NEW: Render compact current operation timer
+   */
+  const renderCurrentTimer = (): React.ReactNode => {
+    if (!timeTracking.currentTimer || !timeTracking.currentTimer.isActive) {
+      return null;
+    }
+
+    const timer = timeTracking.currentTimer;
+    const formattedTime = TimeTrackingHelper.formatCompactTime(timer.elapsedSeconds);
+    
+    return (
+      <div className={styles.currentTimer}>
+        <span className={styles.timerIcon}>⏱️</span>
+        <span className={styles.timerText}>{formattedTime}</span>
+        <span className={styles.timerDescription}>{timer.operationDescription}</span>
+      </div>
+    );
+  };
+
+  /**
+   * NEW: Render completed operations time badges (compact)
+   */
+  const renderCompletedOperations = (): React.ReactNode => {
+    if (!timeTracking.showTimingInfo || timeTracking.completedOperations.length === 0) {
+      return null;
+    }
+
+    // Show only the last 3 completed operations to save space
+    const recentOperations = timeTracking.completedOperations
+      .slice(-3)
+      .reverse(); // Show newest first
+
+    return (
+      <div className={styles.completedOperations}>
+        <span className={styles.completedLabel}>Recent:</span>
+        {recentOperations.map((operation, index) => {
+          const formattedTime = TimeTrackingHelper.formatCompactTime(operation.durationSeconds);
+          const operationIcon = operation.operationType === 'analyze' ? '🔍' : 
+                              operation.operationType === 'search' ? '🔎' : '🏷️';
+          const statusIcon = operation.success ? '✅' : '❌';
+          
+          return (
+            <div 
+              key={`${operation.operationType}-${operation.startTime.getTime()}`}
+              className={`${styles.completedOperation} ${operation.success ? styles.success : styles.error}`}
+              title={`${operation.operationDescription} - ${operation.success ? 'Success' : 'Failed'} - ${formattedTime}${operation.itemsProcessed ? ` (${operation.itemsProcessed} items)` : ''}`}
+            >
+              <span className={styles.operationIcon}>{operationIcon}</span>
+              <span className={styles.operationTime}>{formattedTime}</span>
+              <span className={styles.operationStatus}>{statusIcon}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  /**
+   * NEW: Render timing info section (compact)
+   */
+  const renderTimingInfo = (): React.ReactNode => {
+    if (!timeTracking.showTimingInfo) {
+      return null;
+    }
+
+    const hasCurrentTimer = timeTracking.currentTimer && timeTracking.currentTimer.isActive;
+    const hasCompletedOperations = timeTracking.completedOperations.length > 0;
+
+    if (!hasCurrentTimer && !hasCompletedOperations) {
+      return null;
+    }
+
+    return (
+      <div className={styles.timingInfo}>
+        {renderCurrentTimer()}
+        {renderCompletedOperations()}
+      </div>
+    );
   };
 
   /**
@@ -450,6 +535,9 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
 
       {/* Rename Files Controls with THREE BUTTONS */}
       <div className={styles.renameControls}>
+        {/* NEW: Timing info section (compact) */}
+        {renderTimingInfo()}
+
         <div className={styles.renameButtons}>
           {/* BUTTON 1: Analyze Directories (Stages 1-2) */}
           {buttonState.showAnalyzeButton && (

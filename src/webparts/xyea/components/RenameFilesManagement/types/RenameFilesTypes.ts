@@ -3,6 +3,40 @@
 import { IExcelFile, IExcelSheet } from '../../../interfaces/ExcelInterfaces';
 
 /**
+ * NEW: Interface for operation timer
+ */
+export interface IOperationTimer {
+  isActive: boolean;
+  startTime: Date;
+  currentTime?: Date;
+  elapsedSeconds: number;
+  operationType: 'analyze' | 'search' | 'rename';
+  operationDescription: string;
+}
+
+/**
+ * NEW: Interface for completed operation time tracking
+ */
+export interface ICompletedOperationTime {
+  operationType: 'analyze' | 'search' | 'rename';
+  operationDescription: string;
+  startTime: Date;
+  endTime: Date;
+  durationSeconds: number;
+  success: boolean;
+  itemsProcessed?: number;
+}
+
+/**
+ * NEW: Interface for time tracking state
+ */
+export interface ITimeTrackingState {
+  currentTimer?: IOperationTimer;
+  completedOperations: ICompletedOperationTime[];
+  showTimingInfo: boolean;
+}
+
+/**
  * NEW: Status codes enum for simple text-based statuses
  */
 export enum StatusCode {
@@ -207,7 +241,7 @@ export interface ISearchStageInfo {
 }
 
 /**
- * Enhanced search progress interface with stages
+ * Enhanced search progress interface with stages - UPDATED with timing info
  */
 export interface ISearchProgress {
   // Stage information
@@ -229,8 +263,9 @@ export interface ISearchProgress {
   filesSearched?: number;
   filesFound?: number;
   
-  // Timing information
+  // Timing information - UPDATED
   stageStartTime?: Date;
+  operationStartTime?: Date; // NEW: Overall operation start time
   estimatedTimeRemaining?: number; // in seconds
   
   // Error information
@@ -269,7 +304,7 @@ export interface ISearchPlan {
 }
 
 /**
- * Interface for component state - UPDATED: Added separate directory and file status tracking
+ * Interface for component state - UPDATED: Added time tracking
  */
 export interface IRenameFilesState {
   // File and data
@@ -323,6 +358,9 @@ export interface IRenameFilesState {
     errors: number;
     skipped: number;
   };
+  
+  // NEW: Time tracking state
+  timeTracking: ITimeTrackingState;
 }
 
 /**
@@ -498,7 +536,7 @@ export class SearchProgressHelper {
   }
   
   /**
-   * Create initial search progress
+   * Create initial search progress - UPDATED with timing
    */
   public static createInitialProgress(): ISearchProgress {
     return {
@@ -509,6 +547,7 @@ export class SearchProgressHelper {
       totalRows: 0,
       currentFileName: '',
       stageStartTime: new Date(),
+      operationStartTime: new Date(), // NEW: Track overall operation start
       errors: [],
       warnings: []
     };
@@ -536,7 +575,7 @@ export class SearchProgressHelper {
   }
   
   /**
-   * Transition to next stage
+   * Transition to next stage - UPDATED with timing
    */
   public static transitionToStage(
     currentProgress: ISearchProgress,
@@ -551,6 +590,8 @@ export class SearchProgressHelper {
       stageProgress: 0,
       overallProgress: stageInfo.progressMin,
       stageStartTime: new Date(),
+      // Keep operation start time from previous progress
+      operationStartTime: currentProgress.operationStartTime || new Date(),
       ...updates
     };
   }
@@ -664,6 +705,110 @@ export class RenameProgressHelper {
     }
     
     return messages.join(', ') || 'No operations completed';
+  }
+}
+
+/**
+ * NEW: Helper class for time tracking operations
+ */
+export class TimeTrackingHelper {
+  
+  /**
+   * Create initial time tracking state
+   */
+  public static createInitialState(): ITimeTrackingState {
+    return {
+      currentTimer: undefined,
+      completedOperations: [],
+      showTimingInfo: true
+    };
+  }
+  
+  /**
+   * Start a new operation timer
+   */
+  public static startTimer(
+    operationType: 'analyze' | 'search' | 'rename',
+    operationDescription: string
+  ): IOperationTimer {
+    return {
+      isActive: true,
+      startTime: new Date(),
+      currentTime: new Date(),
+      elapsedSeconds: 0,
+      operationType,
+      operationDescription
+    };
+  }
+  
+  /**
+   * Update current timer
+   */
+  public static updateTimer(timer: IOperationTimer): IOperationTimer {
+    const currentTime = new Date();
+    const elapsedSeconds = Math.floor((currentTime.getTime() - timer.startTime.getTime()) / 1000);
+    
+    return {
+      ...timer,
+      currentTime,
+      elapsedSeconds
+    };
+  }
+  
+  /**
+   * Complete an operation and add to completed list
+   */
+  public static completeOperation(
+    timer: IOperationTimer,
+    success: boolean,
+    itemsProcessed?: number
+  ): ICompletedOperationTime {
+    const endTime = new Date();
+    const durationSeconds = Math.floor((endTime.getTime() - timer.startTime.getTime()) / 1000);
+    
+    return {
+      operationType: timer.operationType,
+      operationDescription: timer.operationDescription,
+      startTime: timer.startTime,
+      endTime,
+      durationSeconds,
+      success,
+      itemsProcessed
+    };
+  }
+  
+  /**
+   * Format elapsed time for display
+   */
+  public static formatElapsedTime(seconds: number): string {
+    if (seconds < 60) {
+      return `${seconds}s`;
+    } else if (seconds < 3600) {
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return `${minutes}m ${remainingSeconds}s`;
+    } else {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      return `${hours}h ${minutes}m`;
+    }
+  }
+  
+  /**
+   * Get compact time format for UI labels
+   */
+  public static formatCompactTime(seconds: number): string {
+    if (seconds < 60) {
+      return `${seconds}s`;
+    } else if (seconds < 3600) {
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return remainingSeconds > 0 ? `${minutes}:${remainingSeconds.toString().padStart(2, '0')}` : `${minutes}m`;
+    } else {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      return `${hours}:${minutes.toString().padStart(2, '0')}h`;
+    }
   }
 }
 
@@ -905,7 +1050,7 @@ export interface IRenameError {
   message: string;
   filePath?: string;
   rowIndex?: number;
-  details?: unknown; // FIXED: Changed from any to unknown
+  details?: unknown;
 }
 
 /**

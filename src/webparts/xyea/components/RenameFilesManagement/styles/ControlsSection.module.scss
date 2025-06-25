@@ -100,6 +100,120 @@
   border: 1px solid #ffb900;
   border-radius: 6px;
 
+  // NEW: Timing info section (compact)
+  .timingInfo {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background-color: rgba(255, 255, 255, 0.7);
+    border-radius: 4px;
+    border-left: 3px solid #0078d4;
+    font-size: 12px;
+    min-height: 32px;
+
+    // Current timer (active operation)
+    .currentTimer {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #0078d4;
+      font-weight: 600;
+
+      .timerIcon {
+        font-size: 14px;
+        animation: pulse 2s infinite;
+      }
+
+      .timerText {
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        font-weight: 700;
+        min-width: 35px;
+      }
+
+      .timerDescription {
+        font-size: 11px;
+        color: #605e5c;
+        font-weight: 500;
+        max-width: 200px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+
+    // Completed operations badges
+    .completedOperations {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto; // Push to right side
+
+      .completedLabel {
+        font-size: 10px;
+        color: #605e5c;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .completedOperation {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        padding: 3px 6px;
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: 600;
+        cursor: help;
+        transition: all 0.2s ease;
+        min-width: 45px;
+        justify-content: center;
+
+        .operationIcon {
+          font-size: 10px;
+        }
+
+        .operationTime {
+          font-family: 'Courier New', monospace;
+          font-size: 9px;
+          min-width: 20px;
+          text-align: center;
+        }
+
+        .operationStatus {
+          font-size: 9px;
+        }
+
+        &.success {
+          background-color: #d4edda;
+          color: #155724;
+          border: 1px solid #c3e6cb;
+
+          &:hover {
+            background-color: #c3e6cb;
+            transform: translateY(-1px);
+            box-shadow: 0 1px 3px rgba(21, 87, 36, 0.2);
+          }
+        }
+
+        &.error {
+          background-color: #f8d7da;
+          color: #721c24;
+          border: 1px solid #f5c6cb;
+
+          &:hover {
+            background-color: #f5c6cb;
+            transform: translateY(-1px);
+            box-shadow: 0 1px 3px rgba(114, 28, 36, 0.2);
+          }
+        }
+      }
+    }
+  }
+
   .renameButtons {
     display: flex;
     align-items: center;
@@ -705,7 +819,7 @@
   }
   50% {
     opacity: 0.7;
-    transform: scale(1.1);
+    transform: scale(1.05);
   }
 }
 
@@ -729,6 +843,15 @@
   }
 }
 
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 // Responsive Design
 @media (max-width: 768px) {
   .folderSelection {
@@ -744,6 +867,46 @@
   }
 
   .renameControls {
+    // NEW: Mobile timing info
+    .timingInfo {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+      padding: 6px 8px;
+
+      .currentTimer {
+        justify-content: center;
+
+        .timerDescription {
+          max-width: none;
+        }
+      }
+
+      .completedOperations {
+        margin-left: 0;
+        justify-content: center;
+
+        .completedLabel {
+          font-size: 9px;
+        }
+
+        .completedOperation {
+          min-width: 40px;
+          padding: 2px 4px;
+
+          .operationTime {
+            font-size: 8px;
+            min-width: 18px;
+          }
+
+          .operationIcon,
+          .operationStatus {
+            font-size: 9px;
+          }
+        }
+      }
+    }
+
     .renameButtons {
       flex-direction: column;
       align-items: stretch;
@@ -861,12 +1024,59 @@
   }
 }
 
-/*
-ИМПОРТ ЭТОГО ФАЙЛА:
-1. В основной RenameFilesManagement.module.scss добавить:
-   @import './styles/ControlsSection.module.scss';
+// NEW: High contrast mode support for timing elements
+@media (prefers-contrast: high) {
+  .renameControls {
+    .timingInfo {
+      border: 2px solid #000;
 
-2. Или импортировать напрямую в соответствующие компоненты:
-   - RenameControlsPanel.tsx
-   - FolderSelectionDialog.tsx
-*/
+      .currentTimer {
+        color: #000;
+      }
+
+      .completedOperations {
+        .completedOperation {
+          &.success {
+            border: 2px solid #000;
+            background-color: #90EE90;
+            color: #000;
+          }
+
+          &.error {
+            border: 2px solid #000;
+            background-color: #FFB6C1;
+            color: #000;
+          }
+        }
+      }
+    }
+  }
+}
+
+// NEW: Print styles - hide timing info in print
+@media print {
+  .renameControls {
+    .timingInfo {
+      display: none;
+    }
+  }
+}
+
+// NEW: Reduced motion support
+@media (prefers-reduced-motion: reduce) {
+  .timingInfo .currentTimer .timerIcon {
+    animation: none;
+  }
+
+  .stageIndicator.active .stageNumber {
+    animation: none;
+  }
+
+  .completedOperation {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
+  }
+}
