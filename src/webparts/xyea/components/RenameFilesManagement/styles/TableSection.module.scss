@@ -1,0 +1,555 @@
+// src/webparts/xyea/components/RenameFilesManagement/styles/TableSection.module.scss
+
+// Data Table Container
+.tableContainer {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 70vh;
+  border: 1px solid #edebe9;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+  .dataTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background-color: white;
+
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background-color: #f8f9fa;
+      
+      tr {
+        border-bottom: 2px solid #edebe9;
+      }
+
+      .rowHeader {
+        background-color: #f3f2f1;
+        color: #323130;
+        font-weight: 600;
+        padding: 12px 8px;
+        text-align: center;
+        border-right: 1px solid #edebe9;
+        min-width: 60px;
+        max-width: 60px;
+        width: 60px;
+        position: sticky;
+        left: 0;
+        z-index: 11;
+      }
+
+      .columnHeader {
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        color: #323130;
+        border-right: 1px solid #edebe9;
+        min-width: 80px;
+        max-width: none;
+        position: relative;
+        vertical-align: top;
+        resize: horizontal;
+        overflow: hidden;
+
+        &.customColumn {
+          background-color: #e1f5fe;
+          border-bottom: 3px solid #107c10;
+        }
+
+        &.excelColumn {
+          background-color: #f8f9fa;
+          border-bottom: 3px solid #0078d4;
+        }
+
+        .headerContent {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+
+          .columnName {
+            font-size: 13px;
+            line-height: 1.3;
+            word-break: break-word;
+          }
+
+          .customBadge {
+            font-size: 10px;
+            background-color: #107c10;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            align-self: flex-start;
+            font-weight: 500;
+          }
+        }
+
+        .resizeHandle {
+          position: absolute;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          width: 4px;
+          cursor: col-resize;
+          background-color: transparent;
+          border-right: 2px solid transparent;
+          transition: background-color 0.2s ease;
+
+          &:hover {
+            background-color: rgba(0, 120, 212, 0.3);
+            border-right-color: #0078d4;
+          }
+
+          &:active {
+            background-color: rgba(0, 120, 212, 0.5);
+            border-right-color: #0078d4;
+          }
+        }
+      }
+    }
+
+    tbody {
+      .editedRow {
+        background-color: #fff4e6;
+      }
+
+      tr {
+        border-bottom: 1px solid #f3f2f1;
+
+        &:hover {
+          background-color: #f8f9fa;
+
+          &.editedRow {
+            background-color: #fff0e6;
+          }
+        }
+
+        .rowNumber {
+          background-color: #faf9f8;
+          color: #605e5c;
+          font-weight: 500;
+          padding: 8px;
+          text-align: center;
+          border-right: 1px solid #edebe9;
+          font-size: 12px;
+          min-width: 60px;
+          max-width: 60px;
+          width: 60px;
+          position: sticky;
+          left: 0;
+          z-index: 5;
+
+          .rowNumberContent {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+
+            .rowNumberText {
+              font-weight: 500;
+            }
+          }
+        }
+
+        .tableCell {
+          padding: 4px;
+          border-right: 1px solid #f3f2f1;
+          vertical-align: top;
+          position: relative;
+
+          &.editedCell {
+            background-color: #fff9c4;
+            border-left: 3px solid #ffb900;
+          }
+
+          .cellInput {
+            width: 100%;
+            border: none;
+            background: transparent;
+            padding: 6px 8px;
+            font-size: 13px;
+            font-family: inherit;
+            color: #323130;
+            resize: none;
+            outline: none;
+            min-height: 20px;
+            line-height: 1.3;
+
+            &:focus {
+              background-color: white;
+              border: 2px solid #0078d4;
+              border-radius: 2px;
+              box-shadow: 0 0 0 1px #0078d4;
+            }
+
+            &::placeholder {
+              color: #a19f9d;
+              font-style: italic;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// NEW: Status Column Styles
+.statusColumn {
+  width: 60px !important;
+  min-width: 60px !important;
+  max-width: 60px !important;
+  background-color: #f8f9fa;
+  border-bottom: 3px solid #0078d4;
+  text-align: center;
+
+  .statusBadge {
+    font-size: 9px;
+    background-color: #0078d4;
+    color: white;
+    padding: 1px 4px;
+    border-radius: 8px;
+    align-self: flex-start;
+    font-weight: 500;
+  }
+}
+
+.statusCell {
+  width: 60px;
+  min-width: 60px;
+  max-width: 60px;
+  padding: 4px 2px;
+  text-align: center;
+  vertical-align: middle;
+  border-right: 1px solid #edebe9;
+  position: relative;
+
+  .statusCode {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 6px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 0.5px;
+    cursor: help;
+    transition: all 0.2s ease;
+
+    &:hover {
+      transform: scale(1.1);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+  }
+}
+
+// Status Color Classes
+.statusSuccess {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+
+  &:hover {
+    background-color: #c3e6cb;
+  }
+}
+
+.statusError {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+
+  &:hover {
+    background-color: #f5c6cb;
+  }
+}
+
+.statusWarning {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+
+  &:hover {
+    background-color: #ffeaa7;
+  }
+}
+
+.statusProgress {
+  background-color: #d1ecf1;
+  color: #0c5460;
+  border: 1px solid #b8daff;
+  
+  &:hover {
+    background-color: #b8daff;
+  }
+}
+
+.statusDefault {
+  background-color: #f8f9fa;
+  color: #6c757d;
+  border: 1px solid #dee2e6;
+
+  &:hover {
+    background-color: #e9ecef;
+  }
+}
+
+// Row styling based on status
+.fileFoundRow {
+  background-color: rgba(16, 124, 16, 0.03);
+  
+  &:hover {
+    background-color: rgba(16, 124, 16, 0.08);
+  }
+}
+
+.fileNotFoundRow {
+  background-color: rgba(209, 52, 56, 0.03);
+  
+  &:hover {
+    background-color: rgba(209, 52, 56, 0.08);
+  }
+}
+
+.directoryNotExistsRow {
+  background-color: rgba(255, 193, 7, 0.03);
+  
+  &:hover {
+    background-color: rgba(255, 193, 7, 0.08);
+  }
+}
+
+.directoryErrorRow {
+  background-color: rgba(255, 107, 53, 0.03);
+  
+  &:hover {
+    background-color: rgba(255, 107, 53, 0.08);
+  }
+}
+
+// Status Legend
+.statusLegend {
+  margin-top: 12px;
+  padding: 12px 16px;
+  background-color: #f8f9fa;
+  border: 1px solid #edebe9;
+  border-radius: 4px;
+  font-size: 12px;
+
+  .legendTitle {
+    font-weight: 600;
+    color: #323130;
+    margin-bottom: 8px;
+  }
+
+  .legendItems {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .legendItem {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    .legendCode {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 4px;
+      border-radius: 2px;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 0.5px;
+      min-width: 24px;
+      text-align: center;
+    }
+
+    .legendText {
+      color: #605e5c;
+      font-size: 11px;
+    }
+  }
+}
+
+.tableNote {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background-color: #fff4ce;
+  border: 1px solid #ffb900;
+  border-radius: 4px;
+  color: #8a6914;
+  font-size: 12px;
+  text-align: center;
+}
+
+// Scrollbar Styling
+.tableContainer::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.tableContainer::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.tableContainer::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.tableContainer::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.tableContainer::-webkit-scrollbar-corner {
+  background: #f1f1f1;
+}
+
+// Mobile responsive updates
+@media (max-width: 768px) {
+  .tableContainer {
+    max-height: 50vh;
+
+    .dataTable {
+      font-size: 12px;
+
+      thead {
+        .columnHeader {
+          min-width: 100px;
+          padding: 8px;
+
+          .headerContent {
+            .columnName {
+              font-size: 12px;
+            }
+
+            .customBadge {
+              font-size: 9px;
+              padding: 1px 4px;
+            }
+          }
+        }
+      }
+
+      tbody {
+        tr {
+          .tableCell {
+            .cellInput {
+              font-size: 12px;
+              padding: 4px 6px;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .statusColumn {
+    width: 50px !important;
+    min-width: 50px !important;
+    max-width: 50px !important;
+    
+    .statusBadge {
+      font-size: 8px;
+      padding: 1px 3px;
+    }
+  }
+
+  .statusCell {
+    width: 50px;
+    min-width: 50px;
+    max-width: 50px;
+    padding: 2px 1px;
+
+    .statusCode {
+      font-size: 10px;
+      padding: 3px 4px;
+    }
+  }
+
+  .statusLegend {
+    .legendItems {
+      gap: 8px;
+    }
+
+    .legendItem {
+      .legendCode {
+        font-size: 9px;
+        min-width: 20px;
+      }
+
+      .legendText {
+        font-size: 10px;
+      }
+    }
+  }
+}
+
+// High Contrast Mode Support
+@media (prefers-contrast: high) {
+  .tableContainer {
+    .dataTable {
+      border: 2px solid #000;
+
+      thead {
+        .columnHeader {
+          &.customColumn {
+            border-bottom: 4px solid #000;
+          }
+
+          &.excelColumn {
+            border-bottom: 4px solid #000;
+          }
+        }
+      }
+
+      tbody {
+        .tableCell {
+          &.editedCell {
+            border-left: 4px solid #000;
+          }
+
+          .cellInput {
+            &:focus {
+              border: 3px solid #000;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// Print Styles
+@media print {
+  .tableContainer {
+    max-height: none;
+    overflow: visible;
+    border: 1px solid #000;
+
+    .dataTable {
+      thead {
+        .rowHeader,
+        .columnHeader {
+          position: static;
+        }
+      }
+
+      tbody {
+        tr {
+          .rowNumber {
+            position: static;
+          }
+        }
+      }
+    }
+  }
+}
+
+/*
+ИМПОРТ ЭТОГО ФАЙЛА:
+1. В основной RenameFilesManagement.module.scss добавить:
+   @import './styles/TableSection.module.scss';
+
+2. Или импортировать напрямую в DataTableView.tsx если нужно:
+   import tableStyles from '../styles/TableSection.module.scss';
+*/

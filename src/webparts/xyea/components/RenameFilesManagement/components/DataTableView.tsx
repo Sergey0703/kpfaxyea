@@ -1,4 +1,6 @@
-// src/webparts/xyea/components/RenameFilesManagement/components/DataTableView.tsx
+/**
+   * NEW: Get CSS class for row styling based on status
+   */// src/webparts/xyea/components/RenameFilesManagement/components/DataTableView.tsx
 
 import * as React from 'react';
 import styles from '../RenameFilesManagement.module.scss';
@@ -6,22 +8,23 @@ import {
   IRenameFilesData,
   DirectoryStatus,
   FileSearchStatus,
-  FileStatusHelper
+  FileStatusHelper,
+  StatusCode
 } from '../types/RenameFilesTypes';
 import { ColumnResizeHandler } from '../handlers/ColumnResizeHandler';
 
 export interface IDataTableViewProps {
   data: IRenameFilesData;
-  directoryResults: { [rowIndex: number]: DirectoryStatus }; // NEW: Directory status
-  fileSearchResults: { [rowIndex: number]: FileSearchStatus }; // UPDATED: Only file search status
+  directoryResults: { [rowIndex: number]: DirectoryStatus };
+  fileSearchResults: { [rowIndex: number]: FileSearchStatus };
   columnResizeHandler: ColumnResizeHandler;
   onCellEdit: (columnId: string, rowIndex: number, newValue: string) => void;
 }
 
 export const DataTableView: React.FC<IDataTableViewProps> = ({
   data,
-  directoryResults, // NEW: Directory status
-  fileSearchResults, // UPDATED: File search status
+  directoryResults,
+  fileSearchResults,
   columnResizeHandler,
   onCellEdit
 }) => {
@@ -30,141 +33,129 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
   };
 
   /**
-   * NEW: Render directory status indicator (shows after Stage 2)
+   * NEW: Get current status code for a row with priority logic
    */
-  const renderDirectoryIndicator = (rowIndex: number) => {
-    const directoryStatus = directoryResults[rowIndex];
-    
-    if (!directoryStatus) return null;
-
-    const icon = FileStatusHelper.getDirectoryIcon(directoryStatus);
-    const tooltip = FileStatusHelper.getDirectoryTooltipText(directoryStatus);
-
-    if (!icon) return null;
-
-    return (
-      <span 
-        className={getDirectoryIndicatorClass(directoryStatus)} 
-        title={tooltip}
-      >
-        {icon}
-      </span>
-    );
-  };
-
-  /**
-   * UPDATED: Render file search indicator (shows after Stage 3)
-   */
-  const renderFileSearchIndicator = (rowIndex: number) => {
-    const fileSearchStatus = fileSearchResults[rowIndex];
-    
-    if (!fileSearchStatus) return null;
-
-    const icon = FileStatusHelper.getFileSearchIcon(fileSearchStatus);
-    const tooltip = FileStatusHelper.getFileTooltipText(fileSearchStatus);
-
-    if (!icon) return null;
-
-    return (
-      <span 
-        className={getFileSearchIndicatorClass(fileSearchStatus)} 
-        title={tooltip}
-      >
-        {icon}
-      </span>
-    );
-  };
-
-  /**
-   * NEW: Get CSS class for directory indicator
-   */
-  const getDirectoryIndicatorClass = (status: DirectoryStatus): string => {
-    switch (status) {
-      case 'checking':
-        return styles.checkingDirectoryIndicator;
-      case 'exists':
-        return styles.directoryExistsIndicator;
-      case 'not-exists':
-        return styles.directoryNotExistsIndicator;
-      case 'error':
-        return styles.directoryErrorIndicator;
-      default:
-        return '';
-    }
-  };
-
-  /**
-   * UPDATED: Get CSS class for file search indicator
-   */
-  const getFileSearchIndicatorClass = (status: FileSearchStatus): string => {
-    switch (status) {
-      case 'searching':
-        return styles.searchingIndicator;
-      case 'found':
-        return styles.foundIndicator;
-      case 'not-found':
-        return styles.notFoundIndicator;
-      case 'skipped':
-        return styles.skippedIndicator;
-      default:
-        return '';
-    }
-  };
-
-  /**
-   * UPDATED: Render combined status indicators with proper priority logic
-   */
-  const renderStatusIndicators = (rowIndex: number) => {
+  const getCurrentStatusCode = (rowIndex: number): StatusCode => {
     const directoryStatus = directoryResults[rowIndex];
     const fileSearchStatus = fileSearchResults[rowIndex];
     
-    // UPDATED: Priority logic:
-    // 1. If directory doesn't exist or has error -> ALWAYS show directory status
-    // 2. If directory exists and we have file search results -> show file status
+    // Priority logic:
+    // 1. If directory doesn't exist or has error -> show directory status
+    // 2. If directory exists and we have file search results -> show file status  
     // 3. If directory exists but no file search yet -> show directory status
     
     if (directoryStatus === 'not-exists' || directoryStatus === 'error') {
-      // Directory doesn't exist or has error - ALWAYS show directory status
-      console.log(`[DataTableView] Row ${rowIndex + 1}: Showing directory status (${directoryStatus}) - directory unavailable`);
-      return renderDirectoryIndicator(rowIndex);
+      // Map directory status to status code
+      switch (directoryStatus) {
+        case 'not-exists':
+          return StatusCode.DIRECTORY_NOT_EXISTS;
+        case 'error':
+          return StatusCode.DIRECTORY_ERROR;
+        default:
+          return StatusCode.CHECKING_DIRECTORY;
+      }
     } else if (fileSearchStatus && directoryStatus === 'exists') {
-      // Directory exists AND we have file search results - show file status
-      console.log(`[DataTableView] Row ${rowIndex + 1}: Showing file status (${fileSearchStatus}) - directory exists, file searched`);
-      return renderFileSearchIndicator(rowIndex);
+      // Map file search status to status code
+      switch (fileSearchStatus) {
+        case 'found':
+          return StatusCode.FOUND;
+        case 'not-found':
+          return StatusCode.NOT_FOUND;
+        case 'searching':
+          return StatusCode.SEARCHING;
+        case 'skipped':
+          return StatusCode.SKIPPED;
+        default:
+          return StatusCode.SEARCHING;
+      }
     } else if (directoryStatus) {
-      // Directory exists but no file search yet - show directory status
-      console.log(`[DataTableView] Row ${rowIndex + 1}: Showing directory status (${directoryStatus}) - waiting for file search`);
-      return renderDirectoryIndicator(rowIndex);
+      // Map directory status to status code
+      switch (directoryStatus) {
+        case 'checking':
+          return StatusCode.CHECKING_DIRECTORY;
+        case 'exists':
+          return StatusCode.DIRECTORY_EXISTS;
+        default:
+          return StatusCode.CHECKING_DIRECTORY;
+      }
     }
     
-    // No status available
-    return null;
+    return StatusCode.CHECKING_DIRECTORY; // Default
   };
 
-
+  /**
+   * NEW: Get CSS class for status styling
+   */
+  const getStatusCssClass = (statusCode: StatusCode): string => {
+    switch (statusCode) {
+      case StatusCode.FOUND:
+      case StatusCode.RENAMED:
+      case StatusCode.DIRECTORY_EXISTS:
+        return 'statusSuccess';
+      case StatusCode.NOT_FOUND:
+      case StatusCode.RENAME_ERROR:
+      case StatusCode.DIRECTORY_NOT_EXISTS:
+      case StatusCode.DIRECTORY_ERROR:
+        return 'statusError';
+      case StatusCode.SKIPPED:
+      case StatusCode.RENAME_SKIPPED:
+        return 'statusWarning';
+      case StatusCode.CHECKING_DIRECTORY:
+      case StatusCode.SEARCHING:
+      case StatusCode.RENAMING:
+        return 'statusProgress';
+      default:
+        return 'statusDefault';
+    }
+  };
 
   /**
-   * UPDATED: Determine row styling with proper priority for directory vs file status
+   * NEW: Get tooltip text for status code
    */
+  const getStatusTooltip = (statusCode: StatusCode): string => {
+    switch (statusCode) {
+      case StatusCode.CHECKING_DIRECTORY:
+        return 'Checking directory...';
+      case StatusCode.DIRECTORY_EXISTS:
+        return 'Directory exists';
+      case StatusCode.DIRECTORY_NOT_EXISTS:
+        return 'Directory not found';
+      case StatusCode.DIRECTORY_ERROR:
+        return 'Directory check error';
+      case StatusCode.SEARCHING:
+        return 'Searching for file...';
+      case StatusCode.FOUND:
+        return 'File found';
+      case StatusCode.NOT_FOUND:
+        return 'File not found';
+      case StatusCode.SKIPPED:
+        return 'File skipped';
+      case StatusCode.RENAMING:
+        return 'Renaming file...';
+      case StatusCode.RENAMED:
+        return 'File renamed successfully';
+      case StatusCode.RENAME_ERROR:
+        return 'File rename error';
+      case StatusCode.RENAME_SKIPPED:
+        return 'File rename skipped';
+      default:
+        return 'Unknown status';
+    }
+  };
   const getRowStatusClass = (rowIndex: number): string => {
     const directoryStatus = directoryResults[rowIndex];
     const fileSearchStatus = fileSearchResults[rowIndex];
     
-    // UPDATED: Priority logic for styling:
-    // 1. If directory doesn't exist -> style based on directory status
-    // 2. If directory exists and file search completed -> style based on file status  
-    // 3. Otherwise no special styling
-    
+    // Apply row styling based on most relevant status
     if (directoryStatus === 'not-exists') {
-      return styles.directoryNotExistsRow;
+      return 'directoryNotExistsRow';
     } else if (directoryStatus === 'error') {
-      return styles.directoryErrorRow;
+      return 'directoryErrorRow';
     } else if (fileSearchStatus && directoryStatus === 'exists') {
-      // Directory exists and we have file search results
       if (fileSearchStatus === 'found') {
-        return styles.fileFoundRow;
+        return 'fileFoundRow';
       } else if (fileSearchStatus === 'not-found') {
-        return styles.fileNotFoundRow;
+        return 'fileNotFoundRow';
       }
     }
     
@@ -177,6 +168,13 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
         <thead>
           <tr>
             <th className={styles.rowHeader}>#</th>
+            {/* NEW: Status Column Header */}
+            <th className={`${styles.columnHeader} ${styles.statusColumn}`}>
+              <div className={styles.headerContent}>
+                <span className={styles.columnName}>Status</span>
+                <span className={styles.statusBadge}>Live</span>
+              </div>
+            </th>
             {data.columns
               .sort((a, b) => a.currentIndex - b.currentIndex)
               .filter(col => col.isVisible)
@@ -204,22 +202,35 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
         </thead>
         <tbody>
           {data.rows.map(row => {
-            // NEW: Apply row styling based on status
             const rowStatusClass = getRowStatusClass(row.rowIndex);
             const baseRowClass = row.isEdited ? styles.editedRow : '';
             const finalRowClass = [baseRowClass, rowStatusClass].filter(Boolean).join(' ');
             
+            // Get current status for this row
+            const currentStatusCode = getCurrentStatusCode(row.rowIndex);
+            const statusCssClass = getStatusCssClass(currentStatusCode);
+            const statusTooltip = getStatusTooltip(currentStatusCode);
+            
             return (
               <tr key={row.rowIndex} className={finalRowClass}>
+                {/* Row Number Column */}
                 <td className={styles.rowNumber}>
                   <div className={styles.rowNumberContent}>
                     <span className={styles.rowNumberText}>{row.rowIndex + 1}</span>
-                    {/* NEW: Show combined status indicators */}
-                    <div className={styles.searchIndicator}>
-                      {renderStatusIndicators(row.rowIndex)}
-                    </div>
                   </div>
                 </td>
+                
+                {/* NEW: Status Column */}
+                <td className={`${styles.statusCell} ${styles[statusCssClass]}`}>
+                  <div 
+                    className={styles.statusCode}
+                    title={statusTooltip}
+                  >
+                    {currentStatusCode}
+                  </div>
+                </td>
+                
+                {/* Data Columns */}
                 {data.columns
                   .sort((a, b) => a.currentIndex - b.currentIndex)
                   .filter(col => col.isVisible)
@@ -246,33 +257,49 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
         </tbody>
       </table>
       
-      {/* NEW: Status legend for better user understanding */}
+      {/* NEW: Status Legend */}
       <div className={styles.statusLegend}>
-        <div className={styles.legendTitle}>Status Legend:</div>
+        <div className={styles.legendTitle}>Status Codes:</div>
         <div className={styles.legendItems}>
           <div className={styles.legendItem}>
-            <span className={styles.legendIcon}>🔍</span>
-            <span className={styles.legendText}>Checking directory...</span>
+            <span className={`${styles.legendCode} ${styles.statusProgress}`}>CHK</span>
+            <span className={styles.legendText}>Checking directory</span>
           </div>
           <div className={styles.legendItem}>
-            <span className={styles.legendIcon}>📂</span>
+            <span className={`${styles.legendCode} ${styles.statusSuccess}`}>DIR</span>
             <span className={styles.legendText}>Directory exists</span>
           </div>
           <div className={styles.legendItem}>
-            <span className={styles.legendIcon}>📂❌</span>
+            <span className={`${styles.legendCode} ${styles.statusError}`}>NDF</span>
             <span className={styles.legendText}>Directory not found</span>
           </div>
           <div className={styles.legendItem}>
-            <span className={styles.legendIcon}>✅</span>
+            <span className={`${styles.legendCode} ${styles.statusProgress}`}>SCH</span>
+            <span className={styles.legendText}>Searching files</span>
+          </div>
+          <div className={styles.legendItem}>
+            <span className={`${styles.legendCode} ${styles.statusSuccess}`}>FND</span>
             <span className={styles.legendText}>File found</span>
           </div>
           <div className={styles.legendItem}>
-            <span className={styles.legendIcon}>❌</span>
+            <span className={`${styles.legendCode} ${styles.statusError}`}>NFD</span>
             <span className={styles.legendText}>File not found</span>
           </div>
           <div className={styles.legendItem}>
-            <span className={styles.legendIcon}>⏭️</span>
-            <span className={styles.legendText}>File skipped</span>
+            <span className={`${styles.legendCode} ${styles.statusProgress}`}>RNG</span>
+            <span className={styles.legendText}>Renaming</span>
+          </div>
+          <div className={styles.legendItem}>
+            <span className={`${styles.legendCode} ${styles.statusSuccess}`}>REN</span>
+            <span className={styles.legendText}>Renamed</span>
+          </div>
+          <div className={styles.legendItem}>
+            <span className={`${styles.legendCode} ${styles.statusWarning}`}>SKP</span>
+            <span className={styles.legendText}>Skipped</span>
+          </div>
+          <div className={styles.legendItem}>
+            <span className={`${styles.legendCode} ${styles.statusError}`}>ERR</span>
+            <span className={styles.legendText}>Error</span>
           </div>
         </div>
       </div>
