@@ -75,8 +75,8 @@ export class FileSearchService {
         throw new Error('Analysis was cancelled');
       }
 
-      // STAGE 2: CHECKING DIRECTORY EXISTENCE (50-100%) with directory status updates
-      currentProgress = await this.executeStage2_CheckDirectoryExistence(
+      // STAGE 2: CHECKING DIRECTORY EXISTENCE (50-100%) - OPTIMIZED: Check directories, not rows
+      currentProgress = await this.executeStage2_CheckDirectoryExistence_OPTIMIZED(
         currentProgress,
         statusCallback,
         directoryStatusCallback // NEW: Pass directory callback to Stage 2
@@ -297,155 +297,165 @@ export class FileSearchService {
   }
 
   /**
-   * UPDATED: STAGE 2: Check directory existence with directory status callback
+   * OPTIMIZED STAGE 2: Check directories ONCE, not per row - FIXED IMPLEMENTATION
    */
-  private async executeStage2_CheckDirectoryExistence(
-    currentProgress: ISearchProgress,
-    statusCallback?: (progress: ISearchProgress) => void,
-    directoryStatusCallback?: DirectoryStatusCallback // NEW: Directory status callback
-  ): Promise<ISearchProgress> {
-    
-    console.log('[FileSearchService] STAGE 2: Checking directory existence with status updates...');
-    
-    let progress = SearchProgressHelper.transitionToStage(
-      currentProgress,
-      SearchStage.CHECKING_EXISTENCE,
-      {
-        currentFileName: 'Loading SharePoint folder structure...'
+private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
+  currentProgress: ISearchProgress,
+  statusCallback?: (progress: ISearchProgress) => void,
+  directoryStatusCallback?: DirectoryStatusCallback
+): Promise<ISearchProgress> {
+  
+  console.log('[FileSearchService] 🚀 OPTIMIZED STAGE 2: Checking directories ONCE, not per row...');
+  
+  let progress = SearchProgressHelper.transitionToStage(
+    currentProgress,
+    SearchStage.CHECKING_EXISTENCE,
+    {
+      currentFileName: 'Loading SharePoint folder structure...'
+    }
+  );
+  statusCallback?.(progress);
+
+  const searchPlan = currentProgress.searchPlan;
+  if (!searchPlan) {
+    throw new Error('Search plan not found from Stage 1');
+  }
+
+  console.log(`[FileSearchService] 📊 EFFICIENCY GAINED: Checking ${searchPlan.directoryGroups.length} directories instead of ${searchPlan.totalRows} rows!`);
+  console.log(`[FileSearchService] 🎯 API calls reduced from ${searchPlan.totalRows} to ${searchPlan.directoryGroups.length} (${Math.round(searchPlan.totalRows / searchPlan.directoryGroups.length)}x improvement)`);
+
+  // NEW: Initialize all rows as 'checking' (bulk operation)
+  if (directoryStatusCallback) {
+    console.log('[FileSearchService] 🔄 Bulk initializing all rows as "checking"...');
+    searchPlan.directoryGroups.forEach(dirGroup => {
+      directoryStatusCallback(dirGroup.rowIndexes, 'checking');
+    });
+  }
+
+  // Load SharePoint folders with timeout (optional optimization)
+  try {
+    const folderLoadPromise = this.folderService.loadAllSubfolders(
+      searchPlan.directoryGroups[0]?.fullSharePointPath?.split('/').slice(0, -1).join('/') || '',
+      (currentPath, foldersLoaded) => {
+        if (statusCallback) {
+          const loadProgress = Math.min(20, (foldersLoaded / 100) * 20);
+          const stageProgress = SearchProgressHelper.updateStageProgress(
+            progress,
+            loadProgress,
+            {
+              currentFileName: `Loading folders... (${foldersLoaded} loaded)`
+            }
+          );
+          statusCallback(stageProgress);
+        }
       }
     );
-    statusCallback?.(progress);
 
-    const searchPlan = currentProgress.searchPlan;
-    if (!searchPlan) {
-      throw new Error('Search plan not found from Stage 1');
-    }
+    // Apply timeout to folder loading
+    await Promise.race([
+      folderLoadPromise,
+      this.createTimeoutPromise(this.FOLDER_LOAD_TIMEOUT, 'Folder loading timeout')
+    ]);
 
-    // NEW: Initialize all directory statuses as 'checking'
-    if (directoryStatusCallback) {
-      console.log('[FileSearchService] 🔄 Initializing directory status as "checking"...');
-      searchPlan.directoryGroups.forEach(dirGroup => {
-        dirGroup.rowIndexes.forEach(rowIndex => {
-          directoryStatusCallback(rowIndex, 'checking');
-        });
-      });
-    }
+  } catch (error) {
+    console.warn('[FileSearchService] Folder loading failed or timed out:', error);
+    // Continue with basic directory checks
+  }
 
-    // Load SharePoint folders with timeout
+  // OPTIMIZED: Check each UNIQUE directory ONCE (not per row)
+  let checkedDirectories = 0;
+  let existingDirectories = 0;
+
+  for (const dirGroup of searchPlan.directoryGroups) {
+    if (this.isCancelled) break;
+
+    console.log(`[FileSearchService] 🔍 Checking UNIQUE directory ${checkedDirectories + 1}/${searchPlan.directoryGroups.length}:`);
+    console.log(`[FileSearchService] 📁 Path: "${dirGroup.directoryPath}"`);
+    console.log(`[FileSearchService] 📊 Will update ${dirGroup.rowIndexes.length} rows with result`);
+
     try {
-      const folderLoadPromise = this.folderService.loadAllSubfolders(
-        searchPlan.directoryGroups[0]?.fullSharePointPath?.split('/').slice(0, -1).join('/') || '',
-        (currentPath, foldersLoaded) => {
-          if (statusCallback) {
-            const loadProgress = Math.min(20, (foldersLoaded / 100) * 20);
-            const stageProgress = SearchProgressHelper.updateStageProgress(
-              progress,
-              loadProgress,
-              {
-                currentFileName: `Loading folders... (${foldersLoaded} loaded)`
-              }
-            );
-            statusCallback(stageProgress);
-          }
-        }
-      );
-
-      // Apply timeout to folder loading
-      await Promise.race([
-        folderLoadPromise,
-        this.createTimeoutPromise(this.FOLDER_LOAD_TIMEOUT, 'Folder loading timeout')
-      ]);
-
-    } catch (error) {
-      console.warn('[FileSearchService] Folder loading failed or timed out:', error);
-      // Continue with basic directory checks
-    }
-
-    // NEW: Check existence of each directory with individual timeouts and status updates
-    let checkedDirectories = 0;
-    let existingDirectories = 0;
-
-    for (const dirGroup of searchPlan.directoryGroups) {
-      if (this.isCancelled) break;
-
-      console.log(`[FileSearchService] 🔍 Checking directory: "${dirGroup.directoryPath}" (${dirGroup.rowIndexes.length} files)`);
-
-      try {
-        // Apply timeout to directory existence check
-        const checkPromise = Promise.resolve(
-          this.folderService.checkDirectoryExists(dirGroup.fullSharePointPath)
-        );
-        
-        dirGroup.exists = await Promise.race([
-          checkPromise,
-          this.createTimeoutPromise(this.DIRECTORY_CHECK_TIMEOUT, false) // Return false on timeout
-        ]) as boolean;
-        
-        if (dirGroup.exists) {
-          existingDirectories++;
-        }
-
-        // NEW: Update directory status for all rows in this directory
-        if (directoryStatusCallback) {
-          const directoryStatus: DirectoryStatus = dirGroup.exists ? 'exists' : 'not-exists';
-          console.log(`[FileSearchService] 📂 Directory "${dirGroup.directoryPath}" -> ${directoryStatus}`);
-          
-          dirGroup.rowIndexes.forEach(rowIndex => {
-            directoryStatusCallback(rowIndex, directoryStatus);
-          });
-        }
-
-      } catch (error) {
-        console.warn(`[FileSearchService] Directory check failed for ${dirGroup.directoryPath}:`, error);
-        dirGroup.exists = false; // Assume not exists on error
-
-        // NEW: Update directory status as error
-        if (directoryStatusCallback) {
-          console.log(`[FileSearchService] 📂⚠️ Directory "${dirGroup.directoryPath}" -> error`);
-          
-          dirGroup.rowIndexes.forEach(rowIndex => {
-            directoryStatusCallback(rowIndex, 'error');
-          });
-        }
-      }
-
-      checkedDirectories++;
-
-      const stageProgress = 20 + ((checkedDirectories / searchPlan.directoryGroups.length) * 80);
-      progress = SearchProgressHelper.updateStageProgress(
-        progress,
-        stageProgress,
-        {
-          currentFileName: `Checking ${dirGroup.directoryPath}... (${dirGroup.exists ? 'EXISTS' : 'NOT FOUND'})`,
-          directoriesChecked: checkedDirectories,
-          existingDirectories
-        }
+      // ONE API call per directory (not per row)
+      const checkPromise = Promise.resolve(
+        this.folderService.checkDirectoryExists(dirGroup.fullSharePointPath)
       );
       
-      statusCallback?.(progress);
-      await this.delay(50);
+      dirGroup.exists = await Promise.race([
+        checkPromise,
+        this.createTimeoutPromise(this.DIRECTORY_CHECK_TIMEOUT, false) // Return false on timeout
+      ]) as boolean;
+      
+      if (dirGroup.exists) {
+        existingDirectories++;
+      }
+
+      // BULK UPDATE: Update ALL rows for this directory with the SAME result
+      if (directoryStatusCallback) {
+        const directoryStatus: DirectoryStatus = dirGroup.exists ? 'exists' : 'not-exists';
+        
+        console.log(`[FileSearchService] 📂 Directory "${dirGroup.directoryPath}" -> ${directoryStatus}`);
+        console.log(`[FileSearchService] 🔄 Bulk updating ${dirGroup.rowIndexes.length} rows with status: ${directoryStatus}`);
+        
+        // NEW (fast) - bulk callback
+        directoryStatusCallback(dirGroup.rowIndexes, directoryStatus);
+        
+        console.log(`[FileSearchService] ✅ Updated rows: ${dirGroup.rowIndexes.slice(0, 5).map(r => r + 1).join(', ')}${dirGroup.rowIndexes.length > 5 ? `, ... and ${dirGroup.rowIndexes.length - 5} more` : ''}`);
+      }
+
+    } catch (error) {
+      console.warn(`[FileSearchService] Directory check failed for ${dirGroup.directoryPath}:`, error);
+      dirGroup.exists = false; // Assume not exists on error
+
+      // BULK UPDATE: Mark all rows for this directory as error
+      if (directoryStatusCallback) {
+        console.log(`[FileSearchService] 📂⚠️ Directory "${dirGroup.directoryPath}" -> error`);
+        console.log(`[FileSearchService] 🔄 Bulk updating ${dirGroup.rowIndexes.length} rows with status: error`);
+        
+        directoryStatusCallback(dirGroup.rowIndexes, 'error');
+      }
     }
 
-    const updatedSearchPlan: ISearchPlan = {
-      ...searchPlan,
-      existingDirectories,
-      missingDirectories: searchPlan.totalDirectories - existingDirectories
-    };
+    checkedDirectories++;
 
+    // Progress based on DIRECTORIES, not rows
+    const stageProgress = 20 + ((checkedDirectories / searchPlan.directoryGroups.length) * 80);
     progress = SearchProgressHelper.updateStageProgress(
       progress,
-      100,
+      stageProgress,
       {
-        currentFileName: `${existingDirectories}/${searchPlan.totalDirectories} directories exist`,
-        searchPlan: updatedSearchPlan
+        currentFileName: `Checked directory ${checkedDirectories}/${searchPlan.directoryGroups.length}: ${dirGroup.directoryPath} (${dirGroup.exists ? 'EXISTS' : 'NOT FOUND'})`,
+        directoriesChecked: checkedDirectories,
+        existingDirectories
       }
     );
     
     statusCallback?.(progress);
-    
-    console.log(`[FileSearchService] ✅ Stage 2 completed: ${existingDirectories}/${searchPlan.totalDirectories} directories exist`);
-    return progress;
+    await this.delay(50); // Small delay between directories
   }
+
+  const updatedSearchPlan: ISearchPlan = {
+    ...searchPlan,
+    existingDirectories,
+    missingDirectories: searchPlan.totalDirectories - existingDirectories
+  };
+
+  progress = SearchProgressHelper.updateStageProgress(
+    progress,
+    100,
+    {
+      currentFileName: `Optimization complete: ${existingDirectories}/${searchPlan.totalDirectories} directories exist`,
+      searchPlan: updatedSearchPlan
+    }
+  );
+  
+  statusCallback?.(progress);
+  
+  console.log(`[FileSearchService] 🎯 STAGE 2 OPTIMIZATION COMPLETE:`);
+  console.log(`[FileSearchService] ✅ Directories checked: ${checkedDirectories} (instead of ${searchPlan.totalRows} rows)`);
+  console.log(`[FileSearchService] 📈 Performance improvement: ${Math.round(searchPlan.totalRows / checkedDirectories)}x fewer API calls`);
+  console.log(`[FileSearchService] 📊 Results: ${existingDirectories} exist, ${searchPlan.totalDirectories - existingDirectories} missing`);
+  
+  return progress;
+}
 
   /**
    * OPTIMIZED STAGE 3: Search files with CORRECTED LOGIC and MINIMAL API calls + DETAILED LOGGING

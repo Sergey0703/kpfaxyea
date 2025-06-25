@@ -812,7 +812,7 @@ export type RenameProgressCallback = (progress: {
   skipped: number;
 }) => void;
 export type FileStatusCallback = (rowIndex: number, status: FileRenameStatus) => void;
-export type DirectoryStatusCallback = (rowIndex: number, status: DirectoryStatus) => void; // NEW
+export type DirectoryStatusCallback = (rowIndexes: number[], status: DirectoryStatus) => void;
 export type FileSearchResultCallback = (rowIndex: number, result: FileSearchStatus) => void; // UPDATED
 
 /**

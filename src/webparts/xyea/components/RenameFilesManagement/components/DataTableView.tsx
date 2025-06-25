@@ -1,6 +1,4 @@
-/**
-   * NEW: Get CSS class for row styling based on status
-   */// src/webparts/xyea/components/RenameFilesManagement/components/DataTableView.tsx
+// src/webparts/xyea/components/RenameFilesManagement/components/DataTableView.tsx
 
 import * as React from 'react';
 import styles from '../RenameFilesManagement.module.scss';
@@ -8,7 +6,6 @@ import {
   IRenameFilesData,
   DirectoryStatus,
   FileSearchStatus,
-  FileStatusHelper,
   StatusCode
 } from '../types/RenameFilesTypes';
 import { ColumnResizeHandler } from '../handlers/ColumnResizeHandler';
@@ -142,6 +139,10 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
         return 'Unknown status';
     }
   };
+
+  /**
+   * Get CSS class for row styling based on status
+   */
   const getRowStatusClass = (rowIndex: number): string => {
     const directoryStatus = directoryResults[rowIndex];
     const fileSearchStatus = fileSearchResults[rowIndex];
@@ -160,6 +161,19 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
     }
     
     return '';
+  };
+
+  /**
+   * Fixed: Safe CSS class access using computed property names
+   */
+  const getStatusCellClass = (statusCode: StatusCode): string => {
+    const statusClass = getStatusCssClass(statusCode);
+    const baseClass = styles.statusCell;
+    
+    // Use array access instead of computed property to avoid TypeScript error
+    const statusStyleClass = styles[statusClass as keyof typeof styles] as string;
+    
+    return `${baseClass} ${statusStyleClass || ''}`;
   };
 
   return (
@@ -208,7 +222,6 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
             
             // Get current status for this row
             const currentStatusCode = getCurrentStatusCode(row.rowIndex);
-            const statusCssClass = getStatusCssClass(currentStatusCode);
             const statusTooltip = getStatusTooltip(currentStatusCode);
             
             return (
@@ -221,7 +234,7 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
                 </td>
                 
                 {/* NEW: Status Column */}
-                <td className={`${styles.statusCell} ${styles[statusCssClass]}`}>
+                <td className={getStatusCellClass(currentStatusCode)}>
                   <div 
                     className={styles.statusCode}
                     title={statusTooltip}

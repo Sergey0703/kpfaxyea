@@ -11,7 +11,8 @@ import {
 import { 
   IRenameFilesData,
   IRenameExportSettings,
-  IRenameExportStatistics
+  IRenameExportStatistics,
+  StatusCode
 } from '../components/RenameFilesManagement/types/RenameFilesTypes';
 
 // Type definitions for better type safety
@@ -485,7 +486,7 @@ export class ExcelExportService {
   }
 
   /**
-   * NEW: Get human-readable status text - UPDATED to use individual file rename status
+   * NEW: Get status code text for export - UPDATED to use StatusCode enum
    */
   private static getRenameStatusText(
     searchStatus: 'found' | 'not-found' | 'searching' | 'skipped',
@@ -496,28 +497,28 @@ export class ExcelExportService {
     if (renameStatus) {
       switch (renameStatus) {
         case 'renaming':
-          return 'Renaming...';
+          return `${StatusCode.RENAMING} - Renaming...`;
         case 'renamed':
-          return 'File renamed';
+          return `${StatusCode.RENAMED} - File renamed`;
         case 'error':
-          return 'File rename error';
+          return `${StatusCode.RENAME_ERROR} - File rename error`;
         case 'skipped':
-          return 'File skipped';
+          return `${StatusCode.RENAME_SKIPPED} - File skipped`;
         default:
           break;
       }
     }
     
-    // Otherwise use search status with updated texts
+    // Otherwise use search status with status codes
     switch (searchStatus) {
       case 'found':
-        return 'File found';
+        return `${StatusCode.FOUND} - File found`;
       case 'not-found':
-        return 'File not found';
+        return `${StatusCode.NOT_FOUND} - File not found`;
       case 'searching':
-        return 'Folder not found';
+        return `${StatusCode.SEARCHING} - Folder not found`;
       case 'skipped':
-        return 'File skipped';
+        return `${StatusCode.SKIPPED} - File skipped`;
       default:
         return 'Unknown';
     }

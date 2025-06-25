@@ -536,17 +536,20 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     });
   }
 
-  // NEW: Separate callback for directory status updates (called after Stage 2)
-  private updateDirectoryStatus: DirectoryStatusCallback = (rowIndex: number, status: DirectoryStatus): void => {
-    console.log(`[RenameFilesManagement] Directory status update: Row ${rowIndex + 1} -> ${status}`);
-    
-    this.setState(prevState => ({
-      directoryResults: {
-        ...prevState.directoryResults,
-        [rowIndex]: status
-      }
-    }));
-  }
+// NEW: Bulk directory status update (39 calls instead of 6000+)
+private updateDirectoryStatus: DirectoryStatusCallback = (rowIndexes: number[], status: DirectoryStatus): void => {
+  console.log(`[RenameFilesManagement] Bulk directory update: ${rowIndexes.length} rows -> ${status}`);
+  
+  this.setState(prevState => {
+    const newDirectoryResults = { ...prevState.directoryResults };
+    rowIndexes.forEach(rowIndex => {
+      newDirectoryResults[rowIndex] = status;
+    });
+    return {
+      directoryResults: newDirectoryResults
+    };
+  });
+}
 
   // NEW: Separate callback for file search results (called after Stage 3)
   private updateFileSearchResult: FileSearchResultCallback = (rowIndex: number, result: FileSearchStatus): void => {
