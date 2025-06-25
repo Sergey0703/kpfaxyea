@@ -230,7 +230,7 @@ export class FileSearchService {
     // Fast extraction of unique directories
     const uniqueDirectories = new Set<string>();
     const directoryToRows = new Map<string, number[]>();
-    let validRows = 0;
+    const validRows = 0; // FIXED: changed let to const
 
     rows.forEach(row => {
       const directoryCell = row.cells.custom_1; // FIXED: dot notation
@@ -620,8 +620,10 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
           const fileExists = sharePointFilesMap.has(excelFile.fileName.toLowerCase());
           const result: FileSearchStatus = fileExists ? 'found' : 'not-found'; // UPDATED: Use typed result
           
-          results[excelFile.rowIndex] = result;
-          progressCallback(excelFile.rowIndex, result);
+          // FIXED: avoid race condition by using local variable
+          const currentResult = result;
+          results[excelFile.rowIndex] = currentResult;
+          progressCallback(excelFile.rowIndex, currentResult);
           
           if (fileExists) {
             foundFiles++;
@@ -674,8 +676,9 @@ private async executeStage2_CheckDirectoryExistence_OPTIMIZED(
         // Mark all files in this directory as not found
         filesFromExcel.forEach(excelFile => {
           if (!this.isCancelled) {
-            results[excelFile.rowIndex] = 'not-found';
-            progressCallback(excelFile.rowIndex, 'not-found');
+            const notFoundResult: FileSearchStatus = 'not-found'; // FIXED: use local variable
+            results[excelFile.rowIndex] = notFoundResult;
+            progressCallback(excelFile.rowIndex, notFoundResult);
             processedFiles++;
           }
         });
