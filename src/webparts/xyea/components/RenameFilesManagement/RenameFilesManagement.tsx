@@ -211,7 +211,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
   private handleUploadProgress = (stage: string, progress: number, message: string): void => {
     this.setState({
       uploadProgress: {
-        stage: stage as any,
+        stage: stage as 'idle' | 'uploading' | 'parsing' | 'complete' | 'error', // FIXED: specific type instead of any
         progress,
         message
       }
@@ -266,7 +266,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     }
   }
 
-  private handleFolderSelect = (folder: any): void => {
+  private handleFolderSelect = (folder: { Name: string; ServerRelativeUrl: string; ItemCount: number; TimeCreated: string; TimeLastModified: string }): void => { // FIXED: inline type instead of interface
     this.setState({ 
       selectedFolder: folder,
       showFolderDialog: false,
@@ -863,7 +863,7 @@ private updateDirectoryStatus: DirectoryStatusCallback = (rowIndexes: number[], 
                   fontSize: '12px',
                   fontWeight: 600,
                   color: '#323130',
-                  fontFamily: '"Segoe UI", "Segoe UI Web (West European)", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif'
+                  fontFamily: '&ldquo;Segoe UI&rdquo;, &ldquo;Segoe UI Web (West European)&rdquo;, &ldquo;Segoe UI&rdquo;, -apple-system, BlinkMacSystemFont, Roboto, &ldquo;Helvetica Neue&rdquo;, sans-serif'
                 }}>Debug Information</h4>
                 <p style={{ margin: '4px 0', lineHeight: 1.4 }}>
                   <strong style={{ color: '#323130' }}>Overall:</strong> {searchProgress.overallProgress.toFixed(1)}%
@@ -892,7 +892,7 @@ private updateDirectoryStatus: DirectoryStatusCallback = (rowIndexes: number[], 
           <div className={styles.emptyState}>
             <div className={styles.emptyIcon}>📊</div>
             <h3>No Excel File Loaded</h3>
-            <p>Click "Open Excel File" to start working with your data. The file should contain columns with file paths that will be automatically split into filename and directory columns.</p>
+            <p>Click &ldquo;Open Excel File&rdquo; to start working with your data. The file should contain columns with file paths that will be automatically split into filename and directory columns.</p>
           </div>
         )}
 
@@ -906,4 +906,4 @@ private updateDirectoryStatus: DirectoryStatusCallback = (rowIndexes: number[], 
       </div>
     );
   }
-} 
+}
