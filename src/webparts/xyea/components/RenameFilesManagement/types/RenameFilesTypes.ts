@@ -329,8 +329,24 @@ export interface IRenameFilesState {
  * Interface for component props
  */
 export interface IRenameFilesManagementProps {
-  context: any; // WebPartContext
+  context: IWebPartContext; // FIXED: Changed from any to specific interface
   userDisplayName: string;
+}
+
+/**
+ * Interface for WebPart context - FIXED: Added specific interface instead of any
+ */
+export interface IWebPartContext {
+  pageContext: {
+    user: {
+      displayName: string;
+    };
+    web: {
+      absoluteUrl: string;
+      serverRelativeUrl: string;
+    };
+  };
+  aadTokenProviderFactory?: unknown;
 }
 
 /**
@@ -889,7 +905,7 @@ export interface IRenameError {
   message: string;
   filePath?: string;
   rowIndex?: number;
-  details?: any;
+  details?: unknown; // FIXED: Changed from any to unknown
 }
 
 /**

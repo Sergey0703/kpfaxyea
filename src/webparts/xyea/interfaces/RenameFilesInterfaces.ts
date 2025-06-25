@@ -3,6 +3,22 @@
 import { IExcelFile, IExcelSheet } from './ExcelInterfaces';
 
 /**
+ * Interface for WebPart context - ADDED: Specific interface instead of any
+ */
+export interface IWebPartContext {
+  pageContext: {
+    user: {
+      displayName: string;
+    };
+    web: {
+      absoluteUrl: string;
+      serverRelativeUrl: string;
+    };
+  };
+  aadTokenProviderFactory?: unknown;
+}
+
+/**
  * Interface for a custom column that can be added to the table
  */
 export interface ICustomColumn {
@@ -145,7 +161,7 @@ export interface ISharePointFolder {
  * Interface for component props
  */
 export interface IRenameFilesManagementProps {
-  context: any; // WebPartContext
+  context: IWebPartContext; // FIXED: Changed from any to specific interface
   userDisplayName: string;
 }
 
