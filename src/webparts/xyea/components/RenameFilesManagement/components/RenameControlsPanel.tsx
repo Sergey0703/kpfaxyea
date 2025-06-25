@@ -166,6 +166,72 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
   };
 
   /**
+   * Render rename progress with skipped files support - UPDATED with new status texts
+   */
+  const renderRenameProgress = (): React.ReactNode => {
+    if (!renameProgress) return null;
+
+    const progressPercentage = renameProgress.total > 0 ? (renameProgress.current / renameProgress.total) * 100 : 0;
+
+    return (
+      <div className={styles.searchProgressInfo}>
+        <div className={styles.stageHeader}>
+          <h4 className={styles.stageTitle}>
+            🏷️ Renaming Files
+            <span className={styles.stageProgress}>
+              ({progressPercentage.toFixed(0)}%)
+            </span>
+          </h4>
+          <p className={styles.stageDescription}>Adding staffID prefix to filenames in SharePoint...</p>
+        </div>
+
+        <div className={styles.progressContainer}>
+          <div className={styles.progressText}>
+            <strong className={styles.overallProgress}>
+              Progress: {renameProgress.current}/{renameProgress.total} files
+            </strong>
+          </div>
+          
+          <div className={styles.progressBar}>
+            <div 
+              className={styles.progressFill}
+              style={{ 
+                width: `${progressPercentage}%`,
+                backgroundColor: '#28a745'
+              }}
+            />
+          </div>
+        </div>
+
+        <div className={styles.operationDetails}>
+          <div className={styles.currentOperation}>
+            <strong>Current File:</strong> {renameProgress.fileName}
+          </div>
+        </div>
+
+        <div className={styles.searchStats}>
+          <div className={styles.stat}>
+            <span className={styles.statLabel}>Files Renamed:</span>
+            <span className={styles.statValue}>{renameProgress.success}</span>
+          </div>
+          <div className={styles.stat}>
+            <span className={styles.statLabel}>Rename Errors:</span>
+            <span className={styles.statValue}>{renameProgress.errors}</span>
+          </div>
+          <div className={styles.stat}>
+            <span className={styles.statLabel}>Files Skipped:</span>
+            <span className={styles.statValue}>{renameProgress.skipped}</span>
+          </div>
+          <div className={styles.stat}>
+            <span className={styles.statLabel}>Remaining:</span>
+            <span className={styles.statValue}>{renameProgress.total - renameProgress.current}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  /**
    * Determine which buttons to show based on current state
    */
   const getButtonState = (): {
@@ -338,72 +404,6 @@ export const RenameControlsPanel: React.FC<IRenameControlsPanelProps> = ({
             ))}
           </div>
         )}
-      </div>
-    );
-  };
-
-  /**
-   * Render rename progress with skipped files support - UPDATED with new status texts
-   */
-  const renderRenameProgress = (): React.ReactNode => {
-    if (!renameProgress) return null;
-
-    const progressPercentage = renameProgress.total > 0 ? (renameProgress.current / renameProgress.total) * 100 : 0;
-
-    return (
-      <div className={styles.searchProgressInfo}>
-        <div className={styles.stageHeader}>
-          <h4 className={styles.stageTitle}>
-            🏷️ Renaming Files
-            <span className={styles.stageProgress}>
-              ({progressPercentage.toFixed(0)}%)
-            </span>
-          </h4>
-          <p className={styles.stageDescription}>Adding staffID prefix to filenames in SharePoint...</p>
-        </div>
-
-        <div className={styles.progressContainer}>
-          <div className={styles.progressText}>
-            <strong className={styles.overallProgress}>
-              Progress: {renameProgress.current}/{renameProgress.total} files
-            </strong>
-          </div>
-          
-          <div className={styles.progressBar}>
-            <div 
-              className={styles.progressFill}
-              style={{ 
-                width: `${progressPercentage}%`,
-                backgroundColor: '#28a745'
-              }}
-            />
-          </div>
-        </div>
-
-        <div className={styles.operationDetails}>
-          <div className={styles.currentOperation}>
-            <strong>Current File:</strong> {renameProgress.fileName}
-          </div>
-        </div>
-
-        <div className={styles.searchStats}>
-          <div className={styles.stat}>
-            <span className={styles.statLabel}>Files Renamed:</span>
-            <span className={styles.statValue}>{renameProgress.success}</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.statLabel}>Rename Errors:</span>
-            <span className={styles.statValue}>{renameProgress.errors}</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.statLabel}>Files Skipped:</span>
-            <span className={styles.statValue}>{renameProgress.skipped}</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.statLabel}>Remaining:</span>
-            <span className={styles.statValue}>{renameProgress.total - renameProgress.current}</span>
-          </div>
-        </div>
       </div>
     );
   };

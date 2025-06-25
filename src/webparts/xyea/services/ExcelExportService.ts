@@ -411,7 +411,7 @@ export class ExcelExportService {
       skipped: number;
     },
     settings?: IRenameExportSettings
-  ): any[][] {
+  ): CellValue[][] { // FIXED: Changed from any[][] to CellValue[][]
     
     // Use default settings if not provided
     const exportSettings: IRenameExportSettings = settings || {
@@ -423,7 +423,7 @@ export class ExcelExportService {
       fileFormat: 'xlsx'
     };
     
-    const exportData: any[][] = [];
+    const exportData: CellValue[][] = []; // FIXED: Changed from any[][] to CellValue[][]
     
     // Prepare headers
     if (exportSettings.includeHeaders) {
@@ -464,7 +464,7 @@ export class ExcelExportService {
         }
       }
       
-      const rowData: any[] = [];
+      const rowData: CellValue[] = []; // FIXED: Changed from any[] to CellValue[]
       
       // Add cell values in column order
       data.columns
@@ -669,7 +669,7 @@ export class ExcelExportService {
    * Create export file for rename files data
    */
   private static async createRenameFilesExportFile(
-    data: any[][],
+    data: CellValue[][], // FIXED: Changed from any[][] to CellValue[][]
     settings: IRenameExportSettings
   ): Promise<Blob> {
     
@@ -683,7 +683,7 @@ export class ExcelExportService {
   /**
    * Create CSV blob from data array
    */
-  private static createCSVBlobFromData(data: any[][]): Blob {
+  private static createCSVBlobFromData(data: CellValue[][]): Blob { // FIXED: Changed from any[][] to CellValue[][]
     const csvContent = data
       .map(row => 
         row.map(cell => {
@@ -703,7 +703,7 @@ export class ExcelExportService {
   /**
    * Create Excel blob from data array
    */
-  private static createExcelBlobFromData(data: any[][], sheetName: string = 'Sheet1'): Blob {
+  private static createExcelBlobFromData(data: CellValue[][], sheetName: string = 'Sheet1'): Blob { // FIXED: Changed from any[][] to CellValue[][]
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.aoa_to_sheet(data);
     
@@ -753,7 +753,7 @@ export class ExcelExportService {
   /**
    * UPDATED: Calculate column widths for rename files export with status columns
    */
-  private static calculateRenameColumnWidths(data: any[][]): Array<{ wch: number }> {
+  private static calculateRenameColumnWidths(data: CellValue[][]): Array<{ wch: number }> { // FIXED: Changed from any[][] to CellValue[][]
     if (data.length === 0) return [];
     
     const columnCount = data[0].length;
