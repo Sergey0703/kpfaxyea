@@ -80,33 +80,37 @@ export class CellEditingHandler {
 
   public validateCellValue(value: string, dataType: string): { isValid: boolean; error?: string } {
     switch (dataType) {
-      case 'number':
+      case 'number': {
         const numValue = parseFloat(value);
         if (value !== '' && (isNaN(numValue) || !isFinite(numValue))) {
           return { isValid: false, error: 'Must be a valid number' };
         }
         break;
+      }
         
-      case 'date':
+      case 'date': {
         if (value !== '' && isNaN(Date.parse(value))) {
           return { isValid: false, error: 'Must be a valid date' };
         }
         break;
+      }
         
-      case 'boolean':
+      case 'boolean': {
         const lowerValue = value.toLowerCase();
         if (value !== '' && !['true', 'false', '1', '0', 'yes', 'no'].includes(lowerValue)) {
           return { isValid: false, error: 'Must be true/false, yes/no, or 1/0' };
         }
         break;
+      }
         
       case 'text':
-      default:
+      default: {
         // Text values are generally always valid, but check length
         if (value.length > 1000) {
           return { isValid: false, error: 'Text too long (max 1000 characters)' };
         }
         break;
+      }
     }
     
     return { isValid: true };
@@ -116,19 +120,22 @@ export class CellEditingHandler {
     if (!value) return '';
     
     switch (dataType) {
-      case 'number':
+      case 'number': {
         const numValue = parseFloat(value);
         return isNaN(numValue) ? value : numValue.toString();
+      }
         
-      case 'date':
+      case 'date': {
         const dateValue = new Date(value);
         return isNaN(dateValue.getTime()) ? value : dateValue.toISOString().split('T')[0];
+      }
         
-      case 'boolean':
+      case 'boolean': {
         const lowerValue = value.toLowerCase();
         if (['true', '1', 'yes'].includes(lowerValue)) return 'true';
         if (['false', '0', 'no'].includes(lowerValue)) return 'false';
         return value;
+      }
         
       case 'text':
       default:
@@ -139,15 +146,15 @@ export class CellEditingHandler {
   public getCellEditHistory(data: IRenameFilesData): Array<{
     columnId: string;
     rowIndex: number;
-    originalValue: any;
-    currentValue: any;
+    originalValue: string | number | boolean | Date | undefined; // FIXED: specific type instead of any
+    currentValue: string | number | boolean | Date | undefined; // FIXED: specific type instead of any
     columnName: string;
   }> {
     const history: Array<{
       columnId: string;
       rowIndex: number;
-      originalValue: any;
-      currentValue: any;
+      originalValue: string | number | boolean | Date | undefined; // FIXED: specific type instead of any
+      currentValue: string | number | boolean | Date | undefined; // FIXED: specific type instead of any
       columnName: string;
     }> = [];
 
@@ -211,16 +218,16 @@ export class CellEditingHandler {
     rowIndex: number;
     changes: Array<{
       columnName: string;
-      originalValue: any;
-      newValue: any;
+      originalValue: string | number | boolean | Date | undefined; // FIXED: specific type instead of any
+      newValue: string | number | boolean | Date | undefined; // FIXED: specific type instead of any
     }>;
   }> {
     const exportData: Array<{
       rowIndex: number;
       changes: Array<{
         columnName: string;
-        originalValue: any;
-        newValue: any;
+        originalValue: string | number | boolean | Date | undefined; // FIXED: specific type instead of any
+        newValue: string | number | boolean | Date | undefined; // FIXED: specific type instead of any
       }>;
     }> = [];
 
@@ -228,8 +235,8 @@ export class CellEditingHandler {
       if (row.isEdited) {
         const changes: Array<{
           columnName: string;
-          originalValue: any;
-          newValue: any;
+          originalValue: string | number | boolean | Date | undefined; // FIXED: specific type instead of any
+          newValue: string | number | boolean | Date | undefined; // FIXED: specific type instead of any
         }> = [];
 
         Object.values(row.cells).forEach(cell => {

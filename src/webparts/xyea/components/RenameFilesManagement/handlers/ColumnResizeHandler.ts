@@ -1,7 +1,7 @@
 // src/webparts/xyea/components/RenameFilesManagement/handlers/ColumnResizeHandler.ts
 
 export class ColumnResizeHandler {
-  private resizingColumn: string | null = null;
+  private resizingColumn: string | undefined = undefined; // FIXED: changed from null to undefined
   private startX: number = 0;
   private startWidth: number = 0;
   private onColumnResize: (columnId: string, newWidth: number) => void;
@@ -61,16 +61,16 @@ export class ColumnResizeHandler {
     
     console.log(`Finished resizing column ${this.resizingColumn}`);
     
-    this.resizingColumn = null;
+    this.resizingColumn = undefined; // FIXED: changed from null to undefined
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
   }
 
   public isResizing(): boolean {
-    return this.resizingColumn !== null;
+    return this.resizingColumn !== undefined; // FIXED: changed from null to undefined
   }
 
-  public getCurrentResizingColumn(): string | null {
+  public getCurrentResizingColumn(): string | undefined { // FIXED: changed return type from null to undefined
     return this.resizingColumn;
   }
 

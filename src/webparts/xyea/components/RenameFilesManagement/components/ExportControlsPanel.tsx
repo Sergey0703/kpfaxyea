@@ -215,7 +215,7 @@ export class ExportControlsPanel extends React.Component<IExportControlsPanelPro
               onChange={this.handleOnlyCompletedRowsChange}
               disabled={isExporting}
             />
-            Export only completed rows (exclude "folders not found")
+            Export only completed rows (exclude &ldquo;folders not found&rdquo;)
           </label>
         </div>
       </div>
@@ -311,7 +311,7 @@ export class ExportControlsPanel extends React.Component<IExportControlsPanelPro
             <div className={styles.infoItem}>
               <span className={styles.infoIcon}>⚠️</span>
               <span className={styles.infoText}>
-                {statistics.searchingFiles} files have "Folder not found" status. 
+                {statistics.searchingFiles} files have &ldquo;Folder not found&rdquo; status. 
                 You can export now or wait for a complete search.
               </span>
             </div>

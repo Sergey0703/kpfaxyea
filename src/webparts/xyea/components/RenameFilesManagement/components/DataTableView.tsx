@@ -25,7 +25,7 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
   columnResizeHandler,
   onCellEdit
 }) => {
-  const handleCellChange = (columnId: string, rowIndex: number, value: string) => {
+  const handleCellChange = (columnId: string, rowIndex: number, value: string): void => {
     onCellEdit(columnId, rowIndex, value);
   };
 
