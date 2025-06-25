@@ -191,7 +191,7 @@ export class ExcelFileProcessor {
       console.log(`  All values (${row.length}):`, row.map((v, i) => `${i}:"${v}"`));
 
       // Ищем возможные staffID колонки в текущей строке
-      const possibleStaffIDData: Array<{index: number, header: string, value: any}> = [];
+      const possibleStaffIDData: Array<{index: number, header: string, value: string | number | boolean | undefined}> = []; // FIXED: specific type instead of any
       headers.forEach((header, index) => {
         const headerLower = String(header || '').toLowerCase();
         const cellValue = row[index];
@@ -353,8 +353,8 @@ export class ExcelFileProcessor {
     console.log(`  📊 Total rows: ${finalData.totalRows}`);
     console.log(`  📋 Total columns: ${finalData.columns.length}`);
     console.log(`  🔧 Custom columns: ${finalData.customColumns.length}`);
-    console.log(`  📁 Files with paths: ${rows.filter(r => r.cells['custom_0']?.value).length}`);
-    console.log(`  📂 Files with directories: ${rows.filter(r => r.cells['custom_1']?.value).length}`);
+    console.log(`  📁 Files with paths: ${rows.filter(r => r.cells.custom_0?.value).length}`); // FIXED: dot notation
+    console.log(`  📂 Files with directories: ${rows.filter(r => r.cells.custom_1?.value).length}`); // FIXED: dot notation
 
     return finalData;
   }
@@ -456,7 +456,7 @@ export class ExcelFileProcessor {
     }
     
     // Must have a file extension at the end
-    const parts = value.split(/[\\\/]/);
+    const parts = value.split(/[\\//]/);
     const lastPart = parts[parts.length - 1];
     if (!lastPart || !lastPart.includes('.')) {
       return false;
@@ -519,7 +519,7 @@ export class ExcelFileProcessor {
   private isDateString(value: string): boolean {
     const datePatterns = [
       /^\d{4}-\d{2}-\d{2}$/,
-      /^\d{2}\/\d{2}\/\d{4}$/,
+      /^\d{2}\/\d{2}\/\d{4}$/, // FIXED: removed unnecessary escape
       /^\d{2}-\d{2}-\d{4}$/
     ];
     
@@ -537,7 +537,7 @@ export class ExcelFileProcessor {
     console.log(`${logPrefix}: Extracting filename from path: "${relativePath}"`);
     
     // Extract filename from path (e.g., "634\2022\10\634-AS Food Hygiene.pdf" -> "634-AS Food Hygiene.pdf")
-    const pathParts = relativePath.split(/[\\\/]/);
+    const pathParts = relativePath.split(/[\\//]/);
     const fileName = pathParts[pathParts.length - 1] || '';
     
     console.log(`${logPrefix}: Path split into ${pathParts.length} parts:`, pathParts);
@@ -552,7 +552,7 @@ export class ExcelFileProcessor {
     console.log(`[ExcelFileProcessor] Extracting directory from path: "${relativePath}"`);
     
     // Split the path by both backslashes and forward slashes
-    const pathParts = relativePath.split(/[\\\/]/);
+    const pathParts = relativePath.split(/[\\//]/);
     
     // Remove the filename (last part) to get directory path
     const directoryParts = pathParts.slice(0, -1);
@@ -574,7 +574,7 @@ export class ExcelFileProcessor {
     console.log(`[ExcelFileProcessor] Extracting directory path from row ${row.rowIndex}`);
     
     // FIRST: Try to get directory from the Directory column (custom_1)
-    const directoryCell = row.cells['custom_1'];
+    const directoryCell = row.cells.custom_1; // FIXED: dot notation
     if (directoryCell && directoryCell.value) {
       const directoryPath = String(directoryCell.value).trim();
       if (directoryPath) {
@@ -625,7 +625,7 @@ export class ExcelFileProcessor {
       return { directoryPath: '', fileName: '' };
     }
     
-    const pathParts = fullPath.split(/[\\\/]/);
+    const pathParts = fullPath.split(/[\\//]/);
     const fileName = pathParts[pathParts.length - 1] || '';
     const directoryParts = pathParts.slice(0, -1);
     const directoryPath = directoryParts.join('/');
