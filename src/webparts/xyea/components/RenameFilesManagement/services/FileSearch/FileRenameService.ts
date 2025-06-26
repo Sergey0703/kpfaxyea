@@ -72,7 +72,7 @@ export class FileRenameService {
     isCancelled?: () => boolean
   ): Promise<IRenameResult> {
     
-    console.log(`[FileRenameService] 🏷️ STARTING OPTIMIZED FILE RENAME`);
+    console.log(`[FileRenameService] 🏷️ STARTING OPTIMIZED FILE RENAME WITH 634 REPLACEMENT LOGIC`);
     
     // Prepare files for renaming
     const filesToRename = this.prepareFilesForRename(rows, fileSearchResults, baseFolderPath);
@@ -228,7 +228,8 @@ export class FileRenameService {
     const directorySharePointPath = this.configService.buildDirectoryPath(directoryPath, baseFolderPath);
     const fullOriginalPath = `${directorySharePointPath}/${originalFileName}`;
     
-    const newFileName = this.configService.generateSafeFileName(originalFileName, staffID, directorySharePointPath);
+    // UPDATED: Use new filename generation logic with 634 replacement
+    const newFileName = this.generateNewFileNameWith634Replacement(originalFileName, staffID);
     const fullNewPath = `${directorySharePointPath}/${newFileName}`;
     
     return {
@@ -240,6 +241,44 @@ export class FileRenameService {
       fullNewPath,
       newFileName
     };
+  }
+
+  /**
+   * NEW: Generate new filename with 634 replacement logic
+   * If filename starts with "634", replace it with staffID
+   * If filename doesn't start with "634", add staffID at the beginning
+   */
+  private generateNewFileNameWith634Replacement(originalFileName: string, staffID: string): string {
+    const cleanStaffID = staffID.replace(/[<>:"/\\|?*]/g, '').trim();
+    
+    console.log(`[FileRenameService] 🔄 Generating new filename:`);
+    console.log(`  Original: "${originalFileName}"`);
+    console.log(`  StaffID: "${cleanStaffID}"`);
+    
+    // Check if filename starts with "634"
+    if (originalFileName.startsWith('634')) {
+      console.log(`[FileRenameService] 🔄 File starts with "634", replacing...`);
+      
+      // Replace "634" at the beginning with staffID
+      const newFileName = cleanStaffID + originalFileName.substring(3);
+      
+      console.log(`[FileRenameService] ✅ 634 replacement: "${originalFileName}" -> "${newFileName}"`);
+      return newFileName;
+    } else {
+      console.log(`[FileRenameService] 🔄 File doesn't start with "634", adding staffID prefix...`);
+      
+      // Check if file already starts with the staffID
+      if (originalFileName.toLowerCase().startsWith(cleanStaffID.toLowerCase())) {
+        console.log(`[FileRenameService] ⚠️ File already starts with staffID: "${originalFileName}"`);
+        return originalFileName;
+      }
+      
+      // Add staffID at the beginning (original behavior)
+      const newFileName = `${cleanStaffID} ${originalFileName}`;
+      
+      console.log(`[FileRenameService] ✅ StaffID prefix added: "${originalFileName}" -> "${newFileName}"`);
+      return newFileName;
+    }
   }
 
   /**
@@ -382,7 +421,7 @@ export class FileRenameService {
     try {
       progressCallback(fileInfo.rowIndex, 'renaming');
       
-      console.log(`[FileRenameService] 🔄 Processing file:`);
+      console.log(`[FileRenameService] 🔄 Processing file with 634 replacement logic:`);
       console.log(`  Original: "${fileInfo.originalFileName}"`);
       console.log(`  New: "${fileInfo.newFileName}"`);
       console.log(`  StaffID: "${fileInfo.staffID}"`);
@@ -435,7 +474,7 @@ export class FileRenameService {
     skippedDetails: string[]
   ): void {
     
-    console.log(`[FileRenameService] 🎯 Rename completed:`);
+    console.log(`[FileRenameService] 🎯 Rename completed with 634 replacement logic:`);
     console.log(`  📊 Total files: ${totalFiles}`);
     console.log(`  ✅ Successful: ${successCount}`);
     console.log(`  ❌ Failed: ${errorCount}`);
