@@ -906,7 +906,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
                 {searchStats.totalDirectories > 0 && (
                   <>
                     {' | '}
-                    <strong> Should be files in directories:</strong> {searchStats.existingDirectories}, {searchStats.missingDirectories} missing
+                    <strong>Files should be in directories:</strong> {searchStats.existingDirectories}, and {searchStats.missingDirectories} files in missing directories
                   </>
                 )}
                 {/* UPDATED: Show CORRECTED file statistics after Stage 3 */}

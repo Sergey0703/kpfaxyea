@@ -5,6 +5,7 @@ import {
   FileSearchStatus
 } from '../../types/RenameFilesTypes';
 import { FileSearchConfigService } from './FileSearchConfigService';
+import { SharePointFolderService } from '../SharePointFolderService'; // NEW: Add folder service
 
 interface IWebPartContext {
   pageContext: {
@@ -51,14 +52,16 @@ type RenameStatus = 'renaming' | 'renamed' | 'error' | 'skipped';
 export class FileRenameService {
   private context: IWebPartContext;
   private configService: FileSearchConfigService;
+  private folderService: SharePointFolderService; // NEW: Add folder service
 
   constructor(context: IWebPartContext, configService: FileSearchConfigService) {
     this.context = context;
     this.configService = configService;
+    this.folderService = new SharePointFolderService(context); // NEW: Initialize folder service
   }
 
   /**
-   * Rename found files with staffID prefix - UPDATED: Skip if target exists
+   * Rename found files with staffID prefix - OPTIMIZED: Batch existence checks
    */
   public async renameFoundFiles(
     rows: IRenameTableRow[],
@@ -69,7 +72,7 @@ export class FileRenameService {
     isCancelled?: () => boolean
   ): Promise<IRenameResult> {
     
-    console.log(`[FileRenameService] 🏷️ STARTING FILE RENAME`);
+    console.log(`[FileRenameService] 🏷️ STARTING OPTIMIZED FILE RENAME`);
     
     // Prepare files for renaming
     const filesToRename = this.prepareFilesForRename(rows, fileSearchResults, baseFolderPath);
@@ -87,7 +90,96 @@ export class FileRenameService {
       };
     }
 
+    // NEW: Batch load all directories before starting rename operations
+    await this.preloadDirectoriesForExistenceChecks(filesToRename);
+
     return this.executeRenameOperations(filesToRename, progressCallback, statusCallback, isCancelled);
+  }
+
+  /**
+   * NEW: Preload all directories for batch existence checks
+   */
+  private async preloadDirectoriesForExistenceChecks(filesToRename: IRenameFileInfo[]): Promise<void> {
+    console.log(`[FileRenameService] 🚀 OPTIMIZATION: Preloading directories for batch existence checks`);
+    
+    // Get unique directories from all files to rename
+    const uniqueDirectories = this.getUniqueDirectories(filesToRename);
+    
+    console.log(`[FileRenameService] 📁 Found ${uniqueDirectories.length} unique directories to preload`);
+    console.log(`[FileRenameService] 📈 Performance gain: ${filesToRename.length} API calls → ${uniqueDirectories.length} API calls`);
+    
+    try {
+      // Batch load all directory contents
+      await this.folderService.batchLoadDirectoryContents(
+        uniqueDirectories,
+        (loaded: number, total: number, currentPath: string) => {
+          console.log(`[FileRenameService] 📦 Preloading directories: ${loaded}/${total} - ${currentPath}`);
+        }
+      );
+      
+      console.log(`[FileRenameService] ✅ Successfully preloaded ${uniqueDirectories.length} directories`);
+      
+      // Log performance statistics
+      const stats = this.folderService.getPerformanceStats();
+      console.log(`[FileRenameService] 📊 Folder service performance:`, {
+        directoriesCached: stats.directoriesCached,
+        totalFilesCached: stats.totalFilesCached,
+        batchLoadsExecuted: stats.batchLoadsExecuted
+      });
+      
+    } catch (error) {
+      console.error(`[FileRenameService] ❌ Error preloading directories:`, error);
+      console.warn(`[FileRenameService] ⚠️ Continuing with individual existence checks as fallback`);
+    }
+  }
+
+  /**
+   * NEW: Get unique directories from files to rename
+   */
+  private getUniqueDirectories(filesToRename: IRenameFileInfo[]): string[] {
+    const uniqueDirectories = new Set<string>();
+    
+    filesToRename.forEach(fileInfo => {
+      const directoryPath = this.getDirectoryFromPath(fileInfo.fullNewPath);
+      if (directoryPath) {
+        uniqueDirectories.add(directoryPath);
+      }
+    });
+    
+    const directories = Array.from(uniqueDirectories);
+    
+    console.log(`[FileRenameService] 🗂️ Unique directories extracted:`, {
+      totalFiles: filesToRename.length,
+      uniqueDirectories: directories.length,
+      optimizationRatio: Math.round(filesToRename.length / directories.length),
+      sampleDirectories: directories.slice(0, 3)
+    });
+    
+    return directories;
+  }
+
+  /**
+   * NEW: Extract directory path from full file path
+   */
+  private getDirectoryFromPath(fullPath: string): string {
+    if (!fullPath) return '';
+    
+    const pathParts = fullPath.split('/');
+    // Remove the filename (last part) to get directory path
+    const directoryParts = pathParts.slice(0, -1);
+    const directoryPath = directoryParts.join('/');
+    
+    return this.configService.cleanSharePointPath(directoryPath);
+  }
+
+  /**
+   * NEW: Extract filename from full file path
+   */
+  private getFileNameFromPath(fullPath: string): string {
+    if (!fullPath) return '';
+    
+    const pathParts = fullPath.split('/');
+    return pathParts[pathParts.length - 1] || '';
   }
 
   /**
@@ -374,14 +466,41 @@ export class FileRenameService {
   }
 
   /**
-   * Check if file exists at given path
+   * OPTIMIZED: Check if file exists using cached directory data
    */
-  private async checkFileExists(filePath: string): Promise<{ exists: boolean; error?: string }> {
+  private async checkFileExistsOptimized(filePath: string): Promise<{ exists: boolean; error?: string }> {
+    try {
+      const directoryPath = this.getDirectoryFromPath(filePath);
+      const fileName = this.getFileNameFromPath(filePath);
+      
+      console.log(`[FileRenameService] 🔍 OPTIMIZED existence check: "${fileName}" in "${directoryPath}"`);
+      
+      // Try to use cached data first
+      if (this.folderService.isDirectoryCached(directoryPath)) {
+        const exists = this.folderService.checkFileExistsInCache(directoryPath, fileName);
+        console.log(`[FileRenameService] ⚡ Cache hit: "${fileName}" ${exists ? 'EXISTS' : 'NOT FOUND'}`);
+        return { exists };
+      }
+      
+      // Fallback to direct API check if not cached
+      console.log(`[FileRenameService] 📞 Cache miss, using direct API check for: "${filePath}"`);
+      return await this.checkFileExistsDirect(filePath);
+      
+    } catch (error) {
+      console.log(`[FileRenameService] ⚠️ Error in optimized existence check: ${error}`);
+      return { exists: false, error: String(error) };
+    }
+  }
+
+  /**
+   * Direct API check for file existence (fallback)
+   */
+  private async checkFileExistsDirect(filePath: string): Promise<{ exists: boolean; error?: string }> {
     try {
       const webUrl = this.context.pageContext.web.absoluteUrl;
       const checkUrl = `${webUrl}/_api/web/getFileByServerRelativeUrl('${encodeURIComponent(filePath)}')`;
       
-      console.log(`[FileRenameService] 🔍 Checking file existence: ${checkUrl}`);
+      console.log(`[FileRenameService] 🔍 Direct API file existence check: ${checkUrl}`);
       
       const response = await fetch(checkUrl, {
         method: 'GET',
@@ -489,10 +608,10 @@ export class FileRenameService {
   }
 
   /**
-   * Rename a single file using SharePoint REST API - UPDATED: Skip if target exists
+   * Rename a single file using SharePoint REST API - OPTIMIZED: Use cached existence checks
    */
   private async renameSingleFile(originalPath: string, newPath: string, requestDigest: string): Promise<void> {
-    console.log(`[FileRenameService] 🔄 CHECKING AND RENAMING file:`);
+    console.log(`[FileRenameService] 🔄 OPTIMIZED CHECKING AND RENAMING file:`);
     console.log(`  From: "${originalPath}"`);
     console.log(`  To: "${newPath}"`);
     
@@ -504,17 +623,17 @@ export class FileRenameService {
     console.log(`  Clean to: "${cleanNewPath}"`);
     
     try {
-      // Check if file with new name already exists
-      const checkResult = await this.checkFileExists(cleanNewPath);
+      // OPTIMIZED: Check if file with new name already exists using cached data
+      const checkResult = await this.checkFileExistsOptimized(cleanNewPath);
       if (checkResult.exists) {
         // Don't create unique name, throw special error instead
         const message = `File already exists with target name. Skipping rename to avoid overwrite.`;
-        console.log(`[FileRenameService] ⚠️ TARGET FILE EXISTS: "${cleanNewPath}"`);
+        console.log(`[FileRenameService] ⚠️ TARGET FILE EXISTS (cached check): "${cleanNewPath}"`);
         console.log(`[FileRenameService] ⏭️ SKIPPING RENAME to avoid overwrite`);
         throw new Error(`FILE_ALREADY_EXISTS: ${message}`);
       }
       
-      console.log(`[FileRenameService] ✅ Target path is free, proceeding with rename...`);
+      console.log(`[FileRenameService] ✅ Target path is free (cached check), proceeding with rename...`);
       
       // Try simple MoveTo API first
       const success = await this.trySimpleMoveTo(cleanOriginalPath, cleanNewPath, requestDigest);
