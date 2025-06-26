@@ -11,6 +11,15 @@ export interface ICachedFolder {
   TimeLastModified: string;
 }
 
+// NEW: Interface for cached directory contents
+export interface ICachedDirectoryContents {
+  directoryPath: string;
+  files: Map<string, ISharePointFolder>; // filename (lowercase) -> file info
+  folders: ISharePointFolder[];
+  lastLoaded: Date;
+  fileCount: number;
+}
+
 // FIXED: Define specific interface instead of using 'any'
 interface IWebPartContext {
   pageContext: {
@@ -26,15 +35,299 @@ interface IWebPartContext {
 }
 
 export class SharePointFolderService {
-  private context: IWebPartContext; // FIXED: specific type instead of any
+  private context: IWebPartContext;
   private cachedFolders: ICachedFolder[] = [];
   private isLoadingAllFolders: boolean = false;
   private allFoldersLoaded: boolean = false;
 
-  constructor(context: IWebPartContext) { // FIXED: specific type instead of any
+  // NEW: Cached directory contents for fast existence checks
+  private directoryContentsCache: Map<string, ICachedDirectoryContents> = new Map();
+  private batchLoadingPromises: Map<string, Promise<ICachedDirectoryContents>> = new Map();
+
+  // NEW: Performance tracking
+  private performanceStats = {
+    cacheHits: 0,
+    cacheMisses: 0,
+    batchLoadsExecuted: 0,
+    totalApiCalls: 0
+  };
+
+  constructor(context: IWebPartContext) {
     this.context = context;
   }
 
+  /**
+   * NEW: Batch load multiple directory contents for fast existence checking
+   * This is the KEY method for performance optimization
+   */
+  public async batchLoadDirectoryContents(
+    directoryPaths: string[],
+    progressCallback?: (loaded: number, total: number, currentPath: string) => void
+  ): Promise<Map<string, ICachedDirectoryContents>> {
+    
+    console.log(`[SharePointFolderService] 🚀 BATCH LOADING ${directoryPaths.length} directories for fast existence checks`);
+    console.log(`[SharePointFolderService] 📊 Performance boost: ${directoryPaths.length} API calls instead of thousands of individual checks`);
+    
+    const results = new Map<string, ICachedDirectoryContents>();
+    
+    // FIXED: ES5 compatible Set to Array conversion
+    const uniquePathsSet = new Set<string>();
+    directoryPaths.forEach(path => {
+      uniquePathsSet.add(this.normalizePath(path));
+    });
+    
+    const uniquePaths: string[] = [];
+    uniquePathsSet.forEach(path => {
+      uniquePaths.push(path);
+    });
+    
+    console.log(`[SharePointFolderService] 📋 Unique directories to load: ${uniquePaths.length}`);
+    
+    // Process directories in parallel batches of 5 to avoid overwhelming SharePoint
+    const BATCH_SIZE = 5;
+    let processed = 0;
+    
+    for (let i = 0; i < uniquePaths.length; i += BATCH_SIZE) {
+      const batch = uniquePaths.slice(i, i + BATCH_SIZE);
+      
+      console.log(`[SharePointFolderService] 📦 Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(uniquePaths.length / BATCH_SIZE)}: ${batch.length} directories`);
+      
+      // Process batch in parallel
+      const batchPromises = batch.map(async (path) => {
+        try {
+          progressCallback?.(processed, uniquePaths.length, path);
+          
+          const contents = await this.loadSingleDirectoryContents(path);
+          results.set(path, contents);
+          processed++;
+          
+          console.log(`[SharePointFolderService] ✅ Loaded directory "${path}": ${contents.fileCount} files`);
+          return contents;
+          
+        } catch (error) {
+          console.warn(`[SharePointFolderService] ⚠️ Failed to load directory "${path}":`, error);
+          
+          // Create empty cache entry for failed directories
+          const emptyContents: ICachedDirectoryContents = {
+            directoryPath: path,
+            files: new Map(),
+            folders: [],
+            lastLoaded: new Date(),
+            fileCount: 0
+          };
+          
+          this.directoryContentsCache.set(path, emptyContents);
+          results.set(path, emptyContents);
+          processed++;
+          
+          return emptyContents;
+        }
+      });
+      
+      await Promise.all(batchPromises);
+      
+      // Small delay between batches to be nice to SharePoint
+      if (i + BATCH_SIZE < uniquePaths.length) {
+        await this.delay(200);
+      }
+      
+      progressCallback?.(processed, uniquePaths.length, `Batch ${Math.floor(i / BATCH_SIZE) + 1} complete`);
+    }
+    
+    this.performanceStats.batchLoadsExecuted++;
+    
+    console.log(`[SharePointFolderService] 🎯 BATCH LOADING COMPLETE:`);
+    console.log(`[SharePointFolderService]   📁 Directories loaded: ${results.size}`);
+    console.log(`[SharePointFolderService]   📄 Total files cached: ${Array.from(results.values()).reduce((sum, dir) => sum + dir.fileCount, 0)}`);
+    console.log(`[SharePointFolderService]   ⚡ API calls made: ${uniquePaths.length} (instead of thousands)`);
+    
+    return results;
+  }
+
+  /**
+   * NEW: Load contents of a single directory and cache it
+   */
+  private async loadSingleDirectoryContents(directoryPath: string): Promise<ICachedDirectoryContents> {
+    const normalizedPath = this.normalizePath(directoryPath);
+    
+    // Check if already cached and recent (within 5 minutes)
+    const cached = this.directoryContentsCache.get(normalizedPath);
+    if (cached && (Date.now() - cached.lastLoaded.getTime()) < 300000) {
+      console.log(`[SharePointFolderService] 📋 Cache hit for directory: "${normalizedPath}"`);
+      this.performanceStats.cacheHits++;
+      return cached;
+    }
+    
+    // Check if already loading
+    const existingPromise = this.batchLoadingPromises.get(normalizedPath);
+    if (existingPromise) {
+      console.log(`[SharePointFolderService] ⏳ Waiting for existing load of: "${normalizedPath}"`);
+      return existingPromise;
+    }
+    
+    // Start loading
+    const loadPromise = this.executeDirectoryLoad(directoryPath, normalizedPath);
+    this.batchLoadingPromises.set(normalizedPath, loadPromise);
+    
+    try {
+      const result = await loadPromise;
+      this.batchLoadingPromises.delete(normalizedPath);
+      return result;
+    } catch (error) {
+      this.batchLoadingPromises.delete(normalizedPath);
+      throw error;
+    }
+  }
+
+  /**
+   * NEW: Execute the actual directory loading with API call
+   */
+  private async executeDirectoryLoad(originalPath: string, normalizedPath: string): Promise<ICachedDirectoryContents> {
+    console.log(`[SharePointFolderService] 📞 API call: getFolderContents("${originalPath}")`);
+    this.performanceStats.totalApiCalls++;
+    this.performanceStats.cacheMisses++;
+    
+    const startTime = Date.now();
+    
+    try {
+      // Use existing getFolderContents method but with caching
+      const { files, folders } = await this.getFolderContents(originalPath);
+      
+      const endTime = Date.now();
+      console.log(`[SharePointFolderService] ✅ API response received in ${endTime - startTime}ms for "${originalPath}"`);
+      
+      // Create case-insensitive file map for fast lookups
+      const fileMap = new Map<string, ISharePointFolder>();
+      files.forEach(file => {
+        fileMap.set(file.Name.toLowerCase(), file);
+      });
+      
+      const contents: ICachedDirectoryContents = {
+        directoryPath: normalizedPath,
+        files: fileMap,
+        folders,
+        lastLoaded: new Date(),
+        fileCount: files.length
+      };
+      
+      // Cache the results
+      this.directoryContentsCache.set(normalizedPath, contents);
+      
+      console.log(`[SharePointFolderService] 💾 Cached directory "${originalPath}": ${files.length} files, ${folders.length} folders`);
+      
+      return contents;
+      
+    } catch (error) {
+      const endTime = Date.now();
+      console.error(`[SharePointFolderService] ❌ API call failed after ${endTime - startTime}ms for "${originalPath}":`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * NEW: Fast file existence check using cached data
+   * This replaces thousands of individual API calls!
+   */
+  public checkFileExistsInCache(directoryPath: string, fileName: string): boolean {
+    const normalizedPath = this.normalizePath(directoryPath);
+    const normalizedFileName = fileName.toLowerCase();
+    
+    const contents = this.directoryContentsCache.get(normalizedPath);
+    if (!contents) {
+      console.warn(`[SharePointFolderService] ⚠️ No cached data for directory: "${directoryPath}"`);
+      console.warn(`[SharePointFolderService] 💡 Suggestion: Call batchLoadDirectoryContents() first`);
+      return false;
+    }
+    
+    const exists = contents.files.has(normalizedFileName);
+    
+    if (exists) {
+      console.log(`[SharePointFolderService] ✅ File EXISTS in cache: "${fileName}" in "${directoryPath}"`);
+    } else {
+      console.log(`[SharePointFolderService] ❌ File NOT FOUND in cache: "${fileName}" in "${directoryPath}"`);
+    }
+    
+    return exists;
+  }
+
+  /**
+   * NEW: Get all cached directory contents
+   */
+  public getCachedDirectoryContents(directoryPath: string): ICachedDirectoryContents | undefined {
+    const normalizedPath = this.normalizePath(directoryPath);
+    return this.directoryContentsCache.get(normalizedPath);
+  }
+
+  /**
+   * NEW: Check if directory contents are cached
+   */
+  public isDirectoryCached(directoryPath: string): boolean {
+    const normalizedPath = this.normalizePath(directoryPath);
+    const cached = this.directoryContentsCache.get(normalizedPath);
+    
+    if (!cached) return false;
+    
+    // Check if cache is recent (within 5 minutes)
+    const isRecent = (Date.now() - cached.lastLoaded.getTime()) < 300000;
+    return isRecent;
+  }
+
+  /**
+   * NEW: Clear directory contents cache
+   */
+  public clearDirectoryCache(directoryPath?: string): void {
+    if (directoryPath) {
+      const normalizedPath = this.normalizePath(directoryPath);
+      this.directoryContentsCache.delete(normalizedPath);
+      console.log(`[SharePointFolderService] 🗑️ Cleared cache for directory: "${directoryPath}"`);
+    } else {
+      this.directoryContentsCache.clear();
+      console.log(`[SharePointFolderService] 🗑️ Cleared entire directory cache`);
+    }
+  }
+
+  /**
+   * NEW: Get performance statistics
+   */
+  public getPerformanceStats(): {
+    cacheHits: number;
+    cacheMisses: number;
+    batchLoadsExecuted: number;
+    totalApiCalls: number;
+    cacheHitRatio: number;
+    directoriesCached: number;
+    totalFilesCached: number;
+  } {
+    const directoriesCached = this.directoryContentsCache.size;
+    const totalFilesCached = Array.from(this.directoryContentsCache.values())
+      .reduce((sum, dir) => sum + dir.fileCount, 0);
+    
+    return {
+      ...this.performanceStats,
+      cacheHitRatio: this.performanceStats.cacheHits + this.performanceStats.cacheMisses > 0 
+        ? this.performanceStats.cacheHits / (this.performanceStats.cacheHits + this.performanceStats.cacheMisses) 
+        : 0,
+      directoriesCached,
+      totalFilesCached
+    };
+  }
+
+  /**
+   * NEW: Invalidate cache entry when file is renamed
+   * Call this after successful rename operations
+   */
+  public invalidateDirectoryCache(directoryPath: string): void {
+    const normalizedPath = this.normalizePath(directoryPath);
+    const cached = this.directoryContentsCache.get(normalizedPath);
+    
+    if (cached) {
+      // Mark as old so it gets refreshed on next access
+      cached.lastLoaded = new Date(0);
+      console.log(`[SharePointFolderService] 🔄 Invalidated cache for directory: "${directoryPath}"`);
+    }
+  }
+
+  // EXISTING METHODS (keeping all original functionality)
   public async getDocumentLibraryFolders(): Promise<ISharePointFolder[]> {
     try {
       const { context } = this;
@@ -49,7 +342,7 @@ export class SharePointFolderService {
         '/Shared%20Documents'
       ];
       
-      let foldersData: { d?: { results?: ISharePointFolder[] }; value?: ISharePointFolder[] } | undefined = undefined; // FIXED: specific type instead of any
+      let foldersData: { d?: { results?: ISharePointFolder[] }; value?: ISharePointFolder[] } | undefined = undefined;
       let workingPath = '';
       
       // Try each possible path
@@ -127,12 +420,12 @@ export class SharePointFolderService {
       
       // Filter out system folders
       const userFolders = folders
-        .filter((folder: ISharePointFolder) => // FIXED: specific type instead of any
+        .filter((folder: ISharePointFolder) => 
           !folder.Name.startsWith('Forms') && 
           !folder.Name.startsWith('_') &&
           folder.Name !== 'Forms'
         )
-        .map((folder: ISharePointFolder) => ({ // FIXED: specific type instead of any
+        .map((folder: ISharePointFolder) => ({
           Name: folder.Name,
           ServerRelativeUrl: folder.ServerRelativeUrl,
           ItemCount: folder.ItemCount || 0,
@@ -223,7 +516,7 @@ export class SharePointFolderService {
     try {
       // NEW: Set a global timeout for the entire loading process
       const loadingPromise = this.loadFoldersRecursively(baseFolderPath, progressCallback);
-      const timeoutPromise = new Promise<void>((resolve, reject) => { // FIXED: parameter names
+      const timeoutPromise = new Promise<void>((resolve, reject) => {
         setTimeout(() => reject(new Error('Folder loading timeout after 30 seconds')), 30000);
       });
       
@@ -296,7 +589,7 @@ export class SharePointFolderService {
         console.log(`[SharePointFolderService] Found ${folders.length} folders in ${folderPath}`);
         
         // Filter out system folders
-        const userFolders = folders.filter((folder: ISharePointFolder) => // FIXED: specific type instead of any
+        const userFolders = folders.filter((folder: ISharePointFolder) => 
           !folder.Name.startsWith('_') && 
           !folder.Name.startsWith('Forms') &&
           folder.Name !== 'Forms'
@@ -416,41 +709,41 @@ export class SharePointFolderService {
   /**
    * Get the full SharePoint path for a directory
    */
- public getFullDirectoryPath(relativePath: string, basePath: string): string {
-  console.log(`[SharePointFolderService] Building full path:`);
-  console.log(`  Base path: "${basePath}"`);
-  console.log(`  Relative path: "${relativePath}"`);
-  
-  // ИСПРАВЛЕНИЕ: НЕ приводим к нижнему регистру!
-  // Convert RelativePath format (e.g., "634\2025\6") to SharePoint format
-  const normalizedRelative = relativePath.replace(/\\/g, '/');
-  const fullPath = `${basePath}/${normalizedRelative}`;
-  
-  // ИСПРАВЛЕНИЕ: Убираем нормализацию, которая портила регистр
-  const cleanPath = fullPath
-    .replace(/\/+/g, '/')          // Remove duplicate slashes
-    .replace(/\/$/, '');           // Remove trailing slash
-  // НЕ ДЕЛАЕМ .toLowerCase() !!!
-  
-  console.log(`  Normalized relative: "${normalizedRelative}"`);
-  console.log(`  Combined path: "${fullPath}"`);
-  console.log(`  Final path: "${cleanPath}"`);
-  
-  return cleanPath;
-}
+  public getFullDirectoryPath(relativePath: string, basePath: string): string {
+    console.log(`[SharePointFolderService] Building full path:`);
+    console.log(`  Base path: "${basePath}"`);
+    console.log(`  Relative path: "${relativePath}"`);
+    
+    // ИСПРАВЛЕНИЕ: НЕ приводим к нижнему регистру!
+    // Convert RelativePath format (e.g., "634\2025\6") to SharePoint format
+    const normalizedRelative = relativePath.replace(/\\/g, '/');
+    const fullPath = `${basePath}/${normalizedRelative}`;
+    
+    // ИСПРАВЛЕНИЕ: Убираем нормализацию, которая портила регистр
+    const cleanPath = fullPath
+      .replace(/\/+/g, '/')          // Remove duplicate slashes
+      .replace(/\/$/, '');           // Remove trailing slash
+    // НЕ ДЕЛАЕМ .toLowerCase() !!!
+    
+    console.log(`  Normalized relative: "${normalizedRelative}"`);
+    console.log(`  Combined path: "${fullPath}"`);
+    console.log(`  Final path: "${cleanPath}"`);
+    
+    return cleanPath;
+  }
 
-// Также исправьте метод normalizePath (если он используется для путей):
-private normalizePath(path: string): string {
-  // ТОЛЬКО для сравнения, НЕ для реальных API вызовов!
-  const normalized = path
-    .replace(/\\/g, '/')           // Convert backslashes to forward slashes
-    .replace(/\/+/g, '/')          // Remove duplicate slashes
-    .toLowerCase()                 // Case insensitive ТОЛЬКО для сравнения
-    .replace(/\/$/, '');           // Remove trailing slash
-  
-  console.log(`[SharePointFolderService] Path normalization FOR COMPARISON: "${path}" -> "${normalized}"`);
-  return normalized;
-}
+  // Также исправьте метод normalizePath (если он используется для путей):
+  private normalizePath(path: string): string {
+    // ТОЛЬКО для сравнения, НЕ для реальных API вызовов!
+    const normalized = path
+      .replace(/\\/g, '/')           // Convert backslashes to forward slashes
+      .replace(/\/+/g, '/')          // Remove duplicate slashes
+      .toLowerCase()                 // Case insensitive ТОЛЬКО для сравнения
+      .replace(/\/$/, '');           // Remove trailing slash
+    
+    console.log(`[SharePointFolderService] Path normalization FOR COMPARISON: "${path}" -> "${normalized}"`);
+    return normalized;
+  }
 
   /**
    * Get cached folders (for debugging or display)
@@ -481,7 +774,7 @@ private normalizePath(path: string): string {
 
   // Existing methods remain unchanged...
 
-  public async getFolderContents(folderPath: string): Promise<{files: ISharePointFolder[], folders: ISharePointFolder[]}> { // FIXED: specific types instead of any
+  public async getFolderContents(folderPath: string): Promise<{files: ISharePointFolder[], folders: ISharePointFolder[]}> {
     try {
       const { context } = this;
       const webUrl = context.pageContext.web.absoluteUrl;
@@ -508,11 +801,11 @@ private normalizePath(path: string): string {
       const folders = foldersResponse.ok ? (await foldersResponse.json()).d?.results || [] : [];
 
       console.log(`[SharePointFolderService] Folder contents: ${files.length} files, ${folders.length} folders`);
-      console.log(`[SharePointFolderService] Files found:`, files.map((f: ISharePointFolder) => f.Name).slice(0, 5)); // FIXED: specific type
+      console.log(`[SharePointFolderService] Files found:`, files.map((f: ISharePointFolder) => f.Name).slice(0, 5));
 
       return {
-        files: files.filter((file: ISharePointFolder) => !file.Name.startsWith('~')), // Filter out temp files // FIXED: specific type
-        folders: folders.filter((folder: ISharePointFolder) => !folder.Name.startsWith('_') && !folder.Name.startsWith('Forms')) // FIXED: specific type
+        files: files.filter((file: ISharePointFolder) => !file.Name.startsWith('~')), // Filter out temp files
+        folders: folders.filter((folder: ISharePointFolder) => !folder.Name.startsWith('_') && !folder.Name.startsWith('Forms'))
       };
     } catch (error) {
       console.error('[SharePointFolderService] Error getting folder contents:', error);

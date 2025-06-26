@@ -18,23 +18,21 @@ export interface IDataTableViewProps {
   onCellEdit: (columnId: string, rowIndex: number, newValue: string) => void;
 }
 
-export const DataTableView: React.FC<IDataTableViewProps> = ({
-  data,
-  directoryResults,
-  fileSearchResults,
-  columnResizeHandler,
-  onCellEdit
-}) => {
-  const handleCellChange = (columnId: string, rowIndex: number, value: string): void => {
-    onCellEdit(columnId, rowIndex, value);
+export class DataTableView extends React.Component<IDataTableViewProps> {
+
+  /**
+   * Handle cell value changes
+   */
+  private handleCellChange = (columnId: string, rowIndex: number, value: string): void => {
+    this.props.onCellEdit(columnId, rowIndex, value);
   };
 
   /**
-   * NEW: Get current status code for a row with priority logic
+   * Get current status code for a row with priority logic
    */
-  const getCurrentStatusCode = (rowIndex: number): StatusCode => {
-    const directoryStatus = directoryResults[rowIndex];
-    const fileSearchStatus = fileSearchResults[rowIndex];
+  private getCurrentStatusCode = (rowIndex: number): StatusCode => {
+    const directoryStatus = this.props.directoryResults[rowIndex];
+    const fileSearchStatus = this.props.fileSearchResults[rowIndex];
     
     // Priority logic:
     // 1. If directory doesn't exist or has error -> show directory status
@@ -62,6 +60,8 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
           return StatusCode.SEARCHING;
         case 'skipped':
           return StatusCode.SKIPPED;
+        case 'directory-missing':
+          return StatusCode.DIRECTORY_MISSING;
         default:
           return StatusCode.SEARCHING;
       }
@@ -81,9 +81,9 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
   };
 
   /**
-   * NEW: Get CSS class for status styling
+   * Get CSS class for status styling
    */
-  const getStatusCssClass = (statusCode: StatusCode): string => {
+  private getStatusCssClass = (statusCode: StatusCode): string => {
     switch (statusCode) {
       case StatusCode.FOUND:
       case StatusCode.RENAMED:
@@ -107,9 +107,9 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
   };
 
   /**
-   * NEW: Get tooltip text for status code
+   * Get tooltip text for status code
    */
-  const getStatusTooltip = (statusCode: StatusCode): string => {
+  private getStatusTooltip = (statusCode: StatusCode): string => {
     switch (statusCode) {
       case StatusCode.CHECKING_DIRECTORY:
         return 'Checking directory...';
@@ -127,6 +127,8 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
         return 'File not found';
       case StatusCode.SKIPPED:
         return 'File skipped';
+      case StatusCode.DIRECTORY_MISSING:
+        return 'Directory missing';
       case StatusCode.RENAMING:
         return 'Renaming file...';
       case StatusCode.RENAMED:
@@ -143,9 +145,9 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
   /**
    * Get CSS class for row styling based on status
    */
-  const getRowStatusClass = (rowIndex: number): string => {
-    const directoryStatus = directoryResults[rowIndex];
-    const fileSearchStatus = fileSearchResults[rowIndex];
+  private getRowStatusClass = (rowIndex: number): string => {
+    const directoryStatus = this.props.directoryResults[rowIndex];
+    const fileSearchStatus = this.props.fileSearchResults[rowIndex];
     
     // Apply row styling based on most relevant status
     if (directoryStatus === 'not-exists') {
@@ -164,10 +166,10 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
   };
 
   /**
-   * Fixed: Safe CSS class access using computed property names
+   * Get status cell class with safe CSS class access
    */
-  const getStatusCellClass = (statusCode: StatusCode): string => {
-    const statusClass = getStatusCssClass(statusCode);
+  private getStatusCellClass = (statusCode: StatusCode): string => {
+    const statusClass = this.getStatusCssClass(statusCode);
     const baseClass = styles.statusCell;
     
     // Use array access instead of computed property to avoid TypeScript error
@@ -176,101 +178,145 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
     return `${baseClass} ${statusStyleClass || ''}`;
   };
 
-  return (
-    <div className={styles.tableContainer}>
-      <table className={styles.dataTable}>
-        <thead>
-          <tr>
-            <th className={styles.rowHeader}>#</th>
-            {/* NEW: Status Column Header */}
-            <th className={`${styles.columnHeader} ${styles.statusColumn}`}>
-              <div className={styles.headerContent}>
-                <span className={styles.columnName}>Status</span>
-                <span className={styles.statusBadge}>Live</span>
-              </div>
-            </th>
-            {data.columns
-              .sort((a, b) => a.currentIndex - b.currentIndex)
-              .filter(col => col.isVisible)
-              .map(column => (
+  /**
+   * Render table headers with proper status column and custom column styling
+   */
+  private renderTableHeaders = (): React.ReactNode => {
+    const { data } = this.props;
+    
+    return (
+      <thead>
+        <tr>
+          {/* Row Number Header */}
+          <th className={styles.rowHeader}>#</th>
+          
+          {/* Status Column Header - FIXED positioning and styling */}
+          <th className={`${styles.columnHeader} ${styles.statusColumn}`}>
+            <div className={styles.headerContent}>
+              <span className={styles.columnName}>Status</span>
+              <span className={styles.statusBadge}>Live</span>
+            </div>
+          </th>
+          
+          {/* Data Column Headers - FIXED custom column detection */}
+          {data.columns
+            .sort((a, b) => a.currentIndex - b.currentIndex)
+            .filter(col => col.isVisible)
+            .map(column => {
+              // FIXED: Better custom column detection
+              const isFilenameColumn = column.id === 'custom_0' || column.name === 'Filename';
+              const isDirectoryColumn = column.id === 'custom_1' || column.name === 'Directory';
+              const isCustomColumn = column.isCustom || isFilenameColumn || isDirectoryColumn;
+              
+              return (
                 <th 
                   key={column.id} 
-                  className={`${styles.columnHeader} ${column.isCustom ? styles.customColumn : styles.excelColumn}`}
+                  className={`${styles.columnHeader} ${isCustomColumn ? styles.customColumn : styles.excelColumn}`}
                   style={{ width: column.width }}
                   data-column-id={column.id}
                 >
                   <div className={styles.headerContent}>
                     <span className={styles.columnName}>{column.name}</span>
-                    {column.isCustom && (
-                      <span className={styles.customBadge}>Custom</span>
+                    {isCustomColumn && (
+                      <span className={styles.customBadge}>
+                        {isFilenameColumn ? 'File' : isDirectoryColumn ? 'Dir' : 'Custom'}
+                      </span>
                     )}
                   </div>
                   <div 
                     className={styles.resizeHandle}
-                    onMouseDown={(e) => columnResizeHandler.handleResizeStart(column.id, e)}
+                    onMouseDown={(e) => this.props.columnResizeHandler.handleResizeStart(column.id, e)}
                     title="Drag to resize column"
                   />
                 </th>
-              ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.rows.map(row => {
-            const rowStatusClass = getRowStatusClass(row.rowIndex);
-            const baseRowClass = row.isEdited ? styles.editedRow : '';
-            const finalRowClass = [baseRowClass, rowStatusClass].filter(Boolean).join(' ');
-            
-            // Get current status for this row
-            const currentStatusCode = getCurrentStatusCode(row.rowIndex);
-            const statusTooltip = getStatusTooltip(currentStatusCode);
-            
-            return (
-              <tr key={row.rowIndex} className={finalRowClass}>
-                {/* Row Number Column */}
-                <td className={styles.rowNumber}>
-                  <div className={styles.rowNumberContent}>
-                    <span className={styles.rowNumberText}>{row.rowIndex + 1}</span>
-                  </div>
-                </td>
-                
-                {/* NEW: Status Column */}
-                <td className={getStatusCellClass(currentStatusCode)}>
-                  <div 
-                    className={styles.statusCode}
-                    title={statusTooltip}
-                  >
-                    {currentStatusCode}
-                  </div>
-                </td>
-                
-                {/* Data Columns */}
-                {data.columns
-                  .sort((a, b) => a.currentIndex - b.currentIndex)
-                  .filter(col => col.isVisible)
-                  .map(column => {
-                    const cell = row.cells[column.id];
-                    return (
-                      <td 
-                        key={`${column.id}_${row.rowIndex}`}
-                        className={`${styles.tableCell} ${cell?.isEdited ? styles.editedCell : ''}`}
-                      >
-                        <input
-                          type="text"
-                          value={String(cell?.value || '')}
-                          onChange={(e) => handleCellChange(column.id, row.rowIndex, e.target.value)}
-                          className={styles.cellInput}
-                          placeholder={column.isCustom ? 'Enter value...' : ''}
-                        />
-                      </td>
-                    );
-                  })}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      
-      {/* NEW: Status Legend */}
+              );
+            })}
+        </tr>
+      </thead>
+    );
+  };
+
+  /**
+   * Render table body with all data rows
+   */
+  private renderTableBody = (): React.ReactNode => {
+    const { data } = this.props;
+    
+    return (
+      <tbody>
+        {data.rows.map(row => {
+          const rowStatusClass = this.getRowStatusClass(row.rowIndex);
+          const baseRowClass = row.isEdited ? styles.editedRow : '';
+          const finalRowClass = [baseRowClass, rowStatusClass].filter(Boolean).join(' ');
+          
+          // Get current status for this row
+          const currentStatusCode = this.getCurrentStatusCode(row.rowIndex);
+          const statusTooltip = this.getStatusTooltip(currentStatusCode);
+          
+          return (
+            <tr key={row.rowIndex} className={finalRowClass}>
+              {/* Row Number Column */}
+              <td className={styles.rowNumber}>
+                <div className={styles.rowNumberContent}>
+                  <span className={styles.rowNumberText}>{row.rowIndex + 1}</span>
+                </div>
+              </td>
+              
+              {/* Status Column - FIXED positioning */}
+              <td className={this.getStatusCellClass(currentStatusCode)}>
+                <div 
+                  className={styles.statusCode}
+                  title={statusTooltip}
+                >
+                  {currentStatusCode}
+                </div>
+              </td>
+              
+              {/* Data Columns */}
+              {data.columns
+                .sort((a, b) => a.currentIndex - b.currentIndex)
+                .filter(col => col.isVisible)
+                .map(column => {
+                  const cell = row.cells[column.id];
+                  const isFilenameColumn = column.id === 'custom_0';
+                  const isDirectoryColumn = column.id === 'custom_1';
+                  
+                  return (
+                    <td 
+                      key={`${column.id}_${row.rowIndex}`}
+                      className={`${styles.tableCell} ${cell?.isEdited ? styles.editedCell : ''}`}
+                    >
+                      <input
+                        type="text"
+                        value={String(cell?.value || '')}
+                        onChange={(e) => this.handleCellChange(column.id, row.rowIndex, e.target.value)}
+                        className={styles.cellInput}
+                        placeholder={
+                          isFilenameColumn ? 'Filename...' : 
+                          isDirectoryColumn ? 'Directory path...' : 
+                          column.isCustom ? 'Enter value...' : ''
+                        }
+                        title={
+                          isFilenameColumn ? 'Original filename from the file path' :
+                          isDirectoryColumn ? 'Directory path where file is located' :
+                          `${column.name} value`
+                        }
+                      />
+                    </td>
+                  );
+                })}
+            </tr>
+          );
+        })}
+      </tbody>
+    );
+  };
+
+  /**
+   * Render status legend for user reference
+   */
+  private renderStatusLegend = (): React.ReactNode => {
+    return (
       <div className={styles.statusLegend}>
         <div className={styles.legendTitle}>Status Codes:</div>
         <div className={styles.legendItems}>
@@ -299,6 +345,10 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
             <span className={styles.legendText}>File not found</span>
           </div>
           <div className={styles.legendItem}>
+            <span className={`${styles.legendCode} ${styles.statusError}`}>DMG</span>
+            <span className={styles.legendText}>Directory missing</span>
+          </div>
+          <div className={styles.legendItem}>
             <span className={`${styles.legendCode} ${styles.statusProgress}`}>RNG</span>
             <span className={styles.legendText}>Renaming</span>
           </div>
@@ -316,6 +366,26 @@ export const DataTableView: React.FC<IDataTableViewProps> = ({
           </div>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
+
+  /**
+   * Main render method
+   */
+  public render(): React.ReactElement<IDataTableViewProps> {
+    return (
+      <div className={styles.tableContainer}>
+        <table className={styles.dataTable}>
+          {/* Render properly structured table headers */}
+          {this.renderTableHeaders()}
+          
+          {/* Render all table body content */}
+          {this.renderTableBody()}
+        </table>
+        
+        {/* Render status legend for user reference */}
+        {this.renderStatusLegend()}
+      </div>
+    );
+  }
+}
