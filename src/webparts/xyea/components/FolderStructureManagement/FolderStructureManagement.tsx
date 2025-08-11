@@ -3,20 +3,11 @@
 import * as React from 'react';
 import styles from './FolderStructureManagement.module.scss';
 import { WebPartContext } from '@microsoft/sp-webpart-base';
-import { SharePointFoldersService } from '../../services/SharePointFoldersService';
+import { SharePointFoldersService, ISharePointFolder } from '../../services/SharePointFoldersService';
 
 export interface IFolderStructureManagementProps {
   context: WebPartContext;
   userDisplayName: string;
-}
-
-export interface ISharePointFolder {
-  Name: string;
-  ServerRelativeUrl: string;
-  ItemCount: number;
-  TimeCreated: string;
-  TimeLastModified: string;
-  Exists: boolean;
 }
 
 export interface IFolderStructureState {
@@ -65,16 +56,18 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
       this.setState({ 
         loading: true, 
         error: undefined,
-        hasSearched: false 
+        hasSearched: false
       });
 
-      console.log('[FolderStructureManagement] Searching folders for path:', folderPath);
+      console.log('[FolderStructureManagement] Starting recursive scan for path:', folderPath);
 
+      // This now returns recursive structure like Python script
       const folders = await this.foldersService.getFoldersInPath(folderPath.trim());
 
-      console.log('[FolderStructureManagement] Found folders:', {
-        count: folders.length,
-        folders: folders.slice(0, 3)
+      console.log('[FolderStructureManagement] Recursive scan completed:', {
+        totalItems: folders.length,
+        files: folders.filter(item => !(item as any).IsFile === false).length,
+        folders: folders.filter(item => (item as any).IsFile === false).length
       });
 
       this.setState({
@@ -84,10 +77,10 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
       });
 
     } catch (error) {
-      console.error('[FolderStructureManagement] Error searching folders:', error);
+      console.error('[FolderStructureManagement] Error during recursive scan:', error);
       this.setState({
         loading: false,
-        error: error instanceof Error ? error.message : 'Failed to load folders',
+        error: error instanceof Error ? error.message : 'Failed to load folder structure',
         hasSearched: true,
         folders: []
       });
@@ -109,11 +102,89 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
   }
 
   private formatFileSize = (itemCount: number): string => {
-    return `${itemCount} items`;
+    if (itemCount === 0) return '0 bytes';
+    
+    if (itemCount < 1024) {
+      return `${itemCount} bytes`;
+    } else if (itemCount < 1024 * 1024) {
+      return `${(itemCount / 1024).toFixed(1)} KB`;
+    } else if (itemCount < 1024 * 1024 * 1024) {
+      return `${(itemCount / (1024 * 1024)).toFixed(1)} MB`;
+    } else {
+      return `${(itemCount / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    }
+  }
+
+  private renderHierarchicalStructure = (): React.ReactElement => {
+    const { folders } = this.state;
+
+    return (
+      <div className={styles.hierarchicalView}>
+        {folders.map((item, index) => {
+          const level = (item as any).Level || 0;
+          const isFile = (item as any).IsFile === true;
+          const isError = item.Name.includes('[Permission Denied]') || item.Name.includes('[Error:');
+          
+          return (
+            <div key={`${item.ServerRelativeUrl}-${index}`} className={styles.hierarchicalItem}>
+              <div 
+                className={styles.itemIndent}
+                style={{ 
+                  paddingLeft: `${level * 20 + 12}px`,
+                  fontFamily: "'Consolas', 'Monaco', 'Courier New', monospace"
+                }}
+              >
+                <span className={styles.itemIcon}>
+                  {isFile ? '📄' : '📁'}
+                </span>
+                <span 
+                  className={styles.itemName}
+                  style={{
+                    fontWeight: isFile ? 'normal' : '600',
+                    color: isError ? '#d13438' : (isFile ? '#323130' : '#0078d4')
+                  }}
+                >
+                  {item.Name}
+                </span>
+                {isFile && !isError && item.ItemCount > 0 && (
+                  <span className={styles.fileSize}>
+                    ({this.formatFileSize(item.ItemCount)})
+                  </span>
+                )}
+                {isError && (
+                  <span className={styles.errorIndicator}> ⚠️</span>
+                )}
+                {!isFile && !isError && (
+                  <span className={styles.folderMeta}>
+                    Modified: {this.formatDate(item.TimeLastModified)}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
   }
 
   public render(): React.ReactElement<IFolderStructureManagementProps> {
     const { folderPath, folders, loading, error, hasSearched } = this.state;
+
+    // Determine if we have hierarchical data
+    const hasHierarchicalData = folders.length > 0 && folders.some(item => (item as any).Level !== undefined);
+    
+    // Calculate statistics for hierarchical data
+    const folderStats = hasHierarchicalData ? {
+      totalItems: folders.length,
+      files: folders.filter(item => (item as any).IsFile === true).length,
+      folders: folders.filter(item => (item as any).IsFile === false).length,
+      maxLevel: Math.max(...folders.map(item => (item as any).Level || 0))
+    } : {
+      totalItems: folders.length,
+      files: 0,
+      folders: folders.length,
+      maxLevel: 0
+    };
 
     return (
       <div className={styles.folderStructure}>
@@ -122,7 +193,7 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
           {/* Header */}
           <div className={styles.header}>
             <h2>Folder Structure Explorer</h2>
-            <p>Enter a SharePoint folder path to explore its subfolders</p>
+            <p>Enter a SharePoint folder path to explore its complete structure recursively (like Python script)</p>
           </div>
 
           {/* Search Section */}
@@ -138,7 +209,7 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
                   value={folderPath}
                   onChange={this.handlePathChange}
                   onKeyPress={this.handleKeyPress}
-                  placeholder="/sites/YourSite/Shared Documents/YourFolder"
+                  placeholder="/Shared Documents"
                   className={styles.pathInput}
                   disabled={loading}
                 />
@@ -150,10 +221,10 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
                   {loading ? (
                     <>
                       <div className={styles.spinner}></div>
-                      Loading...
+                      Scanning...
                     </>
                   ) : (
-                    'Explore Folders'
+                    '🔍 Explore Folders'
                   )}
                 </button>
               </div>
@@ -161,12 +232,21 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
 
             {/* Path Examples */}
             <div className={styles.examples}>
-              <span className={styles.examplesLabel}>Examples:</span>
+              <span className={styles.examplesLabel}>Examples (click to use):</span>
               <ul className={styles.examplesList}>
-                <li>/sites/YourSite/Shared Documents</li>
-                <li>/sites/YourSite/Shared Documents/Projects</li>
-                <li>/Shared Documents/Department</li>
+                <li onClick={() => this.setState({ folderPath: '/Shared Documents' })}>/Shared Documents</li>
+                <li onClick={() => this.setState({ folderPath: '/sites/YourSite/Shared Documents' })}>/sites/YourSite/Shared Documents</li>
+                <li onClick={() => this.setState({ folderPath: '/sites/KPFADataBackUp/Shared Documents' })}>/sites/KPFADataBackUp/Shared Documents</li>
               </ul>
+            </div>
+
+            {/* Algorithm Info */}
+            <div className={styles.algorithmInfo}>
+              <div className={styles.infoIcon}>🐍</div>
+              <div className={styles.infoText}>
+                <strong>Python-like Algorithm:</strong> Scans recursively (3 levels deep), shows files first then folders, 
+                with proper indentation and error handling like your Python script.
+              </div>
             </div>
           </div>
 
@@ -188,19 +268,42 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
           {hasSearched && !loading && !error && (
             <div className={styles.resultsSection}>
               <div className={styles.resultsHeader}>
-                <h3>Subfolders in: {folderPath}</h3>
-                <span className={styles.resultsCount}>
-                  {folders.length} folder{folders.length !== 1 ? 's' : ''} found
-                </span>
+                <h3>
+                  {hasHierarchicalData ? 'Complete Structure:' : 'Subfolders in:'} {folderPath}
+                </h3>
+                <div className={styles.resultsStats}>
+                  {hasHierarchicalData ? (
+                    <>
+                      <span className={styles.statItem}>📁 {folderStats.folders} folders</span>
+                      <span className={styles.statItem}>📄 {folderStats.files} files</span>
+                      <span className={styles.statItem}>📊 {folderStats.maxLevel + 1} levels</span>
+                      <span className={styles.statItem}>📋 {folderStats.totalItems} total</span>
+                    </>
+                  ) : (
+                    <span className={styles.statItem}>
+                      {folders.length} folder{folders.length !== 1 ? 's' : ''} found
+                    </span>
+                  )}
+                </div>
               </div>
 
               {folders.length === 0 ? (
                 <div className={styles.noResults}>
                   <div className={styles.noResultsIcon}>📁</div>
-                  <h4>No subfolders found</h4>
-                  <p>The specified path doesn't contain any subfolders, or you may not have access to view them.</p>
+                  <h4>No items found</h4>
+                  <p>The specified path doesn't contain any items, or you may not have access to view them.</p>
                 </div>
+              ) : hasHierarchicalData ? (
+                // Hierarchical tree view (like Python script output)
+                <>
+                  <div className={styles.treeViewHeader}>
+                    <span className={styles.treeIcon}>🌳</span>
+                    <span>Hierarchical Structure (Files first, then folders - like Python script)</span>
+                  </div>
+                  {this.renderHierarchicalStructure()}
+                </>
               ) : (
+                // Fallback: Regular grid view for simple folder lists
                 <div className={styles.foldersGrid}>
                   {folders.map((folder, index) => (
                     <div key={`${folder.ServerRelativeUrl}-${index}`} className={styles.folderCard}>
@@ -243,8 +346,13 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
           {loading && !error && (
             <div className={styles.loadingState}>
               <div className={styles.loadingSpinner}></div>
-              <h3>Exploring folders...</h3>
-              <p>Please wait while we retrieve the folder structure from SharePoint.</p>
+              <h3>Scanning folder structure...</h3>
+              <p>Please wait while we recursively scan the folder structure (like Python script). This may take a moment for large directories.</p>
+              <div className={styles.loadingSteps}>
+                <div className={styles.step}>📁 Reading folders and files...</div>
+                <div className={styles.step}>🔍 Scanning subdirectories...</div>
+                <div className={styles.step}>📋 Building hierarchical structure...</div>
+              </div>
             </div>
           )}
 

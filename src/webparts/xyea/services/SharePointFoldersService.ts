@@ -1,4 +1,4 @@
-// src/webparts/xyea/services/SharePointFoldersService.ts - Updated to use PnPjs
+// src/webparts/xyea/services/SharePointFoldersService.ts
 
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { SPFI, spfi, SPFx } from "@pnp/sp";
@@ -12,8 +12,6 @@ export interface ISharePointFolder {
   ItemCount: number;
   TimeCreated: string;
   TimeLastModified: string;
-  FolderChildCount: number;
-  FileChildCount: number;
   Exists: boolean;
 }
 
@@ -27,75 +25,229 @@ export class SharePointFoldersService {
   }
 
   /**
-   * Get all subfolders in the specified SharePoint folder path
+   * Get all subfolders in the specified SharePoint folder path - ENHANCED WITH RECURSION LIKE PYTHON SCRIPT
    */
   public async getFoldersInPath(folderPath: string): Promise<ISharePointFolder[]> {
     try {
-      console.log('[SharePointFoldersService] Getting folders for path:', folderPath);
+      console.log('[SharePointFoldersService] Getting recursive structure for path:', folderPath);
       console.log('[SharePointFoldersService] Current web context:', {
         absoluteUrl: this.context.pageContext.web.absoluteUrl,
         serverRelativeUrl: this.context.pageContext.web.serverRelativeUrl,
         title: this.context.pageContext.web.title
       });
 
-      // Clean and validate the path
       const cleanPath = this.cleanFolderPath(folderPath);
       console.log('[SharePointFoldersService] Cleaned path:', cleanPath);
 
-      let folders: ISharePointFolder[] = [];
-
-      // Method 1: Try direct path access
-      try {
-        folders = await this.getFoldersMethod1(cleanPath);
-        if (folders.length >= 0) { // 0 is valid (empty folder)
-          console.log('[SharePointFoldersService] Method 1 successful, found:', folders.length, 'folders');
-          return folders;
-        }
-      } catch (error) {
-        console.warn('[SharePointFoldersService] Method 1 failed:', error);
-      }
-
-      // Method 2: Try cross-site access if path contains different site
-      try {
-        folders = await this.getFoldersMethod2(cleanPath);
-        if (folders.length >= 0) {
-          console.log('[SharePointFoldersService] Method 2 successful, found:', folders.length, 'folders');
-          return folders;
-        }
-      } catch (error) {
-        console.warn('[SharePointFoldersService] Method 2 failed:', error);
-      }
-
-      // Method 3: Try relative path resolution
-      try {
-        folders = await this.getFoldersMethod3(cleanPath);
-        console.log('[SharePointFoldersService] Method 3 successful, found:', folders.length, 'folders');
-        return folders;
-      } catch (error) {
-        console.error('[SharePointFoldersService] All methods failed. Last error:', error);
-        throw new Error(`Failed to access folder "${cleanPath}". Please check the path and permissions.`);
-      }
+      const structure: ISharePointFolder[] = [];
+      
+      // Start recursive exploration like Python script
+      await this.exploreDirectoryRecursive(cleanPath, 0, 3, structure); // Max 3 levels deep
+      
+      console.log('[SharePointFoldersService] Recursive exploration complete:', {
+        totalItems: structure.length,
+        files: structure.filter(item => item.Name && !item.Name.endsWith('/')).length,
+        folders: structure.filter(item => item.Name && item.Name.endsWith('/')).length
+      });
+      
+      return structure;
 
     } catch (error) {
-      console.error('[SharePointFoldersService] Error getting folders:', error);
+      console.error('[SharePointFoldersService] Error getting recursive folders:', error);
       throw new Error(`Failed to retrieve folders: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Recursive function to explore directory structure (exactly like Python script logic)
+   */
+  private async exploreDirectoryRecursive(
+    currentPath: string,
+    currentLevel: number,
+    maxDepth: number,
+    structure: ISharePointFolder[]
+  ): Promise<void> {
+    
+    if (currentLevel >= maxDepth) {
+      console.log(`[SharePointFoldersService] Max depth ${maxDepth} reached at: ${currentPath}`);
+      return;
+    }
+    
+    try {
+      console.log(`[SharePointFoldersService] Level ${currentLevel}: Exploring ${currentPath}`);
+      
+      // Get folders and files in current directory (like Python os.listdir)
+      const [folders, files] = await Promise.all([
+        this.getFoldersOnly(currentPath),
+        this.getFilesOnly(currentPath)
+      ]);
+      
+      console.log(`[SharePointFoldersService] Level ${currentLevel}: ${currentPath} - ${files.length} files, ${folders.length} folders`);
+      
+      // 1. FIRST: Add all FILES (like Python script - files first)
+      files.forEach(file => {
+        structure.push({
+          Name: file.Name, // File name without '/'
+          ServerRelativeUrl: file.ServerRelativeUrl,
+          ItemCount: file.ItemCount,
+          TimeCreated: file.TimeCreated,
+          TimeLastModified: file.TimeLastModified,
+          Exists: true,
+          // Add level info for indentation (like Python script indentation)
+          ['Level' as any]: currentLevel,
+          ['IsFile' as any]: true
+        } as any);
+      });
+      
+      // 2. SECOND: Add all FOLDERS and recurse into them (like Python script - folders second)
+      for (const folder of folders) {
+        // Add folder to structure with '/' suffix (like Python script)
+        structure.push({
+          Name: folder.Name + '/', // Add '/' like Python script
+          ServerRelativeUrl: folder.ServerRelativeUrl,
+          ItemCount: folder.ItemCount,
+          TimeCreated: folder.TimeCreated,
+          TimeLastModified: folder.TimeLastModified,
+          Exists: folder.Exists,
+          ['Level' as any]: currentLevel,
+          ['IsFile' as any]: false
+        } as any);
+        
+        // Recurse into subdirectory (like Python script recursion)
+        try {
+          await this.exploreDirectoryRecursive(
+            folder.ServerRelativeUrl,
+            currentLevel + 1,
+            maxDepth,
+            structure
+          );
+        } catch (subDirError) {
+          console.warn(`[SharePointFoldersService] Failed to access subdirectory: ${folder.ServerRelativeUrl}`, subDirError);
+          
+          // Add permission denied indicator (like Python script [Permission Denied])
+          structure.push({
+            Name: '[Permission Denied]',
+            ServerRelativeUrl: folder.ServerRelativeUrl + '/[denied]',
+            ItemCount: 0,
+            TimeCreated: new Date().toISOString(),
+            TimeLastModified: new Date().toISOString(),
+            Exists: false,
+            ['Level' as any]: currentLevel + 1,
+            ['IsFile' as any]: true
+          } as any);
+        }
+      }
+      
+    } catch (error) {
+      console.error(`[SharePointFoldersService] Error exploring ${currentPath}:`, error);
+      
+      // Add error indicator to structure (like Python script error handling)
+      structure.push({
+        Name: `[Error: ${error instanceof Error ? error.message : 'Unknown'}]`,
+        ServerRelativeUrl: currentPath + '/[error]',
+        ItemCount: 0,
+        TimeCreated: new Date().toISOString(),
+        TimeLastModified: new Date().toISOString(),
+        Exists: false,
+        ['Level' as any]: currentLevel,
+        ['IsFile' as any]: true
+      } as any);
+    }
+  }
+
+  /**
+   * Get only folders (not files) from a path
+   */
+  private async getFoldersOnly(folderPath: string): Promise<any[]> {
+    try {
+      // Try different methods to get folders
+      let folders: any[] = [];
+      
+      // Method 1: Try direct folder access
+      try {
+        folders = await this.getFoldersMethod1(folderPath);
+        if (folders.length >= 0) return folders;
+      } catch (error) {
+        console.warn('[SharePointFoldersService] Method 1 failed for folders:', error);
+      }
+      
+      // Method 2: Try cross-site access
+      try {
+        folders = await this.getFoldersMethod2(folderPath);
+        if (folders.length >= 0) return folders;
+      } catch (error) {
+        console.warn('[SharePointFoldersService] Method 2 failed for folders:', error);
+      }
+      
+      // Method 3: Try relative path
+      try {
+        folders = await this.getFoldersMethod3(folderPath);
+        return folders;
+      } catch (error) {
+        console.warn('[SharePointFoldersService] All methods failed for folders:', error);
+        return [];
+      }
+    } catch (error) {
+      console.warn(`[SharePointFoldersService] Could not get folders for path: ${folderPath}`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get only files (not folders) from a path
+   */
+  private async getFilesOnly(folderPath: string): Promise<any[]> {
+    try {
+      // Use current SPFI instance first
+      let files = await this.getFilesWithSp(this.sp, folderPath);
+      if (files.length >= 0) return files;
+      
+      // If failed, try with cross-site access
+      const tenantUrl = this.context.pageContext.web.absoluteUrl.split('/sites/')[0];
+      if (!folderPath.startsWith(this.context.pageContext.web.serverRelativeUrl)) {
+        const targetSp = spfi(tenantUrl).using(SPFx(this.context));
+        files = await this.getFilesWithSp(targetSp, folderPath);
+      }
+      
+      return files;
+    } catch (error) {
+      console.warn(`[SharePointFoldersService] Could not get files for path: ${folderPath}`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Helper to get files with specific SP instance
+   */
+  private async getFilesWithSp(sp: SPFI, folderPath: string): Promise<any[]> {
+    try {
+      const files = await sp.web.getFolderByServerRelativePath(folderPath)
+        .files
+        .select("Name", "ServerRelativeUrl", "TimeCreated", "TimeLastModified", "Length")
+        .orderBy("Name")();
+
+      return files
+        .filter(file => !file.Name.startsWith('.') && !file.Name.startsWith('~')) // Filter hidden/temp files
+        .map(file => ({
+          Name: file.Name,
+          ServerRelativeUrl: file.ServerRelativeUrl,
+          ItemCount: file.Length || 0,
+          TimeCreated: file.TimeCreated,
+          TimeLastModified: file.TimeLastModified,
+          Exists: true
+        }));
+    } catch (error) {
+      throw error;
     }
   }
 
   /**
    * Method 1: Direct folder access using PnPjs
    */
-  private async getFoldersMethod1(folderPath: string): Promise<ISharePointFolder[]> {
+  private async getFoldersMethod1(folderPath: string): Promise<any[]> {
     try {
       console.log('[SharePointFoldersService] Method 1 - Direct folder access:', folderPath);
       
-      // Use PnPjs to get folder by server relative path
-      const folderInfo = await this.sp.web.getFolderByServerRelativePath(folderPath)
-        .select("Name", "ServerRelativeUrl", "ItemCount", "TimeCreated", "TimeLastModified", "Exists")();
-      
-      console.log('[SharePointFoldersService] Method 1 - Folder exists:', folderInfo);
-
-      // Get subfolders using PnPjs - remove FolderChildCount and FileChildCount as they're not available
       const subfolders = await this.sp.web.getFolderByServerRelativePath(folderPath)
         .folders
         .select("Name", "ServerRelativeUrl", "ItemCount", "TimeCreated", "TimeLastModified", "Exists")
@@ -113,35 +265,25 @@ export class SharePointFoldersService {
   /**
    * Method 2: Cross-site access for different sites (including root site collection)
    */
-  private async getFoldersMethod2(folderPath: string): Promise<ISharePointFolder[]> {
+  private async getFoldersMethod2(folderPath: string): Promise<any[]> {
     try {
       console.log('[SharePointFoldersService] Method 2 - Cross-site access:', folderPath);
       
       const currentSiteUrl = this.context.pageContext.web.serverRelativeUrl;
       const tenantUrl = this.context.pageContext.web.absoluteUrl.split('/sites/')[0];
       
-      console.log('[SharePointFoldersService] Method 2 - URLs:', {
-        currentSiteUrl,
-        tenantUrl,
-        folderPath
-      });
-      
-      // Check if this is a cross-site request or root site collection access
-      let targetSiteAbsoluteUrl: string;
-      
       if (!folderPath.startsWith(currentSiteUrl)) {
-        // Check if it's a path to a different subsite
+        let targetSiteAbsoluteUrl: string;
+        
         const pathParts = folderPath.split('/');
         if (pathParts.length >= 3 && pathParts[1] === 'sites') {
           const targetSiteName = pathParts[2];
           targetSiteAbsoluteUrl = `${tenantUrl}/sites/${targetSiteName}`;
         } 
-        // Check if it's a root site collection path (like /Shared Documents)
         else if (folderPath.startsWith('/Shared Documents') || folderPath.startsWith('/Documents')) {
           targetSiteAbsoluteUrl = tenantUrl; // Root site collection
           console.log('[SharePointFoldersService] Method 2 - Detected root site collection access');
         }
-        // Check if it's any root-level path
         else if (!folderPath.includes('/sites/')) {
           targetSiteAbsoluteUrl = tenantUrl; // Root site collection
           console.log('[SharePointFoldersService] Method 2 - Detected root-level path');
@@ -152,10 +294,8 @@ export class SharePointFoldersService {
         
         console.log('[SharePointFoldersService] Method 2 - Target site URL:', targetSiteAbsoluteUrl);
         
-        // Create new SPFI instance for the target site
         const targetSp = spfi(targetSiteAbsoluteUrl).using(SPFx(this.context));
         
-        // Get subfolders from target site
         const subfolders = await targetSp.web.getFolderByServerRelativePath(folderPath)
           .folders
           .select("Name", "ServerRelativeUrl", "ItemCount", "TimeCreated", "TimeLastModified", "Exists")
@@ -175,26 +315,23 @@ export class SharePointFoldersService {
   /**
    * Method 3: Relative path resolution and root site collection access
    */
-  private async getFoldersMethod3(folderPath: string): Promise<ISharePointFolder[]> {
+  private async getFoldersMethod3(folderPath: string): Promise<any[]> {
     try {
       console.log('[SharePointFoldersService] Method 3 - Relative path resolution:', folderPath);
       
       const currentSiteUrl = this.context.pageContext.web.serverRelativeUrl;
       const tenantUrl = this.context.pageContext.web.absoluteUrl.split('/sites/')[0];
       
-      // Try different path combinations including root site collection
       const pathsToTry = [
         folderPath,
         `${currentSiteUrl}${folderPath}`,
         `${currentSiteUrl}/${folderPath.replace(/^\/+/, '')}`,
         folderPath.replace(currentSiteUrl, ''),
-        `/Shared Documents`, // Root site collection default
-        `/Documents`, // Alternative root document library name
-        // For root site collection, try with different SPFI instance
+        `/Shared Documents`
       ];
 
       // First try with current site instance
-      for (const tryPath of pathsToTry.slice(0, -2)) {
+      for (const tryPath of pathsToTry.slice(0, -1)) {
         if (!tryPath || tryPath === currentSiteUrl) continue;
         
         try {
@@ -263,24 +400,20 @@ export class SharePointFoldersService {
     }
 
     let cleanPath = path.trim();
-
-    // Remove leading and trailing slashes for consistency, then add back leading slash
     cleanPath = cleanPath.replace(/^\/+|\/+$/g, '');
     
     if (!cleanPath) {
       throw new Error('Folder path cannot be empty');
     }
 
-    // Add leading slash back
     cleanPath = '/' + cleanPath;
-
     return cleanPath;
   }
 
   /**
    * Map SharePoint response to our interface and filter system folders
    */
-  private mapAndFilterFolders(folders: any[]): ISharePointFolder[] {
+  private mapAndFilterFolders(folders: any[]): any[] {
     console.log('[SharePointFoldersService] Mapping folders:', folders);
     
     return folders
@@ -291,8 +424,6 @@ export class SharePointFoldersService {
         ItemCount: folder.ItemCount || 0,
         TimeCreated: folder.TimeCreated || new Date().toISOString(),
         TimeLastModified: folder.TimeLastModified || new Date().toISOString(),
-        FolderChildCount: 0, // PnPjs doesn't provide this property, set to 0
-        FileChildCount: 0,   // PnPjs doesn't provide this property, set to 0
         Exists: folder.Exists !== false
       }))
       .sort((a, b) => a.Name.localeCompare(b.Name));
@@ -321,17 +452,14 @@ export class SharePointFoldersService {
       'Solution Gallery'
     ];
 
-    // Filter out folders that start with underscore (system folders)
     if (folder.Name.startsWith('_')) {
       return false;
     }
 
-    // Filter out known system folders
     if (systemFolders.includes(folder.Name)) {
       return false;
     }
 
-    // Only include folders that exist
     if (folder.Exists === false) {
       return false;
     }
@@ -369,8 +497,6 @@ export class SharePointFoldersService {
         ItemCount: folder.ItemCount || 0,
         TimeCreated: folder.TimeCreated,
         TimeLastModified: folder.TimeLastModified,
-        FolderChildCount: 0, // Not available in PnPjs, set to 0
-        FileChildCount: 0,   // Not available in PnPjs, set to 0
         Exists: folder.Exists !== false
       };
     } catch (error) {
@@ -411,13 +537,11 @@ export class SharePointFoldersService {
       return { isValid: false, error: 'Path cannot be empty' };
     }
 
-    // Check for invalid characters
     const invalidChars = /[<>:"|?*]/;
     if (invalidChars.test(trimmedPath)) {
       return { isValid: false, error: 'Path contains invalid characters: < > : " | ? *' };
     }
 
-    // Check for double slashes (except at the beginning)
     if (trimmedPath.includes('//')) {
       return { isValid: false, error: 'Path cannot contain double slashes' };
     }

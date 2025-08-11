@@ -398,6 +398,82 @@
         grid-template-columns: 1fr;
         gap: 12px;
       }
+
+      .hierarchicalView {
+    background-color: white;
+    border: 2px solid #edebe9;
+    border-radius: 8px;
+    max-height: 600px;
+    overflow-y: auto;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+
+    .hierarchicalItem {
+      border-bottom: 1px solid #f8f7f6;
+      
+      &:last-child {
+        border-bottom: none;
+      }
+
+      &:hover {
+        background-color: #f8f7f6;
+      }
+
+      .itemIndent {
+        display: flex;
+        align-items: center;
+        padding: 4px 8px;
+        transition: background-color 0.1s ease;
+        min-height: 28px;
+
+        .itemIcon {
+          margin-right: 8px;
+          font-size: 14px;
+          width: 16px;
+          text-align: center;
+        }
+
+        .itemName {
+          flex: 1;
+          font-size: 13px;
+        }
+
+        .fileSize {
+          color: #a19f9d;
+          font-size: 11px;
+          margin-left: 8px;
+          white-space: nowrap;
+        }
+
+        .errorIndicator {
+          color: #d13438;
+          margin-left: 4px;
+        }
+      }
+    }
+
+    // Custom scrollbar
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: #f8f7f6;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #d2d0ce;
+      border-radius: 4px;
+
+      &:hover {
+        background: #c8c6c4;
+      }
+    }
+  }
+
+
     }
   }
 }
