@@ -242,10 +242,10 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
 
             {/* Algorithm Info */}
             <div className={styles.algorithmInfo}>
-              <div className={styles.infoIcon}>🐍</div>
+              <div className={styles.infoIcon}>🌲</div>
               <div className={styles.infoText}>
-                <strong>Python-like Algorithm:</strong> Scans recursively (3 levels deep), shows files first then folders, 
-                with proper indentation and error handling like your Python script.
+                <strong>Complete Recursive Scan:</strong> Explores ALL levels deep with no depth limit, 
+                shows files first then folders with proper indentation and comprehensive error handling.
               </div>
             </div>
           </div>

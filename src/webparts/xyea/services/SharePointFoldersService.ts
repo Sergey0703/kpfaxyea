@@ -18,6 +18,7 @@ export interface ISharePointFolder {
 export class SharePointFoldersService {
   private sp: SPFI;
   private context: WebPartContext;
+  private readonly REQUEST_DELAY = 100; // Delay between requests in ms
 
   constructor(context: WebPartContext) {
     this.context = context;
@@ -25,11 +26,11 @@ export class SharePointFoldersService {
   }
 
   /**
-   * Get all subfolders in the specified SharePoint folder path - ENHANCED WITH RECURSION LIKE PYTHON SCRIPT
+   * Get complete recursive folder structure with NO DEPTH LIMIT
    */
   public async getFoldersInPath(folderPath: string): Promise<ISharePointFolder[]> {
     try {
-      console.log('[SharePointFoldersService] Getting recursive structure for path:', folderPath);
+      console.log('[SharePointFoldersService] Starting COMPLETE recursive scan for path:', folderPath);
       console.log('[SharePointFoldersService] Current web context:', {
         absoluteUrl: this.context.pageContext.web.absoluteUrl,
         serverRelativeUrl: this.context.pageContext.web.serverRelativeUrl,
@@ -41,42 +42,42 @@ export class SharePointFoldersService {
 
       const structure: ISharePointFolder[] = [];
       
-      // Start recursive exploration like Python script
-      await this.exploreDirectoryRecursive(cleanPath, 0, 3, structure); // Max 3 levels deep
+      // Start UNLIMITED recursive exploration - NO DEPTH LIMIT!
+      await this.exploreDirectoryRecursiveUnlimited(cleanPath, 0, structure);
       
-      console.log('[SharePointFoldersService] Recursive exploration complete:', {
+      console.log('[SharePointFoldersService] COMPLETE recursive exploration finished:', {
         totalItems: structure.length,
-        files: structure.filter(item => item.Name && !item.Name.endsWith('/')).length,
-        folders: structure.filter(item => item.Name && item.Name.endsWith('/')).length
+        files: structure.filter(item => (item as any).IsFile === true).length,
+        folders: structure.filter(item => (item as any).IsFile === false).length,
+        maxLevelReached: Math.max(...structure.map(item => (item as any).Level || 0))
       });
       
       return structure;
 
     } catch (error) {
-      console.error('[SharePointFoldersService] Error getting recursive folders:', error);
-      throw new Error(`Failed to retrieve folders: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('[SharePointFoldersService] Error getting complete recursive structure:', error);
+      throw new Error(`Failed to retrieve complete folder structure: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   /**
-   * Recursive function to explore directory structure (exactly like Python script logic)
+   * UNLIMITED recursive function to explore ALL directory levels (no depth limit)
    */
-  private async exploreDirectoryRecursive(
+  private async exploreDirectoryRecursiveUnlimited(
     currentPath: string,
     currentLevel: number,
-    maxDepth: number,
     structure: ISharePointFolder[]
   ): Promise<void> {
-    
-    if (currentLevel >= maxDepth) {
-      console.log(`[SharePointFoldersService] Max depth ${maxDepth} reached at: ${currentPath}`);
-      return;
-    }
     
     try {
       console.log(`[SharePointFoldersService] Level ${currentLevel}: Exploring ${currentPath}`);
       
-      // Get folders and files in current directory (like Python os.listdir)
+      // Add a small delay to prevent overwhelming SharePoint
+      if (currentLevel > 0) {
+        await this.delay(this.REQUEST_DELAY);
+      }
+      
+      // Get folders and files in current directory
       const [folders, files] = await Promise.all([
         this.getFoldersOnly(currentPath),
         this.getFilesOnly(currentPath)
@@ -84,26 +85,28 @@ export class SharePointFoldersService {
       
       console.log(`[SharePointFoldersService] Level ${currentLevel}: ${currentPath} - ${files.length} files, ${folders.length} folders`);
       
-      // 1. FIRST: Add all FILES (like Python script - files first)
+      // 1. FIRST: Add all FILES (files first, like directory listing)
       files.forEach(file => {
         structure.push({
-          Name: file.Name, // File name without '/'
+          Name: file.Name,
           ServerRelativeUrl: file.ServerRelativeUrl,
           ItemCount: file.ItemCount,
           TimeCreated: file.TimeCreated,
           TimeLastModified: file.TimeLastModified,
           Exists: true,
-          // Add level info for indentation (like Python script indentation)
+          // Add metadata for tree display
           ['Level' as any]: currentLevel,
           ['IsFile' as any]: true
         } as any);
       });
       
-      // 2. SECOND: Add all FOLDERS and recurse into them (like Python script - folders second)
-      for (const folder of folders) {
-        // Add folder to structure with '/' suffix (like Python script)
+      // 2. SECOND: Add all FOLDERS and recurse into them (NO DEPTH LIMIT!)
+      for (let i = 0; i < folders.length; i++) {
+        const folder = folders[i];
+        
+        // Add folder to structure with '/' suffix
         structure.push({
-          Name: folder.Name + '/', // Add '/' like Python script
+          Name: folder.Name + '/',
           ServerRelativeUrl: folder.ServerRelativeUrl,
           ItemCount: folder.ItemCount,
           TimeCreated: folder.TimeCreated,
@@ -113,18 +116,17 @@ export class SharePointFoldersService {
           ['IsFile' as any]: false
         } as any);
         
-        // Recurse into subdirectory (like Python script recursion)
+        // Recurse into subdirectory - NO DEPTH LIMIT!
         try {
-          await this.exploreDirectoryRecursive(
+          await this.exploreDirectoryRecursiveUnlimited(
             folder.ServerRelativeUrl,
             currentLevel + 1,
-            maxDepth,
             structure
           );
         } catch (subDirError) {
-          console.warn(`[SharePointFoldersService] Failed to access subdirectory: ${folder.ServerRelativeUrl}`, subDirError);
+          console.warn(`[SharePointFoldersService] Failed to access subdirectory at level ${currentLevel + 1}: ${folder.ServerRelativeUrl}`, subDirError);
           
-          // Add permission denied indicator (like Python script [Permission Denied])
+          // Add permission denied indicator
           structure.push({
             Name: '[Permission Denied]',
             ServerRelativeUrl: folder.ServerRelativeUrl + '/[denied]',
@@ -136,12 +138,17 @@ export class SharePointFoldersService {
             ['IsFile' as any]: true
           } as any);
         }
+        
+        // Add delay between processing folders to prevent rate limiting
+        if (i < folders.length - 1) {
+          await this.delay(this.REQUEST_DELAY / 2);
+        }
       }
       
     } catch (error) {
-      console.error(`[SharePointFoldersService] Error exploring ${currentPath}:`, error);
+      console.error(`[SharePointFoldersService] Error exploring level ${currentLevel} at ${currentPath}:`, error);
       
-      // Add error indicator to structure (like Python script error handling)
+      // Add error indicator to structure
       structure.push({
         Name: `[Error: ${error instanceof Error ? error.message : 'Unknown'}]`,
         ServerRelativeUrl: currentPath + '/[error]',
@@ -156,16 +163,13 @@ export class SharePointFoldersService {
   }
 
   /**
-   * Get only folders (not files) from a path
+   * Get only folders from a path with multiple fallback methods
    */
   private async getFoldersOnly(folderPath: string): Promise<any[]> {
     try {
-      // Try different methods to get folders
-      let folders: any[] = [];
-      
       // Method 1: Try direct folder access
       try {
-        folders = await this.getFoldersMethod1(folderPath);
+        const folders = await this.getFoldersMethod1(folderPath);
         if (folders.length >= 0) return folders;
       } catch (error) {
         console.warn('[SharePointFoldersService] Method 1 failed for folders:', error);
@@ -173,15 +177,15 @@ export class SharePointFoldersService {
       
       // Method 2: Try cross-site access
       try {
-        folders = await this.getFoldersMethod2(folderPath);
+        const folders = await this.getFoldersMethod2(folderPath);
         if (folders.length >= 0) return folders;
       } catch (error) {
         console.warn('[SharePointFoldersService] Method 2 failed for folders:', error);
       }
       
-      // Method 3: Try relative path
+      // Method 3: Try relative path resolution
       try {
-        folders = await this.getFoldersMethod3(folderPath);
+        const folders = await this.getFoldersMethod3(folderPath);
         return folders;
       } catch (error) {
         console.warn('[SharePointFoldersService] All methods failed for folders:', error);
@@ -194,7 +198,7 @@ export class SharePointFoldersService {
   }
 
   /**
-   * Get only files (not folders) from a path
+   * Get only files from a path with fallback methods
    */
   private async getFilesOnly(folderPath: string): Promise<any[]> {
     try {
@@ -253,17 +257,14 @@ export class SharePointFoldersService {
         .select("Name", "ServerRelativeUrl", "ItemCount", "TimeCreated", "TimeLastModified", "Exists")
         .orderBy("Name")();
 
-      console.log('[SharePointFoldersService] Method 1 - Raw subfolders:', subfolders);
-
       return this.mapAndFilterFolders(subfolders);
     } catch (error) {
-      console.error('[SharePointFoldersService] Method 1 error:', error);
       throw error;
     }
   }
 
   /**
-   * Method 2: Cross-site access for different sites (including root site collection)
+   * Method 2: Cross-site access for different sites
    */
   private async getFoldersMethod2(folderPath: string): Promise<any[]> {
     try {
@@ -282,17 +283,13 @@ export class SharePointFoldersService {
         } 
         else if (folderPath.startsWith('/Shared Documents') || folderPath.startsWith('/Documents')) {
           targetSiteAbsoluteUrl = tenantUrl; // Root site collection
-          console.log('[SharePointFoldersService] Method 2 - Detected root site collection access');
         }
         else if (!folderPath.includes('/sites/')) {
           targetSiteAbsoluteUrl = tenantUrl; // Root site collection
-          console.log('[SharePointFoldersService] Method 2 - Detected root-level path');
         }
         else {
           throw new Error('Invalid cross-site path format');
         }
-        
-        console.log('[SharePointFoldersService] Method 2 - Target site URL:', targetSiteAbsoluteUrl);
         
         const targetSp = spfi(targetSiteAbsoluteUrl).using(SPFx(this.context));
         
@@ -301,13 +298,11 @@ export class SharePointFoldersService {
           .select("Name", "ServerRelativeUrl", "ItemCount", "TimeCreated", "TimeLastModified", "Exists")
           .orderBy("Name")();
 
-        console.log('[SharePointFoldersService] Method 2 - Cross-site subfolders:', subfolders);
         return this.mapAndFilterFolders(subfolders);
       }
       
       throw new Error('Not a cross-site request');
     } catch (error) {
-      console.error('[SharePointFoldersService] Method 2 error:', error);
       throw error;
     }
   }
@@ -335,23 +330,18 @@ export class SharePointFoldersService {
         if (!tryPath || tryPath === currentSiteUrl) continue;
         
         try {
-          console.log('[SharePointFoldersService] Method 3 - Trying path with current site:', tryPath);
-          
           const subfolders = await this.sp.web.getFolderByServerRelativePath(tryPath)
             .folders
             .select("Name", "ServerRelativeUrl", "ItemCount", "TimeCreated", "TimeLastModified", "Exists")
             .orderBy("Name")();
 
-          console.log('[SharePointFoldersService] Method 3 - Success with current site path:', tryPath, 'Found:', subfolders.length, 'folders');
           return this.mapAndFilterFolders(subfolders);
         } catch (pathError) {
-          console.log('[SharePointFoldersService] Method 3 - Current site path failed:', tryPath, pathError.message);
           continue;
         }
       }
       
       // If current site failed, try with root site collection instance
-      console.log('[SharePointFoldersService] Method 3 - Trying root site collection access');
       try {
         const rootSp = spfi(tenantUrl).using(SPFx(this.context));
         
@@ -366,29 +356,31 @@ export class SharePointFoldersService {
           if (!rootPath) continue;
           
           try {
-            console.log('[SharePointFoldersService] Method 3 - Trying root site path:', rootPath);
-            
             const subfolders = await rootSp.web.getFolderByServerRelativePath(rootPath)
               .folders
               .select("Name", "ServerRelativeUrl", "ItemCount", "TimeCreated", "TimeLastModified", "Exists")
               .orderBy("Name")();
 
-            console.log('[SharePointFoldersService] Method 3 - Success with root site path:', rootPath, 'Found:', subfolders.length, 'folders');
             return this.mapAndFilterFolders(subfolders);
           } catch (rootPathError) {
-            console.log('[SharePointFoldersService] Method 3 - Root site path failed:', rootPath, rootPathError.message);
             continue;
           }
         }
       } catch (rootError) {
-        console.error('[SharePointFoldersService] Method 3 - Root site access failed:', rootError);
+        console.error('[SharePointFoldersService] Root site access failed:', rootError);
       }
       
       throw new Error('All path combinations failed');
     } catch (error) {
-      console.error('[SharePointFoldersService] Method 3 error:', error);
       throw error;
     }
+  }
+
+  /**
+   * Utility method for delays to prevent rate limiting
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
@@ -414,8 +406,6 @@ export class SharePointFoldersService {
    * Map SharePoint response to our interface and filter system folders
    */
   private mapAndFilterFolders(folders: any[]): any[] {
-    console.log('[SharePointFoldersService] Mapping folders:', folders);
-    
     return folders
       .filter(folder => this.shouldIncludeFolder(folder))
       .map(folder => ({
