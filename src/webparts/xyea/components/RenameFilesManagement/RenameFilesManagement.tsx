@@ -35,7 +35,7 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
   private columnResizeHandler: ColumnResizeHandler;
   private cellEditingHandler: CellEditingHandler;
   
-  // NEW: Timer interval for updating current timer
+  // FIXED: Timer interval type declaration
   private timerInterval: number | undefined = undefined;
 
   constructor(props: IRenameFilesManagementProps) {
@@ -123,11 +123,11 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
     }
   }
 
-  // NEW: Timer management methods
+  // FIXED: Timer management methods with proper type casting
   private startTimerInterval = (): void => {
-    this.timerInterval = setInterval(() => {
+    this.timerInterval = window.setInterval(() => {
       this.updateCurrentTimer();
-    }, 1000); // Update every second
+    }, 1000) as unknown as number; // Update every second
   }
 
   private stopTimerInterval = (): void => {
@@ -265,8 +265,8 @@ export default class RenameFilesManagement extends React.Component<IRenameFilesM
         }
       });
 
-      // Clear progress message after delay
-      setTimeout(() => {
+      // Clear progress message after delay - FIXED: Type casting for setTimeout
+      window.setTimeout(() => {
         this.setState({
           uploadProgress: {
             stage: 'idle',

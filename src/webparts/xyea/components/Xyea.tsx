@@ -1,4 +1,4 @@
-// src/webparts/xyea/components/Xyea.tsx - Updated with ConvertType support and Rename Files tab
+// src/webparts/xyea/components/Xyea.tsx - Updated with ConvertType support and Folder Structure tab
 
 import * as React from 'react';
 import styles from './Xyea.module.scss';
@@ -13,6 +13,7 @@ import EditPropsDialog from './EditDialog/EditPropsDialog';
 import Tabs, { ITabItem } from './Tabs/Tabs';
 import SeparateFilesManagement from './SeparateFilesManagement/SeparateFilesManagement';
 import RenameFilesManagement from './RenameFilesManagement/RenameFilesManagement';
+import FolderStructureManagement from './FolderStructureManagement/FolderStructureManagement';
 import { IExcelImportData } from './ExcelImportButton/ExcelImportButton';
 import { ISelectedFiles } from './ConvertFilesTable/IConvertFilesTableProps';
 
@@ -461,6 +462,16 @@ export default class Xyea extends React.Component<IXyeaProps, IXyeaState> {
         label: 'Rename Files',
         content: (
           <RenameFilesManagement
+            context={this.props.context}
+            userDisplayName={this.props.userDisplayName}
+          />
+        )
+      },
+      {
+        key: 'folder-structure',
+        label: 'Folder Structure',
+        content: (
+          <FolderStructureManagement
             context={this.props.context}
             userDisplayName={this.props.userDisplayName}
           />
