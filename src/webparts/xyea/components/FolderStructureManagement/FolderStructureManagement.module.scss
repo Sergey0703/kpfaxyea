@@ -148,6 +148,31 @@
         }
       }
     }
+
+    .algorithmInfo {
+      margin-top: 16px;
+      padding: 12px;
+      background-color: #f3f2f1;
+      border: 1px solid #edebe9;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .infoIcon {
+        font-size: 20px;
+      }
+
+      .infoText {
+        font-size: 13px;
+        color: #605e5c;
+        line-height: 1.4;
+
+        strong {
+          color: #323130;
+        }
+      }
+    }
   }
 
   .error {
@@ -207,6 +232,47 @@
         font-size: 12px;
         font-weight: 600;
         white-space: nowrap;
+      }
+    }
+
+    .resultsStats {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+
+      .statItem {
+        background-color: #f3f2f1;
+        border: 1px solid #edebe9;
+        border-radius: 4px;
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #605e5c;
+        white-space: nowrap;
+
+        &:hover {
+          background-color: #edebe9;
+        }
+      }
+    }
+
+    .treeViewHeader {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding: 12px;
+      background-color: #f8f7f6;
+      border: 1px solid #edebe9;
+      border-radius: 4px 4px 0 0;
+      font-weight: 600;
+      color: #323130;
+      font-size: 14px;
+
+      .treeIcon {
+        font-size: 16px;
       }
     }
 
@@ -273,6 +339,12 @@
           overflow: hidden;
         }
 
+        .folderMeta {
+          color: #a19f9d;
+          font-size: 11px;
+          margin-left: 8px;
+        }
+
         .folderDetails {
           display: flex;
           flex-direction: column;
@@ -328,81 +400,10 @@
     }
   }
 
-  .loadingState {
-    text-align: center;
-    padding: 80px 20px;
-    color: #605e5c;
-
-    .loadingSpinner {
-      width: 48px;
-      height: 48px;
-      border: 4px solid #f3f2f1;
-      border-top: 4px solid #0078d4;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 24px;
-    }
-
-    h3 {
-      color: #323130;
-      font-size: 18px;
-      font-weight: 600;
-      margin: 0 0 8px 0;
-    }
-
-    p {
-      color: #605e5c;
-      margin: 0;
-    }
-  }
-
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-
-  // Responsive design
-  @media (max-width: 768px) {
-    padding: 16px;
-
-    .searchSection {
-      padding: 16px;
-
-      .pathInputGroup .inputWrapper {
-        flex-direction: column;
-        gap: 8px;
-
-        .searchButton {
-          min-width: auto;
-        }
-      }
-
-      .examples .examplesList {
-        flex-direction: column;
-        gap: 8px;
-      }
-    }
-
-    .resultsSection {
-      .resultsHeader {
-        flex-direction: column;
-        gap: 12px;
-        align-items: flex-start;
-
-        h3 {
-          font-size: 16px;
-        }
-      }
-
-      .foldersGrid {
-        grid-template-columns: 1fr;
-        gap: 12px;
-      }
-
-      .hierarchicalView {
+  .hierarchicalView {
     background-color: white;
     border: 2px solid #edebe9;
-    border-radius: 8px;
+    border-radius: 0 0 8px 8px;
     max-height: 600px;
     overflow-y: auto;
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
@@ -473,7 +474,152 @@
     }
   }
 
+  .loadingState {
+    text-align: center;
+    padding: 80px 20px;
+    color: #605e5c;
 
+    .loadingSpinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #f3f2f1;
+      border-top: 4px solid #0078d4;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 24px;
+    }
+
+    h3 {
+      color: #323130;
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0 0 8px 0;
+    }
+
+    p {
+      color: #605e5c;
+      margin: 0;
+    }
+
+    .loadingSteps {
+      margin-top: 20px;
+      text-align: left;
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+
+      .step {
+        padding: 8px 12px;
+        margin: 4px 0;
+        background-color: #f8f7f6;
+        border: 1px solid #edebe9;
+        border-radius: 4px;
+        font-size: 13px;
+        color: #605e5c;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        &:first-child {
+          background-color: #e1f5fe;
+          border-color: #0078d4;
+          color: #0078d4;
+        }
+      }
+    }
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  // Responsive design
+  @media (max-width: 768px) {
+    padding: 16px;
+
+    .searchSection {
+      padding: 16px;
+
+      .pathInputGroup .inputWrapper {
+        flex-direction: column;
+        gap: 8px;
+
+        .searchButton {
+          min-width: auto;
+        }
+      }
+
+      .examples .examplesList {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .algorithmInfo {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+    }
+
+    .resultsSection {
+      .resultsHeader {
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+
+        h3 {
+          font-size: 16px;
+        }
+      }
+
+      .resultsStats {
+        justify-content: center;
+
+        .statItem {
+          font-size: 11px;
+          padding: 4px 8px;
+        }
+      }
+
+      .foldersGrid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+    }
+
+    .hierarchicalView {
+      font-size: 12px;
+      max-height: 400px;
+
+      .hierarchicalItem .itemIndent {
+        padding: 2px 4px;
+        min-height: 24px;
+
+        .itemIcon {
+          font-size: 12px;
+          width: 14px;
+        }
+
+        .itemName {
+          font-size: 11px;
+        }
+
+        .fileSize {
+          font-size: 10px;
+        }
+      }
+    }
+
+    .loadingState {
+      padding: 40px 16px;
+
+      .loadingSteps {
+        .step {
+          font-size: 12px;
+          padding: 6px 10px;
+        }
+      }
     }
   }
 }
