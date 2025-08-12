@@ -87,6 +87,7 @@ export class SharePointFoldersService {
       
       // 1. FIRST: Add all FILES (files first, like directory listing)
       files.forEach(file => {
+        console.log(`[SharePointFoldersService] Adding FILE at level ${currentLevel}: ${file.Name}`);
         structure.push({
           Name: file.Name,
           ServerRelativeUrl: file.ServerRelativeUrl,
@@ -103,6 +104,8 @@ export class SharePointFoldersService {
       // 2. SECOND: Add all FOLDERS and recurse into them (NO DEPTH LIMIT!)
       for (let i = 0; i < folders.length; i++) {
         const folder = folders[i];
+        
+        console.log(`[SharePointFoldersService] Adding FOLDER at level ${currentLevel}: ${folder.Name}/`);
         
         // Add folder to structure with '/' suffix
         structure.push({
@@ -198,12 +201,46 @@ export class SharePointFoldersService {
   }
 
   /**
-   * Get only files from a path with fallback methods
+   * Get only files from a path with improved root site handling
    */
   private async getFilesOnly(folderPath: string): Promise<any[]> {
     try {
+      console.log(`[SharePointFoldersService] Getting files for path: ${folderPath}`);
+      
+      // Special handling for root-level paths like /Shared Documents
+      if (folderPath.startsWith('/Shared Documents') && !folderPath.includes('/sites/')) {
+        console.log(`[SharePointFoldersService] Detected root-level path, trying current site context first`);
+        
+        // Try current site first - convert /Shared Documents to current site path
+        const currentSitePath = `${this.context.pageContext.web.serverRelativeUrl}${folderPath}`;
+        try {
+          console.log(`[SharePointFoldersService] Trying current site path: ${currentSitePath}`);
+          const files = await this.getFilesWithSp(this.sp, currentSitePath);
+          if (files.length >= 0) {
+            console.log(`[SharePointFoldersService] SUCCESS: Found ${files.length} files in current site context`);
+            return files;
+          }
+        } catch (currentSiteError) {
+          console.warn(`[SharePointFoldersService] Current site failed for ${currentSitePath}:`, currentSiteError);
+        }
+        
+        // Try root site collection
+        try {
+          console.log(`[SharePointFoldersService] Trying root site collection for: ${folderPath}`);
+          const tenantUrl = this.context.pageContext.web.absoluteUrl.split('/sites/')[0];
+          const rootSp = spfi(tenantUrl).using(SPFx(this.context));
+          const files = await this.getFilesWithSp(rootSp, folderPath);
+          console.log(`[SharePointFoldersService] Root site: Found ${files.length} files`);
+          return files;
+        } catch (rootError) {
+          console.warn(`[SharePointFoldersService] Root site failed for ${folderPath}:`, rootError);
+        }
+      }
+      
       // Use current SPFI instance first
       let files = await this.getFilesWithSp(this.sp, folderPath);
+      console.log(`[SharePointFoldersService] Found ${files.length} files in ${folderPath}`);
+      
       if (files.length >= 0) return files;
       
       // If failed, try with cross-site access
@@ -211,6 +248,7 @@ export class SharePointFoldersService {
       if (!folderPath.startsWith(this.context.pageContext.web.serverRelativeUrl)) {
         const targetSp = spfi(tenantUrl).using(SPFx(this.context));
         files = await this.getFilesWithSp(targetSp, folderPath);
+        console.log(`[SharePointFoldersService] Cross-site: Found ${files.length} files in ${folderPath}`);
       }
       
       return files;
@@ -225,22 +263,36 @@ export class SharePointFoldersService {
    */
   private async getFilesWithSp(sp: SPFI, folderPath: string): Promise<any[]> {
     try {
+      console.log(`[SharePointFoldersService] Fetching files from: ${folderPath}`);
+      
       const files = await sp.web.getFolderByServerRelativePath(folderPath)
         .files
         .select("Name", "ServerRelativeUrl", "TimeCreated", "TimeLastModified", "Length")
         .orderBy("Name")();
 
-      return files
-        .filter(file => !file.Name.startsWith('.') && !file.Name.startsWith('~')) // Filter hidden/temp files
+      console.log(`[SharePointFoldersService] Raw files response:`, files.map(f => ({ name: f.Name, size: f.Length })));
+
+      const filteredFiles = files
+        .filter(file => {
+          // Filter out hidden/temp files and SharePoint system files
+          const isHidden = file.Name.startsWith('.') || file.Name.startsWith('~');
+          const isSystemFile = file.Name.includes('_vti_') || file.Name.endsWith('.aspx');
+          return !isHidden && !isSystemFile;
+        })
         .map(file => ({
           Name: file.Name,
           ServerRelativeUrl: file.ServerRelativeUrl,
-          ItemCount: file.Length || 0,
+          ItemCount: file.Length || 0, // File size in bytes
           TimeCreated: file.TimeCreated,
           TimeLastModified: file.TimeLastModified,
           Exists: true
         }));
+
+      console.log(`[SharePointFoldersService] Filtered files (${filteredFiles.length}):`, filteredFiles.map(f => f.Name));
+      
+      return filteredFiles;
     } catch (error) {
+      console.error(`[SharePointFoldersService] Error fetching files from ${folderPath}:`, error);
       throw error;
     }
   }
