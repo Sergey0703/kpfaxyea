@@ -162,6 +162,7 @@ export class FolderStructureExportService {
         }
       }
       
+      headers.push('Name');
       headers.push('Type');
       headers.push('Full Path');
       
@@ -201,6 +202,9 @@ export class FolderStructureExportService {
           }
         }
       }
+      
+      // Name column (clean name without icon)
+      rowData.push(item.Name);
       
       // Type column
       rowData.push(isFile ? 'File' : 'Folder');
