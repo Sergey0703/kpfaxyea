@@ -193,8 +193,8 @@ export class FolderStructureExportService {
         for (let i = 0; i < hierarchyColumns; i++) {
           if (i === level) {
             // This is the column for this item's level
-            const icon = isFile ? '📄' : '📁';
-            const displayName = `${icon} ${item.Name}`;
+            const icon = isFile ? '' : '📁'; // Only folders get icons, files get no icon
+            const displayName = icon ? `${icon} ${item.Name}` : item.Name;
             rowData.push(displayName);
           } else {
             // Empty cell for other level columns
@@ -374,8 +374,8 @@ export class FolderStructureExportService {
             String(row[col]).startsWith('Level ');
           
           if (isHierarchyColumn) {
-            // Hierarchy columns need consistent width for folder/file names
-            maxWidth = Math.max(maxWidth, Math.min(cellLength + 10, 40));
+            // Hierarchy columns need moderate width for folder/file names
+            maxWidth = Math.max(maxWidth, Math.min(cellLength + 5, 25)); // Reduced from 40 to 25
           } else if (rowIndex === 0) {
             // Header row - give extra space
             maxWidth = Math.max(maxWidth, Math.min(cellLength + 3, 50));
