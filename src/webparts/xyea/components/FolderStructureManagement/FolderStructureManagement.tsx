@@ -4,6 +4,7 @@ import * as React from 'react';
 import styles from './FolderStructureManagement.module.scss';
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { SharePointFoldersService, ISharePointFolder } from '../../services/SharePointFoldersService';
+import { FolderStructureExportService } from '../../services/FolderStructureExportService';
 
 export interface IFolderStructureManagementProps {
   context: WebPartContext;
@@ -16,6 +17,9 @@ export interface IFolderStructureState {
   loading: boolean;
   error: string | undefined;
   hasSearched: boolean;
+  // Export state
+  isExporting: boolean;
+  exportError: string | undefined;
 }
 
 export default class FolderStructureManagement extends React.Component<IFolderStructureManagementProps, IFolderStructureState> {
@@ -29,7 +33,9 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
       folders: [],
       loading: false,
       error: undefined,
-      hasSearched: false
+      hasSearched: false,
+      isExporting: false,
+      exportError: undefined
     };
 
     this.foldersService = new SharePointFoldersService(this.props.context);
@@ -38,7 +44,8 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
   private handlePathChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     this.setState({ 
       folderPath: event.target.value,
-      error: undefined 
+      error: undefined,
+      exportError: undefined
     });
   }
 
@@ -56,6 +63,7 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
       this.setState({ 
         loading: true, 
         error: undefined,
+        exportError: undefined,
         hasSearched: false
       });
 
@@ -83,6 +91,57 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
         error: error instanceof Error ? error.message : 'Failed to load folder structure',
         hasSearched: true,
         folders: []
+      });
+    }
+  }
+
+  private handleExportToExcel = async (): Promise<void> => {
+    const { folders, folderPath } = this.state;
+
+    if (folders.length === 0) {
+      this.setState({ exportError: 'No data to export. Please scan a folder first.' });
+      return;
+    }
+
+    try {
+      this.setState({ 
+        isExporting: true, 
+        exportError: undefined 
+      });
+
+      console.log('[FolderStructureManagement] Starting export to Excel:', {
+        totalItems: folders.length,
+        folderPath
+      });
+
+      // Create export settings
+      const exportSettings = FolderStructureExportService.createDefaultExportSettings(
+        `folder_structure_${folderPath.replace(/[^a-zA-Z0-9]/g, '_')}`
+      );
+
+      // Export to Excel
+      const result = await FolderStructureExportService.exportFolderStructure(
+        folderPath,
+        folders,
+        exportSettings
+      );
+
+      if (result.success) {
+        console.log('[FolderStructureManagement] Export completed successfully:', result.fileName);
+        // Show success message (optional)
+        this.setState({ 
+          isExporting: false,
+          exportError: undefined
+        });
+      } else {
+        throw new Error(result.error || 'Export failed');
+      }
+
+    } catch (error) {
+      console.error('[FolderStructureManagement] Export failed:', error);
+      this.setState({
+        isExporting: false,
+        exportError: error instanceof Error ? error.message : 'Export failed'
       });
     }
   }
@@ -168,7 +227,7 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
   }
 
   public render(): React.ReactElement<IFolderStructureManagementProps> {
-    const { folderPath, folders, loading, error, hasSearched } = this.state;
+    const { folderPath, folders, loading, error, hasSearched, isExporting, exportError } = this.state;
 
     // Determine if we have hierarchical data
     const hasHierarchicalData = folders.length > 0 && folders.some(item => (item as any).Level !== undefined);
@@ -185,6 +244,11 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
       folders: folders.length,
       maxLevel: 0
     };
+
+    // Get export statistics
+    const exportStats = folders.length > 0 
+      ? FolderStructureExportService.getFolderStructureExportStatistics(folders)
+      : null;
 
     return (
       <div className={styles.folderStructure}>
@@ -211,11 +275,11 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
                   onKeyPress={this.handleKeyPress}
                   placeholder="/Shared Documents"
                   className={styles.pathInput}
-                  disabled={loading}
+                  disabled={loading || isExporting}
                 />
                 <button
                   onClick={this.handleSearchFolders}
-                  disabled={loading || !folderPath.trim()}
+                  disabled={loading || !folderPath.trim() || isExporting}
                   className={styles.searchButton}
                 >
                   {loading ? (
@@ -245,7 +309,7 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
               <div className={styles.infoIcon}>🌲</div>
               <div className={styles.infoText}>
                 <strong>Complete Recursive Scan:</strong> Explores ALL levels deep with no depth limit, 
-                shows files first then folders with proper indentation and comprehensive error handling.
+                shows folders first then files with proper indentation and comprehensive error handling.
               </div>
             </div>
           </div>
@@ -257,9 +321,23 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
               <button 
                 className={styles.retryButton}
                 onClick={this.handleSearchFolders}
-                disabled={loading}
+                disabled={loading || isExporting}
               >
                 Try Again
+              </button>
+            </div>
+          )}
+
+          {/* Export Error Display */}
+          {exportError && (
+            <div className={styles.error}>
+              <strong>Export Error:</strong> {exportError}
+              <button 
+                className={styles.retryButton}
+                onClick={this.handleExportToExcel}
+                disabled={loading || isExporting}
+              >
+                Try Export Again
               </button>
             </div>
           )}
@@ -287,6 +365,84 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
                 </div>
               </div>
 
+              {/* Export Button Section */}
+              {folders.length > 0 && (
+                <div style={{ 
+                  marginBottom: '20px', 
+                  padding: '16px', 
+                  backgroundColor: '#f8f7f6', 
+                  borderRadius: '8px',
+                  border: '1px solid #edebe9'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <h4 style={{ 
+                        margin: '0 0 8px 0', 
+                        color: '#323130', 
+                        fontSize: '16px', 
+                        fontWeight: '600' 
+                      }}>
+                        📊 Export Folder Structure
+                      </h4>
+                      {exportStats && (
+                        <div style={{ fontSize: '12px', color: '#605e5c' }}>
+                          Ready to export: {exportStats.totalFiles} files, {exportStats.totalFolders} folders 
+                          ({exportStats.maxDepth} levels deep, ~{exportStats.estimatedFileSize})
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={this.handleExportToExcel}
+                      disabled={loading || isExporting || folders.length === 0}
+                      style={{
+                        padding: '12px 24px',
+                        backgroundColor: isExporting ? '#a19f9d' : '#107c10',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: isExporting ? 'not-allowed' : 'pointer',
+                        transition: 'background-color 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        minWidth: '160px',
+                        justifyContent: 'center'
+                      }}
+                      onMouseOver={(e) => {
+                        if (!isExporting && folders.length > 0) {
+                          e.currentTarget.style.backgroundColor = '#0e6b0e';
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (!isExporting && folders.length > 0) {
+                          e.currentTarget.style.backgroundColor = '#107c10';
+                        }
+                      }}
+                    >
+                      {isExporting ? (
+                        <>
+                          <div style={{
+                            width: '16px',
+                            height: '16px',
+                            border: '2px solid transparent',
+                            borderTop: '2px solid white',
+                            borderRadius: '50%',
+                            animation: 'spin 1s linear infinite'
+                          }}></div>
+                          Exporting...
+                        </>
+                      ) : (
+                        <>
+                          📊 Export to Excel
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {folders.length === 0 ? (
                 <div className={styles.noResults}>
                   <div className={styles.noResultsIcon}>📁</div>
@@ -298,7 +454,7 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
                 <>
                   <div className={styles.treeViewHeader}>
                     <span className={styles.treeIcon}>🌳</span>
-                    <span>Hierarchical Structure (Files first, then folders - like Python script)</span>
+                    <span>Hierarchical Structure (Folders first, then files - like Python script)</span>
                   </div>
                   {this.renderHierarchicalStructure()}
                 </>
@@ -331,6 +487,7 @@ export default class FolderStructureManagement extends React.Component<IFolderSt
                             this.setState({ folderPath: folder.ServerRelativeUrl });
                           }}
                           title="Navigate to this folder"
+                          disabled={loading || isExporting}
                         >
                           Navigate
                         </button>
