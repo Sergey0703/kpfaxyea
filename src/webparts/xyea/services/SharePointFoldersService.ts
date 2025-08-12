@@ -62,6 +62,7 @@ export class SharePointFoldersService {
 
   /**
    * UNLIMITED recursive function to explore ALL directory levels (no depth limit)
+   * FIXED: Now sorts FOLDERS FIRST, then FILES at each level
    */
   private async exploreDirectoryRecursiveUnlimited(
     currentPath: string,
@@ -85,23 +86,7 @@ export class SharePointFoldersService {
       
       console.log(`[SharePointFoldersService] Level ${currentLevel}: ${currentPath} - ${files.length} files, ${folders.length} folders`);
       
-      // 1. FIRST: Add all FILES (files first, like directory listing)
-      files.forEach(file => {
-        console.log(`[SharePointFoldersService] Adding FILE at level ${currentLevel}: ${file.Name}`);
-        structure.push({
-          Name: file.Name,
-          ServerRelativeUrl: file.ServerRelativeUrl,
-          ItemCount: file.ItemCount,
-          TimeCreated: file.TimeCreated,
-          TimeLastModified: file.TimeLastModified,
-          Exists: true,
-          // Add metadata for tree display
-          ['Level' as any]: currentLevel,
-          ['IsFile' as any]: true
-        } as any);
-      });
-      
-      // 2. SECOND: Add all FOLDERS and recurse into them (NO DEPTH LIMIT!)
+      // FIXED: 1. FIRST: Add all FOLDERS (folders first, like standard directory listing)
       for (let i = 0; i < folders.length; i++) {
         const folder = folders[i];
         
@@ -147,6 +132,22 @@ export class SharePointFoldersService {
           await this.delay(this.REQUEST_DELAY / 2);
         }
       }
+      
+      // FIXED: 2. SECOND: Add all FILES (files after folders)
+      files.forEach(file => {
+        console.log(`[SharePointFoldersService] Adding FILE at level ${currentLevel}: ${file.Name}`);
+        structure.push({
+          Name: file.Name,
+          ServerRelativeUrl: file.ServerRelativeUrl,
+          ItemCount: file.ItemCount,
+          TimeCreated: file.TimeCreated,
+          TimeLastModified: file.TimeLastModified,
+          Exists: true,
+          // Add metadata for tree display
+          ['Level' as any]: currentLevel,
+          ['IsFile' as any]: true
+        } as any);
+      });
       
     } catch (error) {
       console.error(`[SharePointFoldersService] Error exploring level ${currentLevel} at ${currentPath}:`, error);
