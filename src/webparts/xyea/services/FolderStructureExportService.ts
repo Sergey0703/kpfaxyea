@@ -138,7 +138,7 @@ export class FolderStructureExportService {
   }
 
   /**
-   * Prepare folder structure data for export
+   * Prepare folder structure data for export with column-based hierarchy
    */
   private static prepareFolderStructureExportData(
     folders: ISharePointFolder[],
@@ -147,18 +147,23 @@ export class FolderStructureExportService {
     
     const exportData: CellValue[][] = [];
     
+    // Find the maximum depth to determine number of hierarchy columns needed
+    const maxDepth = folders.length > 0 ? Math.max(...folders.map(item => (item as any).Level || 0)) : 0;
+    const hierarchyColumns = maxDepth + 1; // +1 because levels are 0-based
+    
     // Prepare headers
     if (settings.includeHeaders) {
       const headers: string[] = [];
       
       if (settings.includeHierarchy) {
-        headers.push('Level');
-        headers.push('Hierarchy');
+        // Create level columns: Level 0, Level 1, Level 2, etc.
+        for (let i = 0; i < hierarchyColumns; i++) {
+          headers.push(`Level ${i}`);
+        }
       }
       
-      headers.push('Name');
       headers.push('Type');
-      headers.push('Path');
+      headers.push('Full Path');
       
       if (settings.includeMetadata) {
         headers.push('Size/Item Count');
@@ -181,20 +186,26 @@ export class FolderStructureExportService {
       
       const rowData: CellValue[] = [];
       
-      // Level and hierarchy
+      // Hierarchy columns - each level gets its own column
       if (settings.includeHierarchy) {
-        rowData.push(level);
-        
-        // Create visual hierarchy with indentation
-        const indent = '  '.repeat(level); // 2 spaces per level
-        const icon = isFile ? '📄' : '📁';
-        const displayName = `${indent}${icon} ${item.Name}`;
-        rowData.push(displayName);
+        // Fill hierarchy columns
+        for (let i = 0; i < hierarchyColumns; i++) {
+          if (i === level) {
+            // This is the column for this item's level
+            const icon = isFile ? '📄' : '📁';
+            const displayName = `${icon} ${item.Name}`;
+            rowData.push(displayName);
+          } else {
+            // Empty cell for other level columns
+            rowData.push('');
+          }
+        }
       }
       
-      // Basic info
-      rowData.push(item.Name);
+      // Type column
       rowData.push(isFile ? 'File' : 'Folder');
+      
+      // Full path
       rowData.push(item.ServerRelativeUrl);
       
       // Metadata
@@ -255,7 +266,7 @@ export class FolderStructureExportService {
   }
 
   /**
-   * Create Excel blob from data array
+   * Create Excel blob from data array with column-based hierarchy styling
    */
   private static createExcelBlob(data: CellValue[][], sheetName: string = 'Folder Structure'): Blob {
     const workbook = XLSX.utils.book_new();
@@ -265,15 +276,61 @@ export class FolderStructureExportService {
     const columnWidths = this.calculateColumnWidths(data);
     worksheet['!cols'] = columnWidths;
     
-    // Add some basic styling for hierarchy column if present
-    if (data.length > 0 && data[0].length > 1) {
-      // Set font family for hierarchy column to monospace for better alignment
+    // Find the number of hierarchy columns
+    let hierarchyColumnCount = 0;
+    if (data.length > 0) {
+      const headerRow = data[0];
+      for (let i = 0; i < headerRow.length; i++) {
+        if (String(headerRow[i]).startsWith('Level ')) {
+          hierarchyColumnCount++;
+        } else {
+          break; // Stop at first non-Level column
+        }
+      }
+    }
+    
+    // Apply styling for hierarchy columns
+    if (hierarchyColumnCount > 0) {
       const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+      
+      // Style hierarchy columns with monospace font for better alignment
       for (let row = 0; row <= range.e.r; row++) {
-        const cellRef = XLSX.utils.encode_cell({ r: row, c: 1 }); // Second column (hierarchy)
-        if (worksheet[cellRef]) {
-          worksheet[cellRef].s = {
-            font: { name: 'Consolas' }
+        for (let col = 0; col < hierarchyColumnCount; col++) {
+          const cellRef = XLSX.utils.encode_cell({ r: row, c: col });
+          if (worksheet[cellRef]) {
+            worksheet[cellRef].s = {
+              font: { name: 'Consolas', sz: 11 },
+              alignment: { vertical: 'center' }
+            };
+            
+            // Add light background for hierarchy columns
+            if (row > 0) { // Skip header row
+              worksheet[cellRef].s.fill = {
+                patternType: 'solid',
+                fgColor: { rgb: 'F8F9FA' }
+              };
+            }
+          }
+        }
+      }
+      
+      // Style header row
+      for (let col = 0; col < range.e.c + 1; col++) {
+        const headerCellRef = XLSX.utils.encode_cell({ r: 0, c: col });
+        if (worksheet[headerCellRef]) {
+          worksheet[headerCellRef].s = {
+            font: { name: 'Calibri', sz: 11, bold: true },
+            fill: {
+              patternType: 'solid',
+              fgColor: { rgb: 'D1E7DD' }
+            },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: {
+              top: { style: 'thin', color: { rgb: '000000' } },
+              bottom: { style: 'thin', color: { rgb: '000000' } },
+              left: { style: 'thin', color: { rgb: '000000' } },
+              right: { style: 'thin', color: { rgb: '000000' } }
+            }
           };
         }
       }
@@ -293,7 +350,7 @@ export class FolderStructureExportService {
   }
 
   /**
-   * Calculate optimal column widths
+   * Calculate optimal column widths for column-based hierarchy
    */
   private static calculateColumnWidths(data: CellValue[][]): IColumnWidth[] {
     if (data.length === 0) return [];
@@ -308,12 +365,19 @@ export class FolderStructureExportService {
         if (row[col] !== undefined && row[col] !== null) {
           const cellLength = String(row[col]).length;
           
-          // Special handling for hierarchy column (usually column 1)
-          if (col === 1 && rowIndex > 0) { // Skip header row
-            // Hierarchy column needs extra width for indentation
-            maxWidth = Math.max(maxWidth, Math.min(cellLength + 5, 80));
+          // Check if this is a hierarchy column (Level 0, Level 1, etc.)
+          const isHierarchyColumn = rowIndex === 0 && 
+            String(row[col]).startsWith('Level ');
+          
+          if (isHierarchyColumn) {
+            // Hierarchy columns need consistent width for folder/file names
+            maxWidth = Math.max(maxWidth, Math.min(cellLength + 10, 40));
+          } else if (rowIndex === 0) {
+            // Header row - give extra space
+            maxWidth = Math.max(maxWidth, Math.min(cellLength + 3, 50));
           } else {
-            maxWidth = Math.max(maxWidth, Math.min(cellLength + 2, 50));
+            // Data rows
+            maxWidth = Math.max(maxWidth, Math.min(cellLength + 2, 60));
           }
         }
       });
